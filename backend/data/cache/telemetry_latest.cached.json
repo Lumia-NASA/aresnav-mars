@@ -9,10 +9,17 @@
     "lng": 77.4508,
     "elevation_m": -2540.5
   },
+  "eva_mobility": {
+    "mode": "HELMET_HUD",
+    "suit_payload_kg": 18.5,
+    "o2_remaining_pct": 84,
+    "buddy_eva2_distance_m": 14.2,
+    "support_rover_status": "FOLLOWING_SAFE_CONTOUR"
+  },
   "layers": {
     "topography": {
       "slope_deg": 18.5,
-      "max_safe_slope_deg": 15.0,
+      "max_safe_slope_deg": 12.0,
       "terrain_status": "HAZARD_STEEP"
     },
     "atmosphere_meda": {
@@ -28,7 +35,9 @@
         "mineral": "Phyllosilicates / Clays",
         "lat": 18.4512,
         "lng": 77.4410,
-        "safe_route": true
+        "safe_route": true,
+        "optical_first_person_url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/00450/ids/edr/browse/ncam/NLB_0450_0707123456_000ECM_N0260000NCAM00500_01_295J01_1200.jpg",
+        "geology_context": "Afloramento sedimentar lacustre; alta probabilidade de bioassinaturas preservadas."
       }
     ]
   },
@@ -36,7 +45,7 @@
     {
       "level": "CRITICAL",
       "code": "SLOPE_EXCEEDED",
-      "action": "Desviar 120m a Leste: inclinação de 18.5° excede limite seguro do traje (15°)."
+      "action": "Desviar 120m a Leste: inclinação de 18.5° excede limite seguro do traje (12° com carga de 18.5kg)."
     }
   ]
 }

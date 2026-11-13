@@ -48,6 +48,11 @@ runTest('1. Validação do arquivo CONTRATO_API.json', () => {
   assert(contract.location.lat >= -90 && contract.location.lat <= 90, 'lat deve estar entre -90 e 90');
   assert(contract.location.lng >= -180 && contract.location.lng <= 360, 'lng deve estar no limite de Marte');
 
+  // EVA Mobility & Rubrica NASA
+  assert(contract.eva_mobility, 'eva_mobility deve existir no contrato');
+  assert.strictEqual(typeof contract.eva_mobility.suit_payload_kg, 'number', 'suit_payload_kg deve ser número');
+  assert(contract.eva_mobility.suit_payload_kg > 0, 'suit_payload_kg deve ser positivo');
+
   // Layers
   assert(contract.layers, 'layers deve existir');
   assert(contract.layers.topography, 'layers.topography deve existir');
@@ -56,6 +61,8 @@ runTest('1. Validação do arquivo CONTRATO_API.json', () => {
   assert(typeof contract.layers.atmosphere_meda.temp_c === 'number');
   assert(Array.isArray(contract.layers.science_targets), 'science_targets deve ser array');
   assert(contract.layers.science_targets.length > 0, 'science_targets deve conter ao menos 1 alvo');
+  assert(contract.layers.science_targets[0].optical_first_person_url, 'optical_first_person_url deve existir no alvo 0');
+  assert(contract.layers.science_targets[0].optical_first_person_url.startsWith('https://'), 'optical_first_person_url deve ser HTTPS');
 
   // HUD Alerts
   assert(Array.isArray(contract.hud_alerts), 'hud_alerts deve ser array');
@@ -99,6 +106,11 @@ runTest('4. Verificação de Cache Offline Resiliente (Backend)', () => {
 
   assert(fs.existsSync(telemetryCache), 'Cache de telemetria deve existir');
   assert(fs.existsSync(traverseCache), 'Cache de traverse deve existir');
+
+  const telemetry = JSON.parse(fs.readFileSync(telemetryCache, 'utf8'));
+  assert(telemetry.eva_mobility, 'Cache deve conter eva_mobility');
+  assert.strictEqual(typeof telemetry.eva_mobility.suit_payload_kg, 'number', 'Cache suit_payload_kg deve ser número');
+  assert(telemetry.layers?.science_targets?.[0]?.optical_first_person_url, 'Cache deve conter optical_first_person_url');
 
   const traverse = JSON.parse(fs.readFileSync(traverseCache, 'utf8'));
   assert.strictEqual(traverse.type, 'FeatureCollection', 'Traverse cache deve ser GeoJSON FeatureCollection');
