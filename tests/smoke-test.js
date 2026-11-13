@@ -84,7 +84,7 @@ runTest('2. Verificação de Isolamento de Skills e Segredos (.gitignore)', () =
 });
 
 // 3. Teste das Skills Roteadas em .skills-local
-runTest('3. Verificação de Presença das 4 Skills em .skills-local', () => {
+runTest('3. Verificação de Presença das 5 Skills em .skills-local (incluindo 05-adk-copilot-skill)', () => {
   const expectedSkills = [
     '01-frontend-hud-skill.md',
     '02-backend-nasa-skill.md',
