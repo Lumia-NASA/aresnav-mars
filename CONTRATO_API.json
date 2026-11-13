@@ -1,0 +1,42 @@
+{
+  "mission": "AresNav - Jezero Crater EVA",
+  "status": "ONLINE",
+  "degraded": false,
+  "evidenceSha256": "string-sha256-hash",
+  "location": {
+    "name": "Jezero Crater Delta",
+    "lat": 18.4447,
+    "lng": 77.4508,
+    "elevation_m": -2540.5
+  },
+  "layers": {
+    "topography": {
+      "slope_deg": 18.5,
+      "max_safe_slope_deg": 15.0,
+      "terrain_status": "HAZARD_STEEP"
+    },
+    "atmosphere_meda": {
+      "temp_c": -68.4,
+      "wind_speed_ms": 12.3,
+      "dust_storm_alert": true,
+      "radiation_msv_day": 0.64
+    },
+    "science_targets": [
+      {
+        "id": "WP-01",
+        "name": "Carbonate Ridge (Bio-signature Target)",
+        "mineral": "Phyllosilicates / Clays",
+        "lat": 18.4512,
+        "lng": 77.4410,
+        "safe_route": true
+      }
+    ]
+  },
+  "hud_alerts": [
+    {
+      "level": "CRITICAL",
+      "code": "SLOPE_EXCEEDED",
+      "action": "Desviar 120m a Leste: inclinação de 18.5° excede limite seguro do traje (15°)."
+    }
+  ]
+}

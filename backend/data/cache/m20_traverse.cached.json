@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "name": "M20_traverse_cache",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "Sol": 1000,
+        "Site": 25,
+        "Drive": 1420,
+        "Dist_m": 24850.2
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [77.4508, 18.4447, -2540.5],
+          [77.4410, 18.4512, -2535.0]
+        ]
+      }
+    }
+  ]
+}

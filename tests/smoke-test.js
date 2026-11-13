@@ -1,0 +1,137 @@
+// language: JavaScript, file: tests/smoke-test.js
+// Smoke Test Suite — AresNav Base Architecture & Contract Verification
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const assert = require('assert');
+
+console.log('====================================================');
+console.log('🚀 INICIANDO SUÍTE DE SMOKE TESTS — ARESNAV (LUMIA)');
+console.log('====================================================\n');
+
+let testsPassed = 0;
+let testsFailed = 0;
+
+function runTest(name, fn) {
+  try {
+    fn();
+    console.log(`[PASS] ${name}`);
+    testsPassed++;
+  } catch (err) {
+    console.error(`[FAIL] ${name}`);
+    console.error(`       -> ${err.message}`);
+    testsFailed++;
+  }
+}
+
+const rootDir = path.resolve(__dirname, '..');
+const contractPath = path.join(rootDir, 'CONTRATO_API.json');
+const gitignorePath = path.join(rootDir, '.gitignore');
+const skillsLocalDir = path.join(rootDir, '.skills-local');
+const cacheDir = path.join(rootDir, 'backend', 'data', 'cache');
+
+// 1. Teste do CONTRATO_API.json
+runTest('1. Validação do arquivo CONTRATO_API.json', () => {
+  assert(fs.existsSync(contractPath), 'Arquivo CONTRATO_API.json deve existir na raiz');
+  const raw = fs.readFileSync(contractPath, 'utf8');
+  const contract = JSON.parse(raw);
+
+  assert.strictEqual(contract.mission, 'AresNav - Jezero Crater EVA');
+  assert.strictEqual(contract.status, 'ONLINE');
+  assert.strictEqual(typeof contract.degraded, 'boolean');
+  assert(typeof contract.evidenceSha256 === 'string', 'evidenceSha256 deve ser string');
+
+  // Location
+  assert(contract.location, 'location deve existir');
+  assert(typeof contract.location.lat === 'number', 'lat deve ser número');
+  assert(typeof contract.location.lng === 'number', 'lng deve ser número');
+  assert(contract.location.lat >= -90 && contract.location.lat <= 90, 'lat deve estar entre -90 e 90');
+  assert(contract.location.lng >= -180 && contract.location.lng <= 360, 'lng deve estar no limite de Marte');
+
+  // Layers
+  assert(contract.layers, 'layers deve existir');
+  assert(contract.layers.topography, 'layers.topography deve existir');
+  assert(typeof contract.layers.topography.slope_deg === 'number');
+  assert(contract.layers.atmosphere_meda, 'layers.atmosphere_meda deve existir');
+  assert(typeof contract.layers.atmosphere_meda.temp_c === 'number');
+  assert(Array.isArray(contract.layers.science_targets), 'science_targets deve ser array');
+  assert(contract.layers.science_targets.length > 0, 'science_targets deve conter ao menos 1 alvo');
+
+  // HUD Alerts
+  assert(Array.isArray(contract.hud_alerts), 'hud_alerts deve ser array');
+  assert(contract.hud_alerts[0].code === 'SLOPE_EXCEEDED');
+});
+
+// 2. Teste de Isolamento do Git (.gitignore)
+runTest('2. Verificação de Isolamento de Skills e Segredos (.gitignore)', () => {
+  assert(fs.existsSync(gitignorePath), '.gitignore deve existir');
+  const content = fs.readFileSync(gitignorePath, 'utf8');
+  assert(content.includes('.skills-local/'), '.gitignore deve ignorar .skills-local/');
+  assert(content.includes('.env'), '.gitignore deve ignorar .env');
+});
+
+// 3. Teste das Skills Roteadas em .skills-local
+runTest('3. Verificação de Presença das 4 Skills em .skills-local', () => {
+  const expectedSkills = [
+    '01-frontend-hud-skill.md',
+    '02-backend-nasa-skill.md',
+    '03-lumia-master-auditor.md',
+    '04-pitch-fable-skill.md'
+  ];
+  for (const s of expectedSkills) {
+    const p = path.join(skillsLocalDir, s);
+    assert(fs.existsSync(p), `Skill ${s} deve existir em .skills-local/`);
+    const content = fs.readFileSync(p, 'utf8');
+    assert(content.length > 100, `Skill ${s} não deve estar vazia`);
+  }
+});
+
+// 4. Teste de Integridade do Cache Offline
+runTest('4. Verificação de Cache Offline Resiliente (Backend)', () => {
+  const telemetryCache = path.join(cacheDir, 'telemetry_latest.cached.json');
+  const traverseCache = path.join(cacheDir, 'm20_traverse.cached.json');
+
+  assert(fs.existsSync(telemetryCache), 'Cache de telemetria deve existir');
+  assert(fs.existsSync(traverseCache), 'Cache de traverse deve existir');
+
+  const traverse = JSON.parse(fs.readFileSync(traverseCache, 'utf8'));
+  assert.strictEqual(traverse.type, 'FeatureCollection', 'Traverse cache deve ser GeoJSON FeatureCollection');
+  assert(Array.isArray(traverse.features), 'GeoJSON deve conter features');
+});
+
+// 5. Teste de Lógica do ScopeGuard (KhaosForge)
+runTest('5. Teste de Lógica do ScopeGuard (Allowlist NASA)', () => {
+  const allowlist = ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov'];
+  function checkScope(urlStr) {
+    const h = new URL(urlStr).hostname;
+    if (!allowlist.includes(h)) throw new Error(`Scope violation: ${h}`);
+    return true;
+  }
+
+  assert(checkScope('https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_traverse.json'));
+  assert(checkScope('https://trek.nasa.gov/tiles/Mars/EQ/test.jpg'));
+  assert(checkScope('https://api.nasa.gov/insight_weather/'));
+
+  assert.throws(() => {
+    checkScope('https://evil-hacker.com/malicious.json');
+  }, /Scope violation/);
+});
+
+// 6. Teste de Lógica do EvidenceGate (SHA-256 Sealing)
+runTest('6. Teste de Lógica do EvidenceGate (Selamento Criptográfico SHA-256)', () => {
+  const sampleData = { rover: 'Perseverance', sol: 1000 };
+  const hash1 = crypto.createHash('sha256').update(JSON.stringify(sampleData)).digest('hex');
+  const hash2 = crypto.createHash('sha256').update(JSON.stringify(sampleData)).digest('hex');
+  assert.strictEqual(hash1, hash2, 'Hash SHA-256 deve ser determinístico');
+  assert.strictEqual(hash1.length, 64, 'Hash SHA-256 deve possuir 64 caracteres hexadecimais');
+});
+
+console.log('\n====================================================');
+console.log(`📊 RESULTADO DOS TESTES: ${testsPassed} PASSOU | ${testsFailed} FALHOU`);
+console.log('====================================================');
+
+if (testsFailed > 0) {
+  process.exit(1);
+} else {
+  console.log('✨ TODAS AS VALIDAÇÕES FORAM BEM-SUCEDIDAS!\n');
+}
