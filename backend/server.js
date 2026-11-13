@@ -18,11 +18,13 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:3000,http://localhost:5173';
 const NASA_TRAVERSE_URL = process.env.NASA_TRAVERSE_URL || 'https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_traverse.json';
+const NASA_WAYPOINTS_URL = process.env.NASA_WAYPOINTS_URL || 'https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_waypoints.json';
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 8000;
 
 const CACHE_DIR = path.join(__dirname, 'data', 'cache');
 const CACHE_TELEMETRY = path.join(CACHE_DIR, 'telemetry_latest.cached.json');
 const CACHE_TRAVERSE = path.join(CACHE_DIR, 'm20_traverse.cached.json');
+const CACHE_WAYPOINTS = path.join(CACHE_DIR, 'm20_waypoints.cached.json');
 
 // 1. Security Headers
 fastify.register(require('@fastify/helmet'), {
@@ -67,6 +69,16 @@ function assertAuthorizedScope(targetUrl) {
 // EvidenceGate (KhaosForge)
 function computeEvidenceHash(data) {
   return crypto.createHash('sha256').update(typeof data === 'string' ? data : JSON.stringify(data)).digest('hex');
+}
+
+function verifyEvidenceIntegrity(rawData) {
+  if (!rawData || typeof rawData !== 'object') {
+    throw new Error('[EvidenceGate] Payload inválido ou vazio.');
+  }
+  if (rawData.type !== 'FeatureCollection' || !Array.isArray(rawData.features)) {
+    throw new Error('[EvidenceGate] Esquema GeoJSON inválido.');
+  }
+  return true;
 }
 
 // Fallback Helper
@@ -171,6 +183,90 @@ fastify.get('/api/v1/traverse', async (request, reply) => {
       message: 'API da NASA inacessível e cache local não encontrado.'
     });
   }
+});
+
+// Rota de Waypoints Oficiais M20
+fastify.get('/api/v1/waypoints', async (request, reply) => {
+  try {
+    assertAuthorizedScope(NASA_WAYPOINTS_URL);
+    fastify.log.info({ target: NASA_WAYPOINTS_URL }, 'Fetching M20 Waypoints da NASA');
+
+    const response = await axios.get(NASA_WAYPOINTS_URL, {
+      timeout: REQUEST_TIMEOUT_MS,
+      maxContentLength: 50 * 1024 * 1024,
+      headers: { 'User-Agent': 'AresNav-Extractor/1.0' },
+      validateStatus: s => s === 200
+    });
+
+    verifyEvidenceIntegrity(response.data);
+    const hash = computeEvidenceHash(response.data);
+    reply.header('X-AresNav-Evidence-SHA256', hash);
+
+    try {
+      fs.writeFileSync(CACHE_WAYPOINTS, JSON.stringify(response.data), 'utf8');
+    } catch (wErr) {
+      fastify.log.warn('Não foi possível atualizar cache de waypoints em disco');
+    }
+
+    return reply.code(200).send({
+      success: true,
+      degraded: false,
+      evidenceSha256: hash,
+      data: response.data
+    });
+  } catch (error) {
+    fastify.log.warn({ err: error.message }, 'Falha na conexão de waypoints com NASA. Acionando cache offline.');
+    const cached = loadOfflineCache(CACHE_WAYPOINTS);
+
+    if (cached) {
+      const hash = computeEvidenceHash(cached);
+      reply.header('X-AresNav-Evidence-SHA256', hash);
+      return reply.code(200).send({
+        success: true,
+        degraded: true,
+        evidenceSha256: hash,
+        data: cached
+      });
+    }
+
+    return reply.code(504).send({
+      success: false,
+      error: 'Upstream Unavailable',
+      message: 'API da NASA inacessível e cache de waypoints não encontrado.'
+    });
+  }
+});
+
+// Rota do Agente Tático Copilot (Inspirado no Google ADK)
+fastify.get('/api/v1/copilot', async (request, reply) => {
+  const telemetry = loadOfflineCache(CACHE_TELEMETRY) || {};
+  const hash = computeEvidenceHash(telemetry);
+  reply.header('X-AresNav-Evidence-SHA256', hash);
+
+  const slope = telemetry.layers?.topography?.slope_deg || 18.5;
+  const maxSafe = telemetry.layers?.topography?.max_safe_slope_deg || 12.0;
+  const payload = telemetry.eva_mobility?.suit_payload_kg || 18.5;
+  const o2 = telemetry.eva_mobility?.o2_remaining_pct || 84;
+  const buddyDist = telemetry.eva_mobility?.buddy_eva2_distance_m || 14.2;
+  const roverStatus = telemetry.eva_mobility?.support_rover_status || 'FOLLOWING_SAFE_CONTOUR';
+
+  const isCritical = slope > maxSafe;
+
+  return reply.code(200).send({
+    agent: 'ARES-ADK-COPILOT',
+    priority: isCritical ? 'CRITICAL' : 'NOMINAL',
+    voice_advisory: isCritical
+      ? `Atenção EVA-1: Inclinação de ${slope}° excede o limite seguro de ${maxSafe}° para carga de ${payload}kg. Desvio tático imediato recomendado: 120 metros a Leste.`
+      : `Condições nominais de terreno. Proceder para o alvo científico WP-01.`,
+    recommended_heading_deg: 90,
+    safe_distance_m: 120,
+    eva_status: {
+      o2_pct: o2,
+      buddy_dist_m: buddyDist,
+      rover_status: roverStatus
+    },
+    evidenceSha256: hash
+  });
 });
 
 const start = async () => {

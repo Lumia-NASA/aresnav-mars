@@ -47,5 +47,10 @@
       "code": "SLOPE_EXCEEDED",
       "action": "Desviar 120m a Leste: inclinação de 18.5° excede limite seguro do traje (12° com carga de 18.5kg)."
     }
-  ]
+  ],
+  "mars_trek_wmts": {
+    "optical_viking": "https://trek.nasa.gov/tiles/Mars/EQ/Viking_MDIM21_ClrMosaic_global_232m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
+    "topography_mola": "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
+    "thermal_tes": "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia_global_3km/1.0.0//default/default028mm/{z}/{y}/{x}.png"
+  }
 }

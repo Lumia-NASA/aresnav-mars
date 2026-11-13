@@ -67,6 +67,12 @@ runTest('1. Validação do arquivo CONTRATO_API.json', () => {
   // HUD Alerts
   assert(Array.isArray(contract.hud_alerts), 'hud_alerts deve ser array');
   assert(contract.hud_alerts[0].code === 'SLOPE_EXCEEDED');
+
+  // Mars Trek WMTS
+  assert(contract.mars_trek_wmts, 'mars_trek_wmts deve existir no contrato');
+  assert(contract.mars_trek_wmts.optical_viking.startsWith('https://trek.nasa.gov'), 'optical_viking deve ser rota trek.nasa.gov');
+  assert(contract.mars_trek_wmts.topography_mola.startsWith('https://trek.nasa.gov'), 'topography_mola deve ser rota trek.nasa.gov');
+  assert(contract.mars_trek_wmts.thermal_tes.startsWith('https://trek.nasa.gov'), 'thermal_tes deve ser rota trek.nasa.gov');
 });
 
 // 2. Teste de Isolamento do Git (.gitignore)
@@ -83,7 +89,8 @@ runTest('3. Verificação de Presença das 4 Skills em .skills-local', () => {
     '01-frontend-hud-skill.md',
     '02-backend-nasa-skill.md',
     '03-lumia-master-auditor.md',
-    '04-pitch-fable-skill.md'
+    '04-pitch-fable-skill.md',
+    '05-adk-copilot-skill.md'
   ];
   if (fs.existsSync(skillsLocalDir)) {
     for (const s of expectedSkills) {
@@ -103,18 +110,25 @@ runTest('3. Verificação de Presença das 4 Skills em .skills-local', () => {
 runTest('4. Verificação de Cache Offline Resiliente (Backend)', () => {
   const telemetryCache = path.join(cacheDir, 'telemetry_latest.cached.json');
   const traverseCache = path.join(cacheDir, 'm20_traverse.cached.json');
+  const waypointsCache = path.join(cacheDir, 'm20_waypoints.cached.json');
 
   assert(fs.existsSync(telemetryCache), 'Cache de telemetria deve existir');
   assert(fs.existsSync(traverseCache), 'Cache de traverse deve existir');
+  assert(fs.existsSync(waypointsCache), 'Cache de waypoints deve existir');
 
   const telemetry = JSON.parse(fs.readFileSync(telemetryCache, 'utf8'));
   assert(telemetry.eva_mobility, 'Cache deve conter eva_mobility');
   assert.strictEqual(typeof telemetry.eva_mobility.suit_payload_kg, 'number', 'Cache suit_payload_kg deve ser número');
   assert(telemetry.layers?.science_targets?.[0]?.optical_first_person_url, 'Cache deve conter optical_first_person_url');
+  assert(telemetry.mars_trek_wmts, 'Cache deve conter catálogo mars_trek_wmts');
 
   const traverse = JSON.parse(fs.readFileSync(traverseCache, 'utf8'));
   assert.strictEqual(traverse.type, 'FeatureCollection', 'Traverse cache deve ser GeoJSON FeatureCollection');
   assert(Array.isArray(traverse.features), 'GeoJSON deve conter features');
+
+  const waypoints = JSON.parse(fs.readFileSync(waypointsCache, 'utf8'));
+  assert.strictEqual(waypoints.type, 'FeatureCollection', 'Waypoints cache deve ser FeatureCollection');
+  assert(Array.isArray(waypoints.features) && waypoints.features.length > 0, 'Waypoints deve conter features');
 });
 
 // 5. Teste de Lógica do ScopeGuard (KhaosForge)
