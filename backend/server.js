@@ -520,7 +520,7 @@ fastify.get('/api/v1/fub/:layer', async (request, reply) => {
 // Blocos dos panoramas 360° (cubos do krpano da FU Berlin), para o visor 360° do próprio app.
 // Só a prévia (6 faces em 256 px) e um nível com faces de até 1280 px (blocos de 512 px).
 const FUB_PANO = 'https://maps.planet.fu-berlin.de/vtour/panos';
-const PANO_CACHE_DIR = path.join(__dirname, 'data', 'cache', 'fubpano');
+const PANO_CACHE_DIR = process.env.PANO_CACHE_DIR || path.join(__dirname, 'data', 'cache', 'fubpano');   // os testes apontam para uma pasta temporária
 fastify.get('/api/v1/fub/pano/:folder/*', { config: PROXY_RATE }, async (request, reply) => {
   const folder = request.params.folder, rest = request.params['*'];
   // formatos do krpano: estéreo "1/f/l2/01/l2_1/f_01_02.jpg" e simples "f/l2/1/l2_f_1_2.jpg"; níveis 1 a 3 (faces de até 1280 px)

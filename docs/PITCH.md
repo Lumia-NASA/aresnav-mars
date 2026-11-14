@@ -6,7 +6,7 @@
 **AresNav turns NASA and ESA orbital data into a go / no-go decision for a walk on Mars — and tells the astronaut exactly what to change when the answer is no.**
 
 ## The problem (20 s)
-An astronaut leaving a habitat in Jezero crater needs to answer three questions before every walk: *Can I get there? Can I get back? Will anyone hear me if something goes wrong?* The data exists (terrain from MOLA and HRSC, HiRISE imagery, the Perseverance traverse, MEDA weather), but it lives in different missions, formats and websites.
+An astronaut leaving a habitat in Jezero crater needs to answer three questions before every walk: *Can I get there? Can I get back? Will anyone hear me if something goes wrong?* The data exists (terrain from MOLA and HRSC, HiRISE imagery, the Perseverance traverse, archived MEDA weather), but it lives in different missions, formats and websites.
 
 ## The demo, step by step
 
@@ -34,7 +34,10 @@ An astronaut leaving a habitat in Jezero crater needs to answer three questions 
 - **Terrain:** the route uses a 200 m terrain model. It finds the general path but hides boulders and small steps; check the HiRISE image along flagged stretches.
 - **Calibration:** the terrain model sits on average 19 m above the elevations Perseverance measured at 613 of its stops (σ 19 m). We show this calibration inside the app.
 - **Simulated values:** suit physics (oxygen use, heart rate, pace vs. payload) is a model, not data from a real suit. The walk execution is simulated (no real suit telemetry).
-- **Weather:** temperature and pressure are real MEDA measurements, but the latest public sol is from April 2024; wind, dust and radiation are sample values (the public feed does not carry them). The app shows the date and labels samples.
+- **Weather, two sets of numbers:**
+  - *Dated measurements:* minimum temperature, maximum temperature and pressure are real MEDA readings, but not live. The latest public sol is from April 2024, and the app shows that date and the age of the reading.
+  - *Sample values:* wind, dust and radiation are fixed example numbers, labeled SAMPLE, because the public feed does not carry them.
+  - The weather values do not feed the verdict math. Only the age of the reading does, as a caveat: because it is more than 30 days old, a GO shows as "GO · with caveats". Sunrise and sunset are computed (Mars24 algorithm), not measured.
 - **Hypothetical base:** the Ares-1 habitat does not exist.
 - **Not yet tested:** a real phone, and the AI answering with a live API key during the demo.
 

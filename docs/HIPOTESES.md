@@ -16,7 +16,18 @@ Os parâmetros estão em `frontend/physics.js` (`SLOPE_RULE` e `ALGORITHM`, vers
 | Ritmo de caminhada (Tobler) | 2,7 km/h no plano, pico em descida suave | função de Tobler com v₀ de astronauta de traje (referência SEXTANT/Apollo) | forma clássica; o valor de v₀ é hipótese |
 | Antena do habitat e capacete | 2 m e 1,7 m | escolha de projeto | hipótese (uma antena mais alta muda muito o resultado do rádio) |
 | Relevo | HRSC + MOLA, 200 m por ponto | NASA Mars Trek | **dado real**. Não enxerga pedras nem degraus; fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m) |
-| Clima (MEDA) | valores do contrato | `CONTRATO_API.json` | valores de exemplo de um sol, não leitura ao vivo |
+| Clima: temperatura e pressão (MEDA) | mínima, máxima e pressão do último sol publicado | feed público do MEDA, via `/api/v1/weather` | **medição real e datada**, não leitura ao vivo. O app mostra a data e a idade do dado; o último sol público é de abril de 2024 |
+| Clima: vento, radiação e poeira | valores do contrato | `CONTRATO_API.json` | **valores de exemplo** (selo SAMPLE). O feed público do MEDA não traz essas grandezas |
+| Nascer e pôr do Sol | calculados para a data de hoje | algoritmo do Mars24, em `frontend/mars-sun.js` | **calculado**, conferido contra os horários do MEDA (menos de 1 min de diferença) |
+
+### Os dois conjuntos de clima
+
+O painel de clima mistura duas origens, e o app as separa com selos:
+
+- **Medições datadas (MEASURED):** temperatura mínima, temperatura máxima e pressão vêm do sensor MEDA do Perseverance. São reais, mas antigas: a NASA publica só os últimos sols, e o mais recente disponível é de abril de 2024. Por isso o app mostra sempre a data e quantos dias o dado tem. Se a NASA estiver fora do ar, vale a última cópia em cache, com a mesma data.
+- **Valores de exemplo (SAMPLE):** vento, radiação e poeira não existem no feed público. O app mostra os números fixos do `CONTRATO_API.json` só para preencher o painel. Eles não descrevem o tempo em Jezero em dia nenhum.
+
+Os valores de clima (temperatura, pressão, vento, radiação, poeira) não entram no cálculo do veredito: ele depende de relevo, carga, oxigênio, rádio e luz do dia, e a luz do dia usa o pôr do Sol calculado. O que entra é só a **idade** da medição, como ressalva no checklist: com o dado medido há mais de 30 dias, um GO aparece como "GO · com ressalvas". Como o último sol público é de 2024, essa ressalva está sempre presente hoje.
 
 ## Quanto cada hipótese mexe no resultado
 
@@ -54,4 +65,4 @@ Para uma rota com pico de 11°, a carga a partir da qual ela vira NO-GO cai de 2
 ## O que mudaria isso em um projeto real
 - Limites de declive e consumo medidos com o traje em ensaio (por exemplo, dados de caminhadas análogas da NASA).
 - Relevo HiRISE de 1 m em Jezero no lugar do de 200 m.
-- Clima vindo do MEDA mais recente, com a idade do dado exibida (o GeoJSON exportado já registra essa idade).
+- Clima do dia da caminhada, com vento, radiação e poeira medidos. Hoje só temperatura e pressão são medições, e de um sol antigo (o GeoJSON exportado registra a idade do dado).

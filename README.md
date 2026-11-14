@@ -20,7 +20,7 @@ O **AresNav** é um protótipo de planejamento de caminhadas (EVA) em Marte. Jun
 
 ---
 
-## 🎬 A demo de ponta a ponta
+## 🎬 A demo, do início ao fim
 Rota científica → risco explicado → comparação → panorama real do local → decisão → corte de enlace. O roteiro completo, em inglês, está em [`docs/PITCH.md`](docs/PITCH.md).
 
 1. **Rota científica:** escolha o depósito de amostras Three Forks, um lugar real onde o Perseverance deixou tubos de amostra, a 3,7 km da base, com 18,5 kg de carga.
@@ -39,7 +39,9 @@ Rota científica → risco explicado → comparação → panorama real do local
 ## ⚠️ Limites (dizemos isso na apresentação)
 - **Relevo de 200 m:** escolhe o caminho geral, mas esconde pedras e degraus. Confira os trechos marcados na imagem HiRISE.
 - **Calibração:** o relevo fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m). O app mostra isso no "Por quê?".
-- **Física simulada:** consumo de O₂, batimentos e ritmo × carga vêm de um modelo, não de um traje real. O clima vem dos valores de exemplo do contrato (MEDA).
+- **Física simulada:** consumo de O₂, batimentos e ritmo × carga vêm de um modelo, não de um traje real. As hipóteses e o peso de cada uma estão em [`docs/HIPOTESES.md`](docs/HIPOTESES.md).
+- **Clima em dois conjuntos:** temperatura e pressão são medições reais do MEDA, mas datadas (último sol público: abril de 2024). Vento, radiação e poeira são valores de exemplo, com o selo SAMPLE. Esses valores não entram no cálculo do veredito; só a idade da medição aparece como ressalva no checklist.
+- **Rota:** a busca roda numa grade de 200 m dentro da área da missão. "Nenhuma rota segura encontrada" vale para esse modelo, não prova que o caminho não existe.
 - **Base hipotética:** a Ares-1 não existe.
 - **Ainda não testado:** celular de verdade e o copiloto com chave da API ao vivo. Os números de desempenho estão em [`docs/DESEMPENHO.md`](docs/DESEMPENHO.md).
 
@@ -48,7 +50,7 @@ Rota científica → risco explicado → comparação → panorama real do local
 ## 🛡️ Arquitetura de Defesa e Resiliência
 * **Offline-First Cache:** Os dados da rota (relevo, trajeto, telemetria) têm cache local em `/backend/data/cache/` e seguem funcionando sem internet. Camadas da FU Berlin, mapas globais e panoramas 360° só funcionam offline se já estiverem no cache. Oscilações da internet ou da API da NASA não derrubam o app.
 * **ScopeGuard (KhaosForge):** Bloqueio estrito contra SSRF, limitando conexões aos domínios da NASA (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`) e ao WebGIS de Jezero da FU Berlin (`maps.planet.fu-berlin.de`).
-* **EvidenceGate:** o backend calcula o SHA-256 de cada resposta e o envia junto. Isso permite conferir que o dado não mudou entre o backend e a tela (e entra no GeoJSON exportado), mas **não autentica a origem**: o hash é calculado pelo nosso próprio servidor, não assinado pela NASA.
+* **EvidenceGate:** o backend calcula o SHA-256 de cada resposta e o envia junto. Isso permite conferir que o dado não mudou **entre o backend e a tela** (e entra no GeoJSON exportado). Não é integridade de ponta a ponta e **não autentica a origem**: o trecho entre a NASA e o nosso backend não é coberto, e o hash é calculado pelo nosso próprio servidor, não assinado pela NASA.
 * **CORS Restrito & Rate Limiting:** Proteção de backend Fastify contra abusos e negação de serviço.
 
 ---
@@ -84,12 +86,17 @@ aresnav-mars/
 
 ## 🧪 Como Executar os Testes de Validação
 ```bash
+npm ci --prefix backend
 node tests/smoke-test.js
 node tests/physics-test.js
-npm ci --prefix backend && node tests/fub-test.js
+node tests/sun-test.js
+node tests/exec-test.js
+node tests/fub-test.js
 node tests/demo-flow-test.js   # percurso completo da demo num Chrome sem janela
 ```
-Ou tudo de uma vez: `cd backend && npm test`. Os quatro rodam no CI a cada pull request.
+Ou tudo de uma vez: `cd backend && npm test`, que roda os seis em sequência.
+
+O percurso da demo testa o panorama 360° em dois cenários: um que aceita falha da rede desde que o visor explique o que houve, e outro com o panorama já no cache, que exige a imagem completa.
 
 **Antes da apresentação** (com o backend rodando e internet):
 ```bash
