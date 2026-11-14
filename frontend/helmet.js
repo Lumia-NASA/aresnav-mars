@@ -264,6 +264,13 @@ function renderHud() {
     : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';
+  /* Perto de um ponto de referência no Terreno 3D: cartão dizendo o que ele é e o que se vê ali */
+  const site = $('#hudSite'), poi = mode === 'terrain' ? A.nearPoi(me.lat, me.lon, 320) : null;
+  site.hidden = !poi;
+  if (poi && site.dataset.n !== poi.n) {
+    site.dataset.n = poi.n; site.textContent = '';
+    [['b', poi.n], ['small', poi.src], ['p', poi.why], ['p', poi.see ? 'No local: ' + poi.see : '']].forEach(([tag, txt]) => { if (!txt) return; const el = document.createElement(tag); el.textContent = txt; site.appendChild(el); });
+  }
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
@@ -283,7 +290,7 @@ function renderBar() {
   const photo = mode === 'photo';
   const jumps = photo
     ? A.POIS.filter(p => p.sol).map((p, i) => `<option value="p${i}">${p.n}</option>`).join('')
-    : `<option value="me">Onde você está (Jezero)</option>` + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
+    : `<option value="me">Onde você está (Jezero)</option><optgroup label="Pontos de referência">` + A.POIS.map((p, i) => `<option value="s${i}">${p.n}</option>`).join('') + '</optgroup>' + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
   $('#hudSols').innerHTML =
     `<span class="seg2"><button data-mode="photo" aria-pressed="${photo}">Fotos do rover</button><button data-mode="terrain" aria-pressed="${!photo}">Terreno 3D</button></span>` +
     `<button data-turn="-1" aria-label="Virar à esquerda">◀</button><button data-walk="-1">▼ voltar</button><button data-walk="1" class="go">▲ avançar</button><button data-turn="1" aria-label="Virar à direita">▶</button>` +
@@ -321,6 +328,7 @@ $('#hudSols').addEventListener('click', e => {
 $('#hudSols').addEventListener('change', e => {
   const v = e.target.value; if (!v) return;
   if (v[0] === 'p') { const p = A.POIS.filter(q => q.sol)[+v.slice(1)]; manual = true; setIdx(nearest(p.lat, p.lon)); }
+  else if (v[0] === 's') A.globe.visit(A.POIS[+v.slice(1)]);
   else if (v === 'me') { const n = A.state.now || A.BASE; A.globe.teleport(n.lat, n.lon); }
   else { const p = PLACES[+v.slice(1)]; A.globe.teleport(p[1], p[2]); }
   e.target.value = '';

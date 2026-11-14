@@ -83,7 +83,7 @@ function init() {
     };
     buildImagery();
 
-    buildStatic(); drawTargets(); applyLayers(A.layerState()); drawRoute(); drawNow();
+    buildStatic(); try { buildSites(); } catch (e) { console.warn('Estruturas dos pontos de referência indisponíveis', e); } drawTargets(); applyLayers(A.layerState()); drawRoute(); drawNow();
 
     const h = new C.ScreenSpaceEventHandler(scene.canvas);
     const ll = pos => {
@@ -155,8 +155,101 @@ function buildStatic() {
   ents.cam = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 10, A.cssv('--blue')), label: label('VISTA DO CAPACETE', 60000) });
 }
 
+/* ---------- Estruturas nos pontos de referência ----------
+   Cada ponto ganha no chão aquilo que o torna importante (habitat, tubos de amostras, a rocha furada...).
+   São maquetes ilustrativas feitas de formas simples, ampliadas na mesma proporção da altura dos olhos
+   para serem vistas de longe; a posição é a real. No Terreno 3D cada ponto tem também um facho de luz
+   com o nome no alto, em alturas alternadas para os nomes não se amontoarem. */
+const SITE = {
+  habitat(a) {
+    a('ell', [0, 0, 0], { d: [5, 5, 3.6], c: '#e9e4da' });                                  // cúpula
+    a('cyl', [8, 0, 1.5], { l: 8, rad: 1.6, p: 90, c: '#d9d4c8' }); a('cyl', [-1.5, 8, 1.5], { l: 8, rad: 1.6, r: 90, c: '#d9d4c8' }); // módulos
+    a('box', [13, 0, 1.3], { d: [2.4, 2.6, 2.6], c: '#b8b2a4' }); a('box', [14.3, 0, 1.1], { d: [0.15, 1.2, 2], c: '#ff8a4c' });   // câmara de ar e porta
+    for (let i = 0; i < 4; i++) { a('box', [-10, -6.5 + i * 4.4, 1.6], { d: [3.2, 4, 0.12], p: -24, c: '#2a4fb0' }); a('cyl', [-10, -6.5 + i * 4.4, 0.7], { l: 1.4, rad: 0.08, c: '#9aa0ab' }); }
+    a('cyl', [5, 6, 5], { l: 10, rad: 0.12, c: '#cfd3da' }); a('ell', [5, 6, 10], { d: [1.3, 1.3, 0.35], p: 35, c: '#f2f2f2' }); a('ell', [5, 6, 10.9], { d: [0.2, 0.2, 0.2], c: '#ff3344' }); // mastro e antena
+  },
+  landing(a) {
+    a('cyl', [0, 0, 0.03], { l: 0.06, rad: 9, c: 'rgba(255,138,76,.7)' }); a('cyl', [0, 0, 0.05], { l: 0.08, rad: 8.3, c: '#6b4633' });  // anel de pouso
+    [[3, 2], [-3, 2], [3, -2], [-3, -2]].forEach(([x, y]) => a('cyl', [x, y, 0.08], { l: 0.06, rad: 1.3, c: '#2a1c16' }));              // marcas dos motores
+    a('cyl', [0, 0, 2], { l: 4, rad: 0.42, rt: 0.12, n: 4, c: '#c9ccd4' });                                                            // marco
+    a('cyl', [2.6, 0, 2.6], { l: 5.2, rad: 0.05, c: '#cfd3da' }); a('box', [3.45, 0, 4.6], { d: [1.6, 0.05, 1], c: '#e8ecf8' });         // bandeira
+  },
+  rochette(a) {
+    a('ell', [0, 0, 0.35], { d: [1.7, 1.15, 0.8], h: 20, c: '#4a3a33' }); a('ell', [2.3, 0.9, 0.15], { d: [0.85, 0.6, 0.42], h: -30, c: '#57443a' }); a('ell', [-1.6, 1.5, 0.1], { d: [0.5, 0.42, 0.3], c: '#3f322c' });
+    a('cyl', [-0.35, 0, 1.12], { l: 0.14, rad: 0.15, c: '#120c0a' }); a('cyl', [0.4, 0.12, 1.1], { l: 0.14, rad: 0.15, c: '#120c0a' }); // furos da broca
+    a('cyl', [0.95, -0.35, 0.98], { l: 0.05, rad: 0.3, c: '#b9a595' });                                                                // área raspada
+    a('cyl', [-2.2, -1.2, 0.6], { l: 1.2, rad: 0.11, c: '#dfe3ea' }); a('cyl', [-2.2, -1.2, 1.25], { l: 0.14, rad: 0.14, c: '#ffb800' }); // tubo de amostra
+  },
+  strata(a) {
+    const tones = ['#8f6a48', '#b98a5e', '#d2a878', '#a47a52'];
+    for (let j = 0; j < 9; j++) a('box', [(j % 2) * 0.35, 0, 0.3 + j * 0.6], { d: [11 - j * 0.6, 3.4 - j * 0.12, 0.6], h: 15, c: tones[j % 4] });
+    a('ell', [5, -2.6, 0.2], { d: [0.9, 0.7, 0.45], c: '#8f6a48' }); a('ell', [-4.2, -2.8, 0.15], { d: [0.6, 0.5, 0.35], c: '#a47a52' });
+  },
+  organics(a) {
+    a('box', [0, 0, 0.25], { d: [6, 3.6, 0.5], h: -12, c: '#b39a7c' }); a('box', [0.4, 0.2, 0.7], { d: [4.4, 2.6, 0.4], h: -12, c: '#c9b08f' }); a('box', [0.2, 0, 1.05], { d: [2.6, 1.6, 0.3], h: -12, c: '#a88c6c' });
+    a('cyl', [0, 0, 2.7], { l: 0.5, rad: 0.85, n: 6, c: '#00ffaa' });                                                      // anel de carbono
+    for (let i = 0; i < 6; i++) { const t = i * Math.PI / 3; a('ell', [Math.cos(t) * 1.35, Math.sin(t) * 1.35, 2.7], { d: [0.24, 0.24, 0.24], c: '#e8ecf8' }); }
+    a('cyl', [0, 0, 1.85], { l: 1.3, rad: 0.04, c: '#00ffaa' });
+  },
+  depot(a) {
+    for (let i = 0; i < 10; i++) {
+      const x = (i - 4.5) * 3, y = i % 2 ? 2.4 : -2.4;
+      a('cyl', [x, y, 0.03], { l: 0.05, rad: 0.95, c: 'rgba(255,184,0,.55)' });
+      a('cyl', [x, y, 0.16], { l: 1.15, rad: 0.1, p: 90, h: 25 * i, c: '#e6e9ef' });
+      if (i) a('box', [x - 1.5, 0, 0.03], { d: [3.9, 0.07, 0.04], h: i % 2 ? -32 : 32, c: 'rgba(255,184,0,.4)' });                    // o zigue-zague
+    }
+  },
+  boulders(a) {
+    [[0, 0, 1.7, 1.3, 1.1, '#6d5546'], [3.2, 1.4, 1.1, 0.9, 0.8, '#7d6352'], [-2.8, 2.2, 0.9, 0.8, 0.6, '#5d4a3f'], [1.6, -2.9, 1.3, 1, 0.85, '#8a705c'],
+      [-3.6, -1.6, 0.7, 0.6, 0.5, '#6d5546'], [5.4, -1.2, 0.6, 0.55, 0.45, '#7d6352'], [-0.8, 4.2, 0.75, 0.6, 0.5, '#8a705c'], [4.1, 3.9, 0.5, 0.45, 0.4, '#5d4a3f']]
+      .forEach(([x, y, rx, ry, rz, c], i) => a('ell', [x, y, rz * 0.45], { d: [rx, ry, rz], h: i * 47, c }));
+  },
+  cheyava(a) {
+    a('box', [0, 0, 0.35], { d: [3.4, 2, 0.7], h: 25, c: '#9a4a35' }); a('box', [2.3, 1.3, 0.2], { d: [1.2, 0.9, 0.4], h: 60, c: '#874030' });
+    a('box', [0, 0.45, 0.71], { d: [3.3, 0.14, 0.04], h: 25, c: '#f1ece2' }); a('box', [0, -0.5, 0.71], { d: [3.3, 0.14, 0.04], h: 25, c: '#f1ece2' }); // veios de sulfato de cálcio
+    [[-1, 0], [-0.4, 0.12], [0.2, -0.1], [0.8, 0.1], [1.2, -0.12], [-0.7, -0.15]].forEach(([u, v]) => {                                  // "manchas de leopardo"
+      const c = Math.cos(25 * Math.PI / 180), s = Math.sin(25 * Math.PI / 180), x = u * c + v * s, y = -u * s + v * c;
+      a('cyl', [x, y, 0.715], { l: 0.03, rad: 0.13, c: '#2a1a16' }); a('cyl', [x, y, 0.725], { l: 0.03, rad: 0.085, c: '#ead9c2' });
+    });
+  },
+  crystals(a) {
+    a('cyl', [0, 0, 0.03], { l: 0.05, rad: 15, c: 'rgba(110,168,255,.3)' }); a('cyl', [0, 0, 0.05], { l: 0.06, rad: 14.2, c: 'rgba(110,168,255,.14)' });
+    [[0, 0, 3.2, 0.6, 0, 0], [1.1, 0.5, 2.1, 0.45, 18, 0], [-0.9, 0.7, 1.7, 0.4, -16, 12], [0.4, -1.1, 1.9, 0.42, 6, -20], [-1, -0.7, 1.2, 0.34, -22, -10], [1.7, -0.6, 1, 0.3, 26, 8]]
+      .forEach(([x, y, l, r, p, rr]) => a('cyl', [x, y, l / 2 - 0.1], { l, rad: r, rt: 0, n: 5, p, r: rr, c: 'rgba(120,180,255,.88)' }));
+  }
+};
+function buildSites() {
+  const S = EYE / 1.7, rad = C.Math.toRadians, col = c => C.Color.fromCssColorString(c), near = new C.DistanceDisplayCondition(0, 12000 * K);
+  ents.sites = []; ents.beacons = [];
+  // luz fixa vinda do mesmo lado do sol do céu do capacete, para as maquetes não ficarem no escuro
+  const f0 = C.Transforms.eastNorthUpToFixedFrame(groundPos(A.BASE.lat, A.BASE.lon));
+  const sun = C.Matrix4.multiplyByPointAsVector(f0, new C.Cartesian3(-0.55, 0.35, -0.42), new C.Cartesian3());
+  viewer.scene.light = new C.DirectionalLight({ direction: C.Cartesian3.normalize(sun, sun), intensity: 2.2 });
+  A.POIS.forEach((p, i) => {
+    const frame = C.Transforms.eastNorthUpToFixedFrame(groundPos(p.lat, p.lon));
+    const add = (shape, at, o) => {
+      const position = C.Matrix4.multiplyByPoint(frame, new C.Cartesian3(at[0] * S, at[1] * S, at[2] * S), new C.Cartesian3());
+      const g = { material: col(o.c), distanceDisplayCondition: near };
+      if (shape === 'cyl') { g.length = o.l * S; g.bottomRadius = o.rad * S; g.topRadius = (o.rt != null ? o.rt : o.rad) * S; if (o.n) g.slices = o.n; }
+      else g[shape === 'box' ? 'dimensions' : 'radii'] = new C.Cartesian3(o.d[0] * S, o.d[1] * S, o.d[2] * S);
+      ents.sites.push(viewer.entities.add({ position, [shape === 'box' ? 'box' : shape === 'cyl' ? 'cylinder' : 'ellipsoid']: g,
+        orientation: C.Transforms.headingPitchRollQuaternion(position, new C.HeadingPitchRoll(rad(o.h || 0), rad(o.p || 0), rad(o.r || 0))) }));
+    };
+    if (SITE[p.site]) SITE[p.site](add);
+    const c = A.KIND[p.k] || '#ffb800', top = (60 + ((i * 3) % 8) * 26) * S;
+    ents.beacons.push(viewer.entities.add({ show: false,
+      polyline: { positions: [groundPos(p.lat, p.lon), groundPos(p.lat, p.lon, top)], width: 7, material: new C.PolylineGlowMaterialProperty({ color: col(c).withAlpha(0.85), glowPower: 0.22, taperPower: 0.9 }),
+        distanceDisplayCondition: new C.DistanceDisplayCondition(120 * K, 4e5 * K) } }));
+    ents.beacons.push(viewer.entities.add({ show: false, position: groundPos(p.lat, p.lon, top),
+      label: Object.assign(label(p.n.replace(' (hipotética)', '').replace(' (aprox.)', ''), 4e5), { heightReference: C.HeightReference.NONE, pixelOffset: new C.Cartesian2(0, -12),
+        scaleByDistance: new C.NearFarScalar(800 * K, 1, 30000 * K, 0.72), translucencyByDistance: new C.NearFarScalar(20000 * K, 1, 90000 * K, 0.35) }) }));
+  });
+}
+
 function applyLayers(s) {
   if (!viewer) return;
+  (ents.sites || []).forEach(e => { e.show = s.poi; }); (ents.beacons || []).forEach(e => { e.show = s.poi && walk.on; });
+  ents.pois.concat(ents.crism, ents.targets || [], ents.base ? [ents.base] : []).forEach(e => { if (e.label) e.label.show = !walk.on; }); // no chão, o nome fica no alto do facho
   const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base !== 'relief', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
   Object.keys(show).forEach(k => { if (layers[k]) layers[k].show = show[k]; });
   ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); (ents.targets || []).forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
@@ -340,6 +433,8 @@ A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.te
 A.globe = {
   get viewer() { return viewer; }, flyJezero, walk, enterWalk, exitWalk,
   teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },
+  /* Para a alguns passos ao sul do ponto, olhando para ele */
+  visit(p) { const back = ({ habitat: 24, landing: 20, crystals: 22, depot: 17, strata: 15 }[p.site] || 9) * EYE / 1.7; walk.lat = p.lat - back / (A.R_MARS * Math.PI / 180); walk.lon = p.lon; walk.heading = 0; walk.pitch = -6; walk.vel = 0; },
   look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-60, Math.min(35, walk.pitch + dEl)); },
   stepBy(m) { move(m); },
   setPace(p) { if (PACE[p]) walk.pace = p; },
