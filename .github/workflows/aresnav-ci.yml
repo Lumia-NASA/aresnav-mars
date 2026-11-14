@@ -44,3 +44,7 @@ jobs:
       - name: FU Berlin Integration Tests (360° viewer logic, tiles & panorama routes, offline)
         run: |
           node tests/fub-test.js
+
+      - name: End-to-end Demo Flow (headless Chrome)
+        run: |
+          node tests/demo-flow-test.js

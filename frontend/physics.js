@@ -6,8 +6,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
   const kg = v => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
-  /* Limite de declive seguro em graus: 15° sem carga, menos 0,2° por kg, nunca abaixo de 8° */
-  const maxSafeSlope = payloadKg => Math.max(8, 15 - kg(payloadKg) * 0.2);
+  /* Limite de declive da SIMULAÇÃO, em graus: 15° sem carga, menos 0,2° por kg, nunca abaixo de 8°.
+     ATENÇÃO: é uma hipótese de projeto do AresNav para demonstrar o efeito da carga, não um limite validado
+     de EVA real (não vem de norma da NASA nem de ensaio com traje). A sensibilidade a cada parâmetro está
+     em docs/HIPOTESES.md e em tests/physics-test.js. Os parâmetros ficam expostos em SLOPE_RULE. */
+  const SLOPE_RULE = Object.freeze({ base: 15, perKg: 0.2, floor: 8, status: 'simulation hypothesis' });
+  const maxSafeSlope = (payloadKg, rule) => { const r = rule || SLOPE_RULE; return Math.max(r.floor, r.base - kg(payloadKg) * r.perKg); };
   /* Multiplicador do consumo de oxigênio e do esforço: +1,8% por kg */
   const metabolicFactor = payloadKg => 1 + kg(payloadKg) * 0.018;
   /* Oxigênio previsto ao fim de uma caminhada de totalMin minutos (em % do tanque) */
@@ -106,5 +110,7 @@
     return out;
   }
 
-  return { maxSafeSlope, metabolicFactor, o2AtReturn, verdict, walkSpeedKmh, walkTimes, turnBackPoint, checkLineOfSight, assess, maxPayloadForO2, runs, O2_MIN: 30, NO_LOAD_SLOPE: 15 };
+  /* Versão do algoritmo de decisão: entra no GeoJSON exportado para reproduzir um veredito */
+  const ALGORITHM = Object.freeze({ name: 'aresnav-eva-verdict', version: '1.3.0', o2ReservePct: 30, autonomyMin: 480, metabolicPerKg: 0.018, paceLossPerKg: 0.012, tobler: 'v0*exp(-3.5*|tan(theta)+0.05|)', slopeRule: SLOPE_RULE });
+  return { maxSafeSlope, metabolicFactor, o2AtReturn, verdict, walkSpeedKmh, walkTimes, turnBackPoint, checkLineOfSight, assess, maxPayloadForO2, runs, SLOPE_RULE, ALGORITHM, O2_MIN: 30, NO_LOAD_SLOPE: 15 };
 });

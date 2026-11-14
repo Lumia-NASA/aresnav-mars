@@ -7,14 +7,14 @@
 ---
 
 ## 🌟 Visão Geral
-O **AresNav** é um sistema tático de navegação e sobrevivência para astronautas em atividade extraveicular (EVA) na superfície de Marte. Integrando camadas científicas em tempo real da NASA a um HUD tático com mapas 2D/3D interativos, o AresNav antecipa desastres de terreno, tempestades de poeira e guia astronautas para rotas seguras e alvos biológicos prioritários.
+O **AresNav** é um protótipo de planejamento de caminhadas (EVA) em Marte. Junta dados históricos de missões da NASA e da ESA (relevo, imagens, trajeto do Perseverance, minerais) a um modelo simulado do traje e responde, para uma rota escolhida, se a caminhada é GO, CAUTION ou NO-GO, por quê, e o que mudar. Os dados vêm de arquivos e serviços públicos com cache local: **não são transmissões em tempo real**, e o veredito é uma **simulação para planejamento**, não uma autorização de segurança.
 
 ---
 
 ## 🛰️ As 3 Camadas Científicas da NASA Unificadas
-1. **Topografia & Altimetria (MGS MOLA):** Mapeamento digital de elevação (DEM) e cálculo de declividade (`slope_deg`) para prevenir colapsos em encostas acidentadas (>15°).
-2. **Meteorologia Marciana (Perseverance MEDA):** Monitoramento contínuo de ventos, temperaturas extremas (até -68.4°C), alerta de tempestades de poeira e índice de radiação diária.
-3. **Mineralogia & Rota do Rover (Mars 2020 Traverse):** Traçado histórico e atual do rover Perseverance, indicando depósitos de carbonatos e filossilicatos (argilas) com alto potencial de bioassinaturas fósseis.
+1. **Topografia & Altimetria (MGS MOLA + Mars Express HRSC):** relevo de 200 m por ponto e declive calculado dele. Mostra o caminho geral e as encostas fortes; não enxerga pedras nem degraus menores que isso.
+2. **Meteorologia Marciana (Perseverance MEDA):** vento, temperatura (−68,4 °C), alerta de poeira e radiação, lidos do contrato do AresNav (valores de exemplo de um sol, não leitura ao vivo do rover).
+3. **Mineralogia & Rota do Rover (Mars 2020 + CRISM):** trajeto real do Perseverance e detecções orbitais de minerais hidratados (CRISM), que indicam onde houve água.
 
 ---
 
@@ -43,7 +43,7 @@ Rota científica → risco explicado → comparação → panorama real do local
 ## 🛡️ Arquitetura de Defesa e Resiliência
 * **Offline-First Cache:** Os dados da rota (relevo, trajeto, telemetria) têm cache local em `/backend/data/cache/` e seguem funcionando sem internet. Camadas da FU Berlin, mapas globais e panoramas 360° só funcionam offline se já estiverem no cache. Oscilações da internet ou da API da NASA não derrubam o app.
 * **ScopeGuard (KhaosForge):** Bloqueio estrito contra SSRF, limitando conexões aos domínios da NASA (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`) e ao WebGIS de Jezero da FU Berlin (`maps.planet.fu-berlin.de`).
-* **EvidenceGate:** Selamento criptográfico SHA-256 de cada telemetria processada, garantindo integridade auditável ponta a ponta.
+* **EvidenceGate:** o backend calcula o SHA-256 de cada resposta e o envia junto. Isso permite conferir que o dado não mudou entre o backend e a tela (e entra no GeoJSON exportado), mas **não autentica a origem**: o hash é calculado pelo nosso próprio servidor, não assinado pela NASA.
 * **CORS Restrito & Rate Limiting:** Proteção de backend Fastify contra abusos e negação de serviço.
 
 ---
@@ -53,7 +53,7 @@ Rota científica → risco explicado → comparação → panorama real do local
 aresnav-mars/
 ├── CONTRATO_API.json         # Contrato unificado de integração Frontend <-> Backend
 ├── .gitignore                # Isolamento estrito de segredos e skills confidenciais
-├── backend/                  # Módulo Extrator Fastify blindado
+├── backend/                  # Backend Fastify 5 (proxy com allowlist, cache, rate limit, CSP)
 │   ├── server.js             # Rotas /health, telemetry, traverse, waypoints, tiles, dem, crism e navcam
 │   ├── package.json          # Dependências do backend
 │   ├── Dockerfile            # Container hardening (Alpine, non-root, dumb-init)
@@ -63,11 +63,14 @@ aresnav-mars/
 ├── tests/
 │   ├── smoke-test.js         # Contrato, ScopeGuard e EvidenceGate
 │   ├── physics-test.js       # Física do traje, Tobler, ponto de retorno, rádio, veredito e decisão
-│   └── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
+│   ├── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
+│   └── demo-flow-test.js     # Percurso completo da apresentação num Chrome sem janela
 ├── tools/build-fub-cache.py  # Baixa e converte as camadas da FU Berlin
+├── tools/prewarm-demo.js     # Pré-carrega e confere offline o que a demo usa
 └── docs/
     ├── PITCH.md              # Roteiro da demo para os jurados (inglês)
-    └── DESEMPENHO.md         # Medições de carregamento, 360° e memória
+    ├── DESEMPENHO.md         # Medições de carregamento, 360° e memória
+    └── HIPOTESES.md          # Hipóteses do modelo e sensibilidade do veredito
 ```
 
 ---
@@ -77,5 +80,12 @@ aresnav-mars/
 node tests/smoke-test.js
 node tests/physics-test.js
 npm ci --prefix backend && node tests/fub-test.js
+node tests/demo-flow-test.js   # percurso completo da demo num Chrome sem janela
 ```
-Os três rodam no CI a cada pull request.
+Ou tudo de uma vez: `cd backend && npm test`. Os quatro rodam no CI a cada pull request.
+
+**Antes da apresentação** (com o backend rodando e internet):
+```bash
+cd backend && npm run prewarm         # grava no cache tudo o que a demo usa (~45 s)
+npm run check-offline                 # confere sem internet que os 813 itens abrem do cache
+```

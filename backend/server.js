@@ -51,7 +51,7 @@ fastify.register(require('@fastify/cors'), {
     return cb(new Error('Origem não autorizada pela política AresNav'), false);
   },
   methods: ['GET'],
-  exposedHeaders: ['X-AresNav-Evidence-SHA256', 'X-AresNav-Degraded', 'X-AresNav-Cache']
+  exposedHeaders: ['X-AresNav-Evidence-SHA256', 'X-AresNav-Degraded', 'X-AresNav-Cache', 'X-AresNav-Data-Date']
 });
 
 // 3. Heavy Rate Limiting
@@ -92,7 +92,8 @@ if (fs.existsSync(path.join(FRONTEND_DIR, 'index.html'))) {
   fastify.register(require('@fastify/static'), {
     root: FRONTEND_DIR,
     prefix: '/',
-    setHeaders: res => { res.setHeader('Content-Security-Policy', FRONTEND_CSP); }
+    // @fastify/static 10 passa o reply do Fastify (antes era a resposta crua do Node)
+    setHeaders: res => { (res.header ? res.header.bind(res) : res.setHeader.bind(res))('Content-Security-Policy', FRONTEND_CSP); }
   });
 }
 
@@ -119,6 +120,9 @@ function verifyEvidenceIntegrity(rawData) {
   }
   return true;
 }
+
+// Data em que um arquivo de dados foi gravado (quando o dado veio da fonte): vai no cabeçalho X-AresNav-Data-Date
+const dataDate = file => { try { return fs.statSync(file).mtime.toISOString(); } catch (e) { return null; } };
 
 // Fallback Helper
 function loadOfflineCache(filePath) {
@@ -160,6 +164,7 @@ fastify.get('/api/v1/telemetry', async (request, reply) => {
     cached.degraded = false;
 
     reply.header('X-AresNav-Evidence-SHA256', hash);
+    const d = dataDate(CACHE_TELEMETRY); if (d) reply.header('X-AresNav-Data-Date', d);
     return reply.code(200).send(cached);
   } catch (error) {
     fastify.log.error(error);
@@ -394,6 +399,7 @@ fastify.get('/api/v1/dem/jezero', async (request, reply) => {
   }
   if (!body) return reply.code(504).send({ error: 'NASA inacessível e relevo fora do cache' });
   reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
+  const d = dataDate(file); if (d) reply.header('X-AresNav-Data-Date', d);
   return reply.code(200).header('Content-Type', 'application/octet-stream').header('X-AresNav-Degraded', String(degraded)).send(body);
 });
 
@@ -579,14 +585,15 @@ Rules:
 fastify.get('/api/v1/copilot/status', async () => ({ ai: !!getAnthropic(), model: COPILOT_MODEL }));
 fastify.post('/api/v1/copilot/ask', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, bodyLimit: 32 * 1024 }, async (request, reply) => {
   const body = request.body || {};
-  const question = typeof body.question === 'string' ? body.question.trim().slice(0, 600) : '';
+  const clean = t => String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/g, ' ').replace(/\s{3,}/g, '  ').trim();   // controle e invisíveis
+  const question = typeof body.question === 'string' ? clean(body.question).slice(0, 600) : '';
   if (!question) return reply.code(400).send({ error: 'Pergunta vazia' });
   const client = getAnthropic();
   if (!client) return reply.code(503).send({ offline: true, error: 'Copiloto sem credencial da API: usando o modo local do navegador' });
   const context = JSON.stringify(body.context || {}).slice(0, 12000);
   const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string')
-    .map(m => ({ role: m.role, content: m.text.slice(0, 1200) }));
+    .map(m => ({ role: m.role, content: clean(m.text).slice(0, 1200) }));
   while (history.length && history[0].role !== 'user') history.shift();
   try {
     const res = await client.beta.messages.create({

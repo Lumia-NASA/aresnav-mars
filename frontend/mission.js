@@ -103,7 +103,7 @@ function renderWhy() {
     ['O₂ na base virando ali', `${Math.round(P.tb.o2AtBase)}%`],
     ['Rádio na rota', los ? (los.losClear ? 'Visada direta com o habitat em toda a rota' : `Terreno bloqueia em ${Math.round(los.blindShare * 100)}% da rota (pior: ${A.num(los.maxObstructionMeters, 0)} m) → relé MRO`) : '—']
   ] : [];
-  const note = `DEM ${calib ? `checked against ${calib.n} M20 waypoints (bias ${calib.bias >= 0 ? '+' : ''}${calib.bias.toFixed(1)} m, σ ${calib.sd.toFixed(1)} m, RMS ${calib.rms.toFixed(1)} m)` : 'HRSC + MOLA 200 m'} | Kinematics: SEXTANT/Tobler + Suit Mass (${A.num(st.payloadKg || 0, 1)} kg)`;
+  const note = `DEM ${calib ? `checked against ${calib.n} M20 waypoints (bias ${calib.bias >= 0 ? '+' : ''}${calib.bias.toFixed(1)} m, σ ${calib.sd.toFixed(1)} m, RMS ${calib.rms.toFixed(1)} m)` : 'HRSC + MOLA 200 m'} | Kinematics: SEXTANT/Tobler + Suit Mass (${A.num(st.payloadKg || 0, 1)} kg) | Slope rule 15° − 0.2°/kg is a simulation hypothesis, not a validated EVA limit · algorithm v${Physics.ALGORITHM.version}`;
   $('#whyBody').innerHTML = `<h4>Motivos</h4><ul class="why-list">${reasons || '<li>Sem rota calculada.</li>'}</ul>` +
     (rows.length ? `<h4>Ida x volta</h4><div class="facts">${rows.map(([k, v]) => `<div><span>${k}</span><b class="mono">${v}</b></div>`).join('')}</div>` : '') +
     `<p class="calib mono">${note}</p>`;
@@ -122,8 +122,24 @@ $('#exportBtn').onclick = async () => {
     { type: 'Feature', geometry: { type: 'Point', coordinates: [P.tbLL[1], P.tbLL[0]] }, properties: { kind: 'turn_back_point', o2_at_base_pct: +P.tb.o2AtBase.toFixed(1), reaches_goal: P.tb.reachesEnd } }
   ].concat(st.stops.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.p.lon, s.p.lat] }, properties: { kind: s.isGoal ? 'goal' : 'science_stop', name: s.p.n, km_from_base: +s.km.toFixed(2) } })));
   const body = { type: 'FeatureCollection', features: feats };
+  /* Auditoria: de onde veio cada entrada e com qual versão do algoritmo, para reproduzir o veredito depois */
+  const head = async u => { try { const r = await fetch(`${A.API}${u}`, { method: 'HEAD' }); return { date: r.headers.get('x-aresnav-data-date'), sha256: r.headers.get('x-aresnav-evidence-sha256'), degraded: r.headers.get('x-aresnav-degraded') === 'true' }; } catch (e) { return null; } };
+  const [demH, teleH] = await Promise.all([head('/dem/jezero'), head('/telemetry')]);
+  const ageH = d => (d ? Math.round((Date.now() - Date.parse(d)) / 3600000 * 10) / 10 : null);
+  const meda = (st.tele && st.tele.layers && st.tele.layers.atmosphere_meda) || null;
+  const audit = {
+    algorithm: Physics.ALGORITHM,
+    route_mode: st.mode, route_search: 'A* on the DEM grid (8 neighbours); safe = slope penalty, short = distance',
+    dem: { source: 'NASA Mars Trek · Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp (HRSC + MOLA)', resolution_m: 200, grid: '150 x 145',
+      bbox: [A.BOX.XMIN, A.BOX.YMIN, A.BOX.XMAX, A.BOX.YMAX], retrieved_at: demH && demH.date, sha256: demH && demH.sha256, from_cache: demH ? demH.degraded : null,
+      known_bias_vs_m20: calib ? { waypoints: calib.n, bias_m: +calib.bias.toFixed(2), sigma_m: +calib.sd.toFixed(2) } : null },
+    payload: { kg: st.payloadKg, slope_limit_deg: A.LIM.safe, metabolic_factor: +Physics.metabolicFactor(st.payloadKg).toFixed(3), slope_rule: Physics.SLOPE_RULE },
+    weather: { source: 'AresNav contract (MEDA sample values)', values: meda, measured_at: null, note: 'the contract carries no measurement time: treat as sample values, not a live reading',
+      file_updated_at: teleH && teleH.date, file_age_h: ageH(teleH && teleH.date) },
+    simulated: ['oxygen use', 'heart rate', 'pace vs payload', 'slope limit rule'], measured: ['terrain', 'rover traverse and waypoints', 'imagery'],
+  };
   const meta = {
-    generator: 'AresNav · Lumia · NASA Space Apps 2026', created: new Date().toISOString(), mars_time: (m => ({ sol: m.sol, lmst: hhmm(m.lmst), ls_deg: +m.ls.toFixed(1) }))(marsTime()),
+    generator: 'AresNav · Lumia · NASA Space Apps 2026', created: new Date().toISOString(), audit, mars_time: (m => ({ sol: m.sol, lmst: hhmm(m.lmst), ls_deg: +m.ls.toFixed(1) }))(marsTime()),
     verdict: st.assessment ? st.assessment.level : null, reasons: st.assessment ? st.assessment.reasons : [],
     suit_payload_kg: st.payloadKg, max_safe_slope_deg: A.LIM.safe, radio: st.los ? { los_clear_whole_route: st.los.losClear, blind_share: +st.los.blindShare.toFixed(2), worst_obstruction_m: st.los.maxObstructionMeters } : null,
     calibration: calib ? { m20_waypoints: calib.n, bias_m: +calib.bias.toFixed(2), sigma_m: +calib.sd.toFixed(2), rms_m: +calib.rms.toFixed(2) } : null,

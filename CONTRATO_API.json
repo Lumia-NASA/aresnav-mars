@@ -34,7 +34,7 @@
         "name": "Carbonate Ridge (Bio-signature Target)",
         "mineral": "Phyllosilicates / Clays",
         "lat": 18.4512,
-        "lng": 77.4410,
+        "lng": 77.441,
         "safe_route": true,
         "optical_first_person_url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/00450/ids/edr/browse/ncam/NLB_0450_0707123456_000ECM_N0260000NCAM00500_01_295J01_1200.jpg",
         "geology_context": "Afloramento sedimentar lacustre; alta probabilidade de bioassinaturas preservadas."
@@ -52,5 +52,22 @@
     "optical_viking": "https://trek.nasa.gov/tiles/Mars/EQ/Viking_MDIM21_ClrMosaic_global_232m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
     "topography_mola": "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
     "thermal_tes": "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia_global_3km/1.0.0//default/default028mm/{z}/{y}/{x}.png"
+  },
+  "endpoints": {
+    "GET /health": "Estado do serviço",
+    "GET /api/v1/telemetry": "Telemetria unificada deste contrato (selo SHA-256 em evidenceSha256)",
+    "GET /api/v1/traverse": "Trajeto do Perseverance (MMGIS), com cache offline",
+    "GET /api/v1/waypoints": "Paradas do Perseverance com elev_geoid (calibração do relevo)",
+    "GET /api/v1/tiles/:layer/:z/:y/:x": "Blocos de imagem: Mars Trek WMTS e WMS da FU Berlin (fubcolor, fubcontour); ?offline=1 só cache",
+    "GET /api/v1/dem/jezero": "Relevo HRSC+MOLA 200 m de Jezero (float32 150x145)",
+    "GET /api/v1/dem/patch/:lat/:lon": "Relevo sob demanda em blocos de 2 graus (int16 513x513)",
+    "GET /api/v1/crism": "Detecções de minerais hidratados (CRISM)",
+    "GET /api/v1/navcam/*": "Fotos brutas da Navcam do Perseverance",
+    "GET /api/v1/zones": "Zonas de exploração humana (workshop NASA 2015, Mars Trek EZMars)",
+    "GET /api/v1/fub/:layer": "Camadas vetoriais da FU Berlin: lake, channel-lines, landingellipse, poi, panoramas",
+    "GET /api/v1/fub/pano/:folder/*": "Blocos dos panoramas 360 (krpano da FU Berlin); ?offline=1 só cache",
+    "GET /api/v1/copilot": "Aviso tático simples a partir da telemetria",
+    "GET /api/v1/copilot/status": "Se o copiloto ARES tem chave da API (ai) e qual modelo",
+    "POST /api/v1/copilot/ask": "Pergunta ao ARES com o resumo da caminhada; 503 sem chave (o navegador usa o modo local)"
   }
 }
