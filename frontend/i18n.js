@@ -16,6 +16,12 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  '64 pontos · clique para ver em 360° aqui no app': '64 spots · click to view in 360° inside the app',
+  'Cor natural': 'Natural color',
+  'Realce de minerais': 'Mineral enhancement',
+  'montagem': 'stitching',
+  'Arraste para olhar em volta · roda do mouse aproxima · Esc fecha · Panorama:': 'Drag to look around · scroll to zoom · Esc closes · Panorama:',
+  'Panorama 360°': '360° panorama',
   'Jezero · FU Berlin': 'Jezero · FU Berlin',
   'Margem do antigo lago': 'Paleo-lake shoreline',
   'Contorno mapeado pela FU Berlin': 'Mapped by FU Berlin',

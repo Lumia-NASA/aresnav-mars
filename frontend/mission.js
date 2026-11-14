@@ -146,7 +146,7 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-shore" checked><b>Margem do antigo lago</b><small>Contorno mapeado pela FU Berlin</small></label>
   <label class="layer"><input type="checkbox" id="ov-channels" checked><b>Canais dos rios</b><small>Neretva e Sava (entrada), Pliva (saída)</small></label>
   <label class="layer"><input type="checkbox" id="ov-ellipse" checked><b>Elipse de pouso do Perseverance</b><small>Área-alvo do pouso da Mars 2020</small></label>
-  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>64 pontos · clique para abrir o tour da FU Berlin</small></label>
+  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>64 pontos · clique para ver em 360° aqui no app</small></label>
   <label class="layer"><input type="checkbox" id="ov-contour"><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
   <h3 class="gap">Marte inteiro</h3>
   <label class="layer"><input type="checkbox" id="ov-sites" checked><b>Locais de pouso</b><small>14 sondas e rovers, 1971–2021</small></label>
@@ -351,12 +351,13 @@ const gview = $('#view-globe'); if (gview) gview.appendChild(banner);
 const FUB = {}, FUB_TOUR = id => `https://maps.planet.fu-berlin.de/jezero/360/${encodeURIComponent(id)}`;
 const fubL = { shore: null, channels: null, ellipse: null, pano360: null }, fubG = { shore: [], channels: [], ellipse: [], pano360: [] };
 async function loadFub() {
-  await Promise.all(['lake', 'channel-lines', 'landingellipse', 'panoramas'].map(async k => {
-    try { const r = await fetch(`${A.API}/fub/${k}`); if (r.ok) FUB[k] = (await r.json()).data; } catch (e) { /* sem backend: camada fica vazia */ }
+  await Promise.all(['lake', 'channel-lines', 'landingellipse', 'panoramas'].map(async k => {   // no-cache: sempre confere com o servidor
+    try { const r = await fetch(`${A.API}/fub/${k}`, { cache: 'no-cache' }); if (r.ok) FUB[k] = (await r.json()).data; } catch (e) { /* sem backend: camada fica vazia */ }
   }));
   buildFubLeaflet(); drawFub();
 }
-const openTour = (id, name) => { const w = window.open(FUB_TOUR(id), '_blank', 'noopener'); if (!w) alert(tr('Abra no navegador: ') + FUB_TOUR(id) + ' · ' + name); };
+/* abre o panorama no visor 360° do próprio app (pano360.js); o site da FU Berlin fica só como crédito */
+const openTour = p => { if (A.pano360) A.pano360.open(p); };
 const panoTxt = p => `${p.name || 'Panorama'} · ${(p.credits || '').replace(/,.*$/, '')} · ${tr('abrir 360°')}`;
 function buildFubLeaflet() {
   if (!window.L || !A.map) return;
@@ -364,7 +365,7 @@ function buildFubLeaflet() {
   if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#7FD4FF', weight: 1.6, opacity: 0.9 }, interactive: false });
   if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
   if (FUB.panoramas) fubL.pano360 = L.geoJSON(FUB.panoramas, { pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 5, color: '#0A0D14', weight: 1.5, fillColor: '#FF9F43', fillOpacity: 0.95 }),
-    onEachFeature: (f, l) => { l.bindTooltip(panoTxt(f.properties), { className: 'tag' }); l.on('click', e => { L.DomEvent.stopPropagation(e); openTour(f.properties.pano_id, f.properties.name); }); } });
+    onEachFeature: (f, l) => { l.bindTooltip(panoTxt(f.properties), { className: 'tag' }); l.on('click', e => { L.DomEvent.stopPropagation(e); openTour(f.properties); }); } });
 }
 function ringsOf(g) { return g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []; }
 function drawFub() {
@@ -386,7 +387,7 @@ function drawFub() {
   Object.keys(fubG).forEach(k => fubG[k].forEach(e => { e.show = on('ov-' + k) && !walking; }));
   if (!v._aresTourClick) {   // clique num ponto 360° abre o tour da FU Berlin
     v._aresTourClick = new C.ScreenSpaceEventHandler(v.scene.canvas);
-    v._aresTourClick.setInputAction(ev => { const pk = v.scene.pick(ev.position); const p = pk && pk.id && pk.id._aresTour; if (p) openTour(p.pano_id, p.name); }, C.ScreenSpaceEventType.LEFT_CLICK);
+    v._aresTourClick.setInputAction(ev => { const pk = v.scene.pick(ev.position); const p = pk && pk.id && pk.id._aresTour; if (p) openTour(p); }, C.ScreenSpaceEventType.LEFT_CLICK);
   }
 }
 

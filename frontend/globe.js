@@ -72,7 +72,8 @@ function init() {
       const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box && !d.min ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
       // d.min: a camada só aparece de perto (o tom do mosaico da FU Berlin difere do Viking visto de longe)
-      const l = d.min ? viewer.imageryLayers.add(new C.ImageryLayer(provider, { minimumTerrainLevel: d.min })) : viewer.imageryLayers.addImageryProvider(provider);
+      let l; // imageryLayers.add() não devolve a camada; addImageryProvider() devolve
+      if (d.min) { l = new C.ImageryLayer(provider, { minimumTerrainLevel: d.min }); viewer.imageryLayers.add(l); } else l = viewer.imageryLayers.addImageryProvider(provider);
       if (alpha != null) l.alpha = alpha;
       layers[name || k] = l;
     };

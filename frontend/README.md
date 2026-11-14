@@ -148,7 +148,11 @@ O WebGIS de Jezero da Freie Universität Berlin (`maps.planet.fu-berlin.de/jezer
   - margem do antigo lago;
   - 20 canais (Neretva, Sava, Pliva);
   - elipse de pouso do Perseverance;
-  - 64 pontos de panorama 360°. Clicar num ponto abre o tour da FU Berlin em `/jezero/360/<id>`.
+  - 64 pontos de panorama 360° (Mastcam-Z e cenas sintéticas, como o lago cheio). Clicar num ponto abre o **visor 360° do próprio app** (`pano360.js`).
+    - O visor monta o cubo do krpano com CSS 3D, sem biblioteca. Também reprojeta os panoramas esféricos em cubo, num canvas.
+    - Cada panorama tem a versão "cor natural" e a versão "realce de minerais".
+    - Os blocos passam por `/api/v1/fub/pano/...` e ficam em cache no disco.
+    - O formato de cada panorama (pasta, nível e se é esférico) vem do `tour.xml` da FU Berlin, lido por `tools/build-fub-cache.py`. No krpano, o primeiro número de `multires` é o tamanho do bloco.
 - **Como os dados foram gerados:** o WFS deles só fala EPSG:49911 (Marte, cilíndrica equidistante, R = 3 396 190 m). `tools/build-fub-cache.py` baixa as camadas e converte para graus (x/R, y/R). A conversão bate com os limites que o próprio servidor informa.
 - **Créditos exigidos:** HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX: NASA/JPL-Caltech/MSSS; HiRISE: NASA/JPL/University of Arizona (Fergason et al., 2020). Estão no rodapé do app.
 

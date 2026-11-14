@@ -492,8 +492,27 @@ fastify.get('/api/v1/fub/:layer', async (request, reply) => {
   const data = loadOfflineCache(path.join(FUB_DIR, `${name}.geojson`));
   if (!data) return reply.code(404).send({ error: 'Camada fora do cache. Rode python tools/build-fub-cache.py' });
   const hash = computeEvidenceHash(data);
-  return reply.code(200).header('X-AresNav-Evidence-SHA256', hash).header('Cache-Control', 'public, max-age=86400')
+  return reply.code(200).header('X-AresNav-Evidence-SHA256', hash).header('Cache-Control', 'no-cache')
     .send({ success: true, source: 'FU Berlin Jezero WebGIS', evidenceSha256: hash, data });
+});
+
+// Blocos dos panoramas 360° (cubos do krpano da FU Berlin), para o visor 360° do próprio app.
+// Só a prévia (6 faces em 256 px) e um nível com faces de até 1280 px (blocos de 512 px).
+const FUB_PANO = 'https://maps.planet.fu-berlin.de/vtour/panos';
+const PANO_CACHE_DIR = path.join(__dirname, 'data', 'cache', 'fubpano');
+fastify.get('/api/v1/fub/pano/:folder/*', { config: PROXY_RATE }, async (request, reply) => {
+  const folder = request.params.folder, rest = request.params['*'];
+  // formatos do krpano: estéreo "1/f/l2/01/l2_1/f_01_02.jpg" e simples "f/l2/1/l2_f_1_2.jpg"; níveis 1 a 3 (faces de até 1280 px)
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(folder) || !/^(preview\.jpg|1\/[fblrud]\/l[1-3]\/0[1-3]\/l[1-3]_1\/[fblrud]_0[1-3]_0[1-3]\.jpg|[fblrud]\/l[1-3]\/[1-3]\/l[1-3]_[fblrud]_[1-3]_[1-3]\.jpg|l1\/00[0-3]\/l1_00[0-3]_00[0-5]\.jpg)$/.test(rest)) {   // ... e esférico \"l1/001/l1_001_002.jpg\"
+    return reply.code(400).send({ error: 'Bloco de panorama inválido' });
+  }
+  const file = path.join(PANO_CACHE_DIR, folder, rest);
+  let r;
+  if (!readCache(file) && !cacheOnly(request)) { await fubSlot(); try { r = await cachedBinary(`${FUB_PANO}/${folder}.tiles/${rest}`, file, false); } finally { fubFree(); } }
+  else r = await cachedBinary(`${FUB_PANO}/${folder}.tiles/${rest}`, file, cacheOnly(request));
+  if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'FU Berlin inacessível e bloco fora do cache' });
+  if (r.notFound) return reply.code(404).send({ error: 'Bloco não encontrado' });
+  return reply.code(200).header('Content-Type', 'image/jpeg').header('Cache-Control', 'public, max-age=604800').header('X-AresNav-Cache', r.cache).send(r.body);
 });
 
 // Zonas de exploração para missões humanas (NASA Human Landing Site / Exploration Zone Workshop, 2015)

@@ -560,3 +560,19 @@ body:not(.left-collapsed) .mission-banner{left:calc(50% + var(--lw) / 2 - var(--
 body.geo-enhanced #pano{filter:contrast(1.38) saturate(1.45) hue-rotate(-8deg)}
 @media (max-width:900px){.hud-fx{bottom:170px}}
 .basepick[data-base="fub"] .thumb{background:radial-gradient(circle at 40% 35%,#d9a77a,#9a5f3c 55%,#4a2a1a)}
+/* visor 360° (panoramas Mastcam-Z montados pela FU Berlin) */
+.pano360{position:fixed;inset:0;z-index:2100;background:#000}
+.p360-stage{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
+.p360-stage:active{cursor:grabbing}
+.p360-cube{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
+.p360-face{position:absolute;left:-512px;top:-512px;width:1024px;height:1024px;display:grid;background-size:100% 600%;backface-visibility:hidden;outline:1px solid transparent;overflow:hidden}
+.p360-face img{width:calc(100% + 1px);height:calc(100% + 1px);margin:-.5px;display:block;user-select:none;pointer-events:none}   /* sobrepõe meio pixel: some a linha entre os blocos */
+.p360-bar{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 16px;background:linear-gradient(180deg,rgba(0,0,0,.75),transparent);pointer-events:none}
+.p360-bar b{display:block;font-size:15px;font-weight:500}
+.p360-bar small{color:var(--muted);font-size:11px}
+.p360-actions{display:flex;gap:6px;pointer-events:auto}
+.p360-actions button{font-size:12px;padding:6px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.25);background:rgba(10,13,20,.7);color:var(--fg);cursor:pointer}
+.p360-actions button[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
+.p360-actions button:disabled{opacity:.4;cursor:not-allowed}
+.p360-hint{position:absolute;left:0;right:0;bottom:10px;margin:0;text-align:center;font-size:11px;color:rgba(255,255,255,.7);text-shadow:0 1px 2px #000}
+.p360-hint a{color:var(--accent)}
