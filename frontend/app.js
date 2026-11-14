@@ -283,9 +283,30 @@ function loadVoices() { try { voices = window.speechSynthesis.getVoices() || [];
 if ('speechSynthesis' in window) { loadVoices(); try { window.speechSynthesis.addEventListener('voiceschanged', loadVoices); } catch (e) { /* navegador antigo */ } }
 function bestVoice(lang) {
   const pre = lang.slice(0, 2).toLowerCase();
-  const score = v => (v.lang.toLowerCase() === lang.toLowerCase() ? 4 : 0) + (/natural|neural/i.test(v.name) ? 6 : 0) + (/google/i.test(v.name) ? 4 : 0) + (/online/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
+  // vozes neurais primeiro (Edge: "Francisca/Antonio Online (Natural)"; Chrome: "Google português do Brasil");
+  // as vozes "Desktop" antigas do Windows são as mais robóticas e ficam por último
+  const score = v => (v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase() ? 4 : 0) + (/natural|neural/i.test(v.name) ? 8 : 0)
+    + (/google/i.test(v.name) ? 5 : 0) + (/online/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1) - (/desktop|espeak/i.test(v.name) ? 4 : 0);
   return voices.filter(v => v.lang.toLowerCase().startsWith(pre)).sort((x, y) => score(y) - score(x))[0] || null;
 }
+/* No Chrome a lista de vozes chega vazia no primeiro instante: espera até 1,5 s por ela */
+function voicesReady() {
+  if (voices.length) return Promise.resolve();
+  return new Promise(res => {
+    const t = setTimeout(res, 1500);
+    try { window.speechSynthesis.addEventListener('voiceschanged', () => { clearTimeout(t); loadVoices(); res(); }, { once: true }); } catch (e) { clearTimeout(t); res(); }
+  });
+}
+/* Números como uma pessoa falaria: "18,5" vira "18 e meio" e "25,0" vira "25" */
+function spokenNumbers(msg, en) {
+  return msg.replace(/(\d+)[.,]5\b/g, en ? '$1 and a half' : '$1 e meio').replace(/(\d+)[.,]0\b/g, '$1');
+}
+/* Quebra a fala em frases curtas: cada uma ganha entonação própria e uma pausa de respiração.
+   Também evita o corte de falas longas do Chrome (para depois de ~15 s numa única fala). */
+function phrases(msg) {
+  return (msg.match(/[^.!?;:]+[.!?;:]*/g) || [msg]).map(s => s.trim()).filter(Boolean);
+}
+let speechRun = 0;
 /* Bipe curto de rádio antes da fala */
 function radioBeep() {
   try {
@@ -298,12 +319,29 @@ function speak(msg) {
   state.lastVoice = msg;
   try {
     if (!('speechSynthesis' in window)) return;
-    const lang = window.LANG === 'en' ? 'en-US' : 'pt-BR';
+    const en = window.LANG === 'en', lang = en ? 'en-US' : 'pt-BR', run = ++speechRun;
     window.speechSynthesis.cancel(); radioBeep();
-    const u = new SpeechSynthesisUtterance(msg), v = bestVoice(lang);
-    u.lang = lang; if (v) u.voice = v;
-    u.rate = 1.02; u.pitch = 0.92; u.volume = 1;
-    setTimeout(() => window.speechSynthesis.speak(u), 240);
+    const parts = phrases(spokenNumbers(msg, en));
+    voicesReady().then(() => {
+      if (run !== speechRun) return;                      // chegou outra fala nesse meio-tempo
+      const v = bestVoice(lang);
+      const say = i => {
+        if (run !== speechRun || i >= parts.length) return;
+        const text = parts[i], u = new SpeechSynthesisUtterance(text);
+        u.lang = lang; if (v) u.voice = v; u.volume = 1;
+        // ritmo e tom levemente diferentes por frase, como uma pessoa: a primeira (o chamado) mais firme,
+        // perguntas sobem no fim, e uma variação pequena tira a cadência de máquina
+        const jitter = (Math.random() - 0.5) * 0.06;
+        u.rate = (i === 0 ? 0.95 : 1.0) + jitter;
+        u.pitch = (/\?$/.test(text) ? 1.08 : i === 0 ? 1.02 : 0.98) + jitter;
+        // pausa de respiração maior depois de ponto final, menor depois de dois-pontos ou vírgula
+        const gap = /[.!?]$/.test(text) ? 260 + Math.random() * 120 : 140;
+        u.onend = () => setTimeout(() => say(i + 1), gap);
+        u.onerror = () => say(i + 1);
+        window.speechSynthesis.speak(u);
+      };
+      setTimeout(() => say(0), 260);                      // depois do bipe de rádio
+    });
   } catch (e) { /* navegador sem voz: o alerta visual continua valendo */ }
 }
 /* Aviso por voz quando o veredito vira NO-GO. Frases curtas e imperativas, estilo controle de missão. */
@@ -311,11 +349,12 @@ function announce(v) {
   const say = v => num(Math.round(v * 10) / 10, v % 1 ? 1 : 0);   // "25" em vez de "25,0" na fala
   const kg = say(state.payloadKg), lim = say(LIM.safe), o2 = Math.max(0, Math.round(state.plan ? state.plan.o2 : 0));
   const en = window.LANG === 'en';
+  // frases como um controlador de missão falaria no rádio: chama pelo nome, dá o motivo e sugere a saída
   speak(v.code === 'SLOPE'
-    ? (en ? `Helena, no go. Payload ${kg} kilograms. Safe slope limit is now ${lim} degrees. Route blocked. Drop payload or divert to flatter ground.`
-      : `Helena, no go. Carga de ${kg} quilos. Limite de declive agora em ${lim} graus. Rota bloqueada. Reduza a carga ou desvie por terreno plano.`)
-    : (en ? `Helena, no go. Payload ${kg} kilograms. Oxygen at return forecast at ${o2} percent, below the 30 percent reserve. Drop payload or shorten the route.`
-      : `Helena, no go. Carga de ${kg} quilos. Oxigênio previsto na volta em ${o2} por cento, abaixo da reserva de 30. Reduza a carga ou encurte a rota.`));
+    ? (en ? `Helena, hold on. With ${kg} kilos on the suit, the safe slope limit drops to ${lim} degrees. This route goes steeper than that, so it's a no go. Lighten the load, or let's find flatter ground.`
+      : `Helena, segura aí. Com ${kg} quilos no traje, o limite seguro de declive cai pra ${lim} graus. Essa rota passa disso, então é no go. Alivia a carga, ou vamos achar um caminho mais plano.`)
+    : (en ? `Helena, heads up. Carrying ${kg} kilos, you'd get back with only ${o2} percent oxygen. That's under our 30 percent reserve, so it's a no go. Drop some weight, or let's shorten the walk.`
+      : `Helena, atenção. Carregando ${kg} quilos, você voltaria com só ${o2} por cento de oxigênio. Isso fica abaixo da reserva de 30, então é no go. Deixa um pouco do peso, ou vamos encurtar a caminhada.`));
 }
 
 /* ---------- Mapa 2D (Leaflet) ---------- */
