@@ -388,7 +388,7 @@ function fxFrame() {
   fx.ground.x = walk.gx % 4096; fx.ground.y = walk.gy % 4096;
 }
 function move(m) {
-  const r = Math.PI / 180;
+  const r = Math.PI / 180; walk.moved = true;   // andou por conta própria: a execução mede o desvio da rota
   walk.gx += m * Math.sin(walk.heading * r); walk.gy += m * Math.cos(walk.heading * r); // metros andados, para o granulado do solo não escorregar
   walk.lat = Math.max(-88, Math.min(88, walk.lat + m * Math.cos(walk.heading * r) / (A.R_MARS * r)));
   walk.lon += m * Math.sin(walk.heading * r) / (A.R_MARS * r * Math.cos(walk.lat * r));
@@ -441,7 +441,7 @@ function step() {
 function enterWalk(host, lat, lon, heading) {
   init(); if (!viewer) return false;
   viewer.camera.cancelFlight();
-  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now() });
+  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now(), moved: false });
   setEx(1);                                   // no chão a escala é sempre real
   viewer.camera.frustum.near = 0.2 * K;       // deixa ver o chão a 1,7 m sem cortar
   if ('renderable' in viewer.scene.fog) viewer.scene.fog.renderable = false;   // a névoa do Cesium escurece o horizonte; o filtro do capacete faz a dele

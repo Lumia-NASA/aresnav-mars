@@ -21,7 +21,8 @@ An astronaut leaving a habitat in Jezero crater needs to answer three questions 
 | 7 | Switch to **Shortest** route on a far point: the direct path is dashed red, the safe detour green. | "When the short way is too steep for the load, it offers the safe detour in one click." | Slope from the 200 m terrain model |
 | 8 | Click a **360°** point near the depot. | "Before going, she can stand there: this is a real Mastcam-Z panorama from Perseverance. Purple points are synthetic views rendered from the terrain — we label them so nobody mistakes them for photos." | Mastcam-Z panoramas stitched by FU Berlin |
 | 9 | Open **ARES · AI** and ask "Where do I turn back?" | "ARES answers by voice, using only the numbers the app computed. With no AI key or no network it still answers, in local mode." | Claude (Anthropic) through our backend, or local rules |
-| 10 | Click **UPLINK: NASA LIVE** to cut the Earth–Mars link. | "Mars is up to 22 light-minutes away. When the link drops, route, verdict and physics keep working from the habitat's cache. Layers that need the internet say so." | Offline-first cache in the backend |
+| 10 | Click **Run the walk** with actual pace at 85%. Speed up the clock. | "Now she is out there. The panel compares plan and reality: she is 13 minutes behind, so the turn-back point is coming closer. ARES calls it out: turn back in 5 minutes... turn back now." Click **Turn back now**. | Execution engine on the same physics; real sunset at Jezero (Mars24, checked against MEDA) |
+| 11 | Click **UPLINK: NASA LIVE** to cut the Earth–Mars link. | "Mars is up to 22 light-minutes away. When the link drops, route, verdict and physics keep working from the habitat's cache. Layers that need the internet say so." | Offline-first cache in the backend |
 
 ## What makes it different (20 s)
 - **It explains itself.** Every verdict has its reasons, with numbers.
@@ -32,7 +33,8 @@ An astronaut leaving a habitat in Jezero crater needs to answer three questions 
 ## Limits we say out loud
 - **Terrain:** the route uses a 200 m terrain model. It finds the general path but hides boulders and small steps; check the HiRISE image along flagged stretches.
 - **Calibration:** the terrain model sits on average 19 m above the elevations Perseverance measured at 613 of its stops (σ 19 m). We show this calibration inside the app.
-- **Simulated values:** suit physics (oxygen use, heart rate, pace vs. payload) is a model, not data from a real suit. The weather values come from the AresNav contract (sample MEDA values).
+- **Simulated values:** suit physics (oxygen use, heart rate, pace vs. payload) is a model, not data from a real suit. The walk execution is simulated (no real suit telemetry).
+- **Weather:** temperature and pressure are real MEDA measurements, but the latest public sol is from April 2024; wind, dust and radiation are sample values (the public feed does not carry them). The app shows the date and labels samples.
 - **Hypothetical base:** the Ares-1 habitat does not exist.
 - **Not yet tested:** a real phone, and the AI answering with a live API key during the demo.
 

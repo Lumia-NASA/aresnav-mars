@@ -77,6 +77,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       await page.keyboard.press('Escape');
       assert.ok(await page.evaluate(() => document.querySelector('.pano360').hidden), 'Esc fecha o visor');
     });
+    await step('executar a caminhada: contagem até o ponto de retorno, "vire agora", virar e chegar em casa', async () => {
+      await page.evaluate(() => { App.speak = () => {}; const s = document.querySelector('#payload'); s.value = '18.5'; s.dispatchEvent(new Event('input', { bubbles: true })); });
+      await until(() => /NO-GO/.test(document.querySelector('#gonogo').innerText), 8000, 'voltar ao NO-GO com 18,5 kg');
+      await page.evaluate(() => { document.querySelector('#execPace').value = '0.85'; document.querySelector('#execBtn').click(); App.state.speed = 3; });
+      await until(() => !document.querySelector('#exec').hidden && /Turn back in|Vire em/.test(document.querySelector('#execTurnText').innerText), 8000, 'contagem aparecer');
+      // vira no mesmo instante em que o aviso aparece (como o astronauta obedecendo ao ARES)
+      await until(() => { if (!/TURN BACK NOW|VIRE AGORA/.test(document.querySelector('#execTurnText').innerText)) return false; document.querySelector('#execTurnNow').click(); return true; }, 60000, '"vire agora"');
+      const log = await page.evaluate(() => [...document.querySelectorAll('#execLog li')].map(l => l.innerText).join(' | '));
+      assert.ok(/Turn back now|Vire agora/.test(log), 'o ARES avisou: ' + log);
+      await until(() => /Back at base|De volta à base/.test(document.querySelector('#execTurnText').innerText), 40000, 'chegar em casa');
+      const o2 = await page.evaluate(() => App.execution.run.prev.o2Now);
+      assert.ok(o2 >= 27, `virando no aviso chega perto da reserva de 30%: ${o2.toFixed(1)}%`);   // passo de 3 min: pode passar um pouco do ponto
+      await page.evaluate(() => { App.state.speed = 1.5; document.querySelector('#execStop').click(); App.setView('globe'); });   // volta ao planejamento
+    });
     await step('cortar o enlace Terra-Marte e seguir com os dados disponíveis', async () => {
       await page.click('#uplink');
       await until(() => document.body.classList.contains('offline'), 8000, 'modo offline');

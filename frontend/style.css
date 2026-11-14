@@ -676,3 +676,34 @@ body.ge .gonogo.clickable{cursor:pointer}
 body.ge .gonogo.clickable:hover,body.ge .gonogo:focus-visible{outline:2px solid #7FD4FF;outline-offset:2px}
 
 .prov-badge.e{color:#B4BCCB;border-style:dashed}   /* exemplo do contrato: não é leitura */
+
+/* Execução ao vivo da caminhada */
+.exec-btn{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid #7FD4FF;background:#14203A;color:#CFE0FF;font:600 12.5px var(--body);flex:none;cursor:pointer}
+.exec-btn[aria-pressed="true"]{border-color:#FF7A8A;background:#2A1218;color:#FF9AA6}
+.exec{position:fixed;z-index:880;right:14px;top:calc(var(--bar) + 300px);width:min(340px,calc(100vw - 28px));box-sizing:border-box;padding:12px 14px;border-radius:12px;
+  background:rgba(13,16,24,.94);border:1px solid #2B4A73;box-shadow:0 10px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:9px;font-size:12.5px}
+body:not(.helmet-mode) .exec{top:auto;bottom:118px;right:calc(var(--rw) + 26px)}
+body.right-collapsed:not(.helmet-mode) .exec{right:14px}
+.exec header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.exec header b{font:700 12px var(--mono);letter-spacing:.12em;color:#9CC2FF}
+.exec-sim{font:600 10px var(--mono);padding:1px 6px;border-radius:4px;border:1px dashed #B4BCCB;color:#B4BCCB}
+.exec-pace{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px}
+.exec-pace select{background:var(--surface2);color:var(--fg);border:1px solid var(--edge);border-radius:6px;padding:3px 6px;font:inherit}
+.exec-turn{display:flex;flex-direction:column;gap:5px;padding:9px 10px;border-radius:8px;border:1px solid var(--edge);font:600 13px var(--body)}
+.exec-turn i{display:block;height:5px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.exec-turn i b{display:block;height:100%;border-radius:99px;background:currentColor;transition:width .25s linear}
+.exec-turn.ok{color:#7EF2C8;border-color:#1F6B57;background:#0F2A24}
+.exec-turn.warn{color:#FFCB66;border-color:#6B5419;background:#2A1F0E}
+.exec-turn.crit{color:#FF9AA6;border-color:#7A2633;background:#2A1218;animation:hudalert 1.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.exec-turn.crit{animation:none}}
+.exec-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0}
+.exec-grid dt{color:var(--muted)} .exec-grid dd{margin:0;font-family:var(--mono);font-size:12px}
+.exec-grid dd.warn{color:#FFCB66} .exec-grid dd.crit{color:#FF9AA6}
+.exec-actions{display:flex;gap:6px}
+.exec-actions button{flex:1;min-height:36px;border-radius:8px;border:1px solid #2E3647;background:var(--surface2);color:var(--fg);font:600 12px var(--body);cursor:pointer}
+.exec-actions #execTurnNow{border-color:#FFB020;color:#FFCB66}
+.exec-actions button:disabled{opacity:.45;cursor:not-allowed}
+.exec-log{list-style:none;margin:0;padding:8px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px;max-height:118px;overflow:auto}
+.exec-log li{font-size:12px;line-height:1.35} .exec-log li span{font-family:var(--mono);color:#7EF2C8;margin-right:4px}
+body.executing.helmet-mode .hud-target{display:none}
+@media (max-width:900px){.exec{top:auto;bottom:150px;right:8px}}
