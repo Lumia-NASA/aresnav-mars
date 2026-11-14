@@ -19,6 +19,8 @@ npm-debug.log*
 
 # Cache de Telemetria NASA (mantido local para offline)
 data/cache/*.tmp
+backend/data/cache/tiles/
+backend/data/cache/navcam/
 
 # Arquivos de Sistema e IDE
 .DS_Store

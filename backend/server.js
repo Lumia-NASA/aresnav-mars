@@ -16,7 +16,7 @@ const fastify = Fastify({
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:3000,http://localhost:5173';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:3000,http://localhost:5173,http://localhost:5183,http://127.0.0.1:5183';
 const NASA_TRAVERSE_URL = process.env.NASA_TRAVERSE_URL || 'https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_traverse.json';
 const NASA_WAYPOINTS_URL = process.env.NASA_WAYPOINTS_URL || 'https://mars.nasa.gov/mmgis-maps/M20/Layers/json/M20_waypoints.json';
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 8000;
@@ -37,7 +37,9 @@ fastify.register(require('@fastify/helmet'), {
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   frameguard: { action: 'deny' },
-  noSniff: true
+  noSniff: true,
+  // o frontend roda em outra origem e carrega imagens e dados daqui
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 });
 
 // 2. Strict CORS
@@ -48,7 +50,8 @@ fastify.register(require('@fastify/cors'), {
     if (allowed.includes(origin)) return cb(null, true);
     return cb(new Error('Origem não autorizada pela política AresNav'), false);
   },
-  methods: ['GET']
+  methods: ['GET'],
+  exposedHeaders: ['X-AresNav-Evidence-SHA256', 'X-AresNav-Degraded', 'X-AresNav-Cache']
 });
 
 // 3. Heavy Rate Limiting
@@ -235,6 +238,125 @@ fastify.get('/api/v1/waypoints', async (request, reply) => {
       message: 'API da NASA inacessível e cache de waypoints não encontrado.'
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Proxies blindados para o frontend (regra: o navegador nunca chama a NASA direto)
+// Cada rota aceita só identificadores de uma lista fechada, passa pelo ScopeGuard
+// e guarda a resposta em disco para operar offline.
+// ---------------------------------------------------------------------------
+const TILE_CACHE_DIR = path.join(CACHE_DIR, 'tiles');
+const NAVCAM_CACHE_DIR = path.join(CACHE_DIR, 'navcam');
+const TREK_TILES = 'https://trek.nasa.gov/tiles/Mars/EQ';
+const TREK_AGS = 'https://trek.nasa.gov/mars/trekarcgis/rest/services';
+const NAVCAM_BASE = 'https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/';
+const JEZERO_BBOX = [77.25, 18.33, 77.55, 18.62];
+const TILE_LAYERS = {
+  viking: { id: 'Mars_Viking_MDIM21_ClrMosaic_global_232m', ext: 'jpg', max: 7 },
+  relief: { id: 'Mars_MOLA_blend200ppx_HRSC_ClrShade_clon0dd_200mpp_lzw', ext: 'jpg', max: 8 },
+  mola: { id: 'Mars_MGS_MOLA_ClrShade_merge_global_463m', ext: 'jpg', max: 7 },
+  ctx: { id: 'JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0', ext: 'png', max: 13 },
+  hirise: { id: 'JEZ_hirise_soc_006_orthoMosaic_25cm_Eqc_latTs0_lon0_first_dd', ext: 'png', max: 17 },
+  mosaic: { id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018', ext: 'png', max: 16 },
+  themis: { id: 'THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018', ext: 'png', max: 9 }
+};
+const PROXY_RATE = { rateLimit: { max: parseInt(process.env.TILE_RATE_LIMIT_MAX, 10) || 3000, timeWindow: '1 minute' } };
+const missing = new Set(); // blocos que a NASA respondeu 404 (sem cobertura)
+
+function readCache(file) { try { return fs.readFileSync(file); } catch (e) { return null; } }
+function writeCache(file, buf) {
+  try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); }
+  catch (e) { fastify.log.warn({ err: e.message }, 'Não foi possível gravar cache em disco'); }
+}
+async function fetchBinary(url) {
+  assertAuthorizedScope(url);
+  const r = await axios.get(url, {
+    responseType: 'arraybuffer', timeout: REQUEST_TIMEOUT_MS, maxContentLength: 20 * 1024 * 1024,
+    headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 200 || st === 404
+  });
+  return { status: r.status, body: Buffer.from(r.data) };
+}
+/* Busca na NASA com cache em disco. Devolve { body, cache } ou { notFound } ou null (NASA fora do ar) */
+async function cachedBinary(url, file) {
+  const hit = readCache(file);
+  if (hit) return { body: hit, cache: 'HIT' };
+  try {
+    const r = await fetchBinary(url);
+    if (r.status === 404) return { notFound: true };
+    writeCache(file, r.body);
+    return { body: r.body, cache: 'MISS' };
+  } catch (e) {
+    fastify.log.warn({ err: e.message, url }, 'Falha no upstream da NASA');
+    return null;
+  }
+}
+const MIME = { jpg: 'image/jpeg', png: 'image/png' };
+
+// Blocos de imagem do NASA Mars Trek (WMTS)
+fastify.get('/api/v1/tiles/:layer/:z/:y/:x', { config: PROXY_RATE }, async (request, reply) => {
+  const L = TILE_LAYERS[request.params.layer];
+  const [z, y, x] = ['z', 'y', 'x'].map(k => Number(request.params[k]));
+  if (!L || ![z, y, x].every(Number.isInteger) || z < 0 || z > L.max || y < 0 || x < 0 || y >= 2 ** z || x >= 2 ** (z + 1)) {
+    return reply.code(400).send({ error: 'Bloco inválido' });
+  }
+  const key = `${request.params.layer}/${z}/${y}/${x}`;
+  if (missing.has(key)) return reply.code(404).send({ error: 'Sem cobertura' });
+  const r = await cachedBinary(`${TREK_TILES}/${L.id}/1.0.0/default/default028mm/${z}/${y}/${x}.${L.ext}`, path.join(TILE_CACHE_DIR, `${key}.${L.ext}`));
+  if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e bloco fora do cache' });
+  if (r.notFound) { missing.add(key); return reply.code(404).send({ error: 'Sem cobertura' }); }
+  return reply.code(200).header('Content-Type', MIME[L.ext]).header('Cache-Control', 'public, max-age=86400').header('X-AresNav-Cache', r.cache).send(r.body);
+});
+
+// Relevo de Jezero (MOLA + HRSC, 200 m) como grade float32 de 150 x 145
+fastify.get('/api/v1/dem/jezero', async (request, reply) => {
+  const [x0, y0, x1, y1] = JEZERO_BBOX;
+  const url = `${TREK_AGS}/Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp_lzw/ImageServer/exportImage?bbox=${x0},${y0},${x1},${y1}&bboxSR=104905&imageSR=104905&size=150,145&format=bsq&pixelType=F32&interpolation=RSP_BilinearInterpolation&f=image`;
+  const file = path.join(CACHE_DIR, 'dem_jezero_200m.cached.f32');
+  let body = null, degraded = false;
+  try {
+    const r = await fetchBinary(url);
+    if (r.status !== 200 || r.body.length < 150 * 145 * 4) throw new Error('resposta inesperada');
+    body = r.body.subarray(0, 150 * 145 * 4);
+    writeCache(file, body);
+  } catch (e) {
+    fastify.log.warn({ err: e.message }, 'Relevo indisponível na NASA. Acionando cache offline.');
+    body = readCache(file); degraded = true;
+  }
+  if (!body) return reply.code(504).send({ error: 'NASA inacessível e relevo fora do cache' });
+  reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
+  return reply.code(200).header('Content-Type', 'application/octet-stream').header('X-AresNav-Degraded', String(degraded)).send(body);
+});
+
+// Detecções de minerais hidratados (CRISM) em Jezero
+fastify.get('/api/v1/crism', async (request, reply) => {
+  const [x0, y0, x1, y1] = JEZERO_BBOX;
+  const url = `${TREK_AGS}/Hydrous_Mineral_Detections_OMEGA_CRISM_clon0/MapServer/0/query?where=1%3D1&outFields=Type,Instrument&geometry=${x0},${y0},${x1},${y1}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outSR=4326&f=geojson`;
+  const file = path.join(CACHE_DIR, 'crism_jezero.cached.json');
+  try {
+    assertAuthorizedScope(url);
+    const r = await axios.get(url, { timeout: REQUEST_TIMEOUT_MS, headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 200 });
+    verifyEvidenceIntegrity(r.data);
+    writeCache(file, JSON.stringify(r.data));
+    const hash = computeEvidenceHash(r.data);
+    reply.header('X-AresNav-Evidence-SHA256', hash);
+    return reply.code(200).send({ success: true, degraded: false, evidenceSha256: hash, data: r.data });
+  } catch (e) {
+    fastify.log.warn({ err: e.message }, 'CRISM indisponível na NASA. Acionando cache offline.');
+    const cached = loadOfflineCache(file);
+    if (cached) return reply.code(200).send({ success: true, degraded: true, evidenceSha256: computeEvidenceHash(cached), data: cached });
+    return reply.code(504).send({ success: false, error: 'Upstream Unavailable' });
+  }
+});
+
+// Fotos brutas da Navcam do Perseverance (modo Capacete e pop-up de verdade de solo)
+const NAVCAM_PATH = /^\d{5}\/ids\/(edr|fdr)\/browse\/ncam\/[A-Za-z0-9_]+\.(jpg|png)$/;
+fastify.get('/api/v1/navcam/*', { config: PROXY_RATE }, async (request, reply) => {
+  const rel = request.params['*'];
+  if (!NAVCAM_PATH.test(rel)) return reply.code(400).send({ error: 'Caminho de foto inválido' });
+  const r = await cachedBinary(NAVCAM_BASE + rel, path.join(NAVCAM_CACHE_DIR, rel));
+  if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e foto fora do cache' });
+  if (r.notFound) return reply.code(404).send({ error: 'Foto não encontrada na NASA' });
+  return reply.code(200).header('Content-Type', MIME[rel.split('.').pop()]).header('Cache-Control', 'public, max-age=604800').header('X-AresNav-Cache', r.cache).send(r.body);
 });
 
 // Rota do Agente Tático Copilot (Inspirado no Google ADK)

@@ -15,7 +15,7 @@ let viewAz = 0, viewEl = 2, ppd = 10, spin = 0, anim = null;
 const loaded = fetch('data/pano/index.json').then(r => r.json()).then(d => {
   prefix = d.prefix;
   panos = d.panos.map(p => ({ sol: p.sol, lat: p.lat, lon: p.lon, km: p.km, t: p.t,
-    strips: p.s.map(([az, el, y, h, u, c]) => ({ url: prefix + u, color: !!c, w: 96, h: h * K, cx: (((az + p.yaw) % 360) + 360) % 360, cy: el - ((y + h / 2) - 1920) * K })) }));
+    strips: p.s.map(([az, el, y, h, u, c]) => ({ rel: u, color: !!c, w: 96, h: h * K, cx: (((az + p.yaw) % 360) + 360) % 360, cy: el - ((y + h / 2) - 1920) * K })) }));
 }).catch(e => console.warn('Índice de panoramas indisponível', e));
 
 const visible = () => A.state.view === 'helmet';
@@ -53,10 +53,11 @@ function build() {
   const frag = document.createDocumentFragment();
   for (let copy = 0; copy < 3; copy++) p.strips.forEach(im => {
     const el = document.createElement('img');
-    el.src = im.url; el.alt = ''; el.draggable = false; el.decoding = 'async';
+    const src = A.photoUrl(im.rel); if (!src) return; // as fotos passam pelo backend; sem ele, fica só o fundo
+    el.src = src; el.alt = ''; el.draggable = false; el.decoding = 'async';
     if (!im.color) el.className = 'gray';
     el.style.cssText = `left:${(im.cx - im.w / 2 + copy * 360) * ppd}px;top:${(EL_TOP - (im.cy + im.h / 2)) * ppd}px;width:${im.w * ppd}px;height:${im.h * ppd}px`;
-    el.addEventListener('load', () => { el.classList.add('in'); A.setStatus('navcam', 'ok'); }, { once: true });
+    el.addEventListener('load', () => { el.classList.add('in'); A.setStatus('navcam', A.state.linkState === 'online' ? 'ok' : 'fb'); }, { once: true });
     el.addEventListener('error', () => el.remove(), { once: true });
     frag.appendChild(el);
   });
@@ -145,21 +146,31 @@ function renderTarget() {
 const bar = (pct, color) => `<span class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></i></span>`;
 const tone = (v, warn, crit) => v <= crit ? 'var(--crit)' : v <= warn ? 'var(--warn)' : 'var(--ok)';
 const num = (v, d) => v.toFixed(d).replace('.', ',');
+const STATUS_PT = { FOLLOWING_SAFE_CONTOUR: 'seguindo contorno seguro', HAZARD_STEEP: 'declive perigoso', NOMINAL: 'nominal', SAFE: 'seguro' };
+const statusPt = v => STATUS_PT[v] || String(v || '—').toLowerCase().replace(/_/g, ' ');
 function renderHud() {
   if (!visible()) return;
-  const st = A.state, n = st.now;
-  if (n) {
-    $('#hudCrew').innerHTML = [['Você', `${Math.round(n.hr)} bpm`, n.o2], ['Dupla · a 14 m', `${Math.round(n.hr * 0.93 + 4)} bpm`, Math.min(100, n.o2 + 3)]]
-      .map(([a, b, o]) => `<div class="crew"><b>${a}</b><span class="mono">${b}</span>${bar(o, tone(o, 45, 30))}</div>`).join('') +
-      `<div class="crew"><b>Rover de apoio</b><span class="mono">seguindo a ${Math.round(40 + n.slope * 6)} m</span></div>`;
-    $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${tone(n.o2, 45, 30)}">${Math.round(n.o2)}<small>%</small></b></div>` +
-      [['Bateria', Math.round(n.batt) + '%'], ['Traje', num(n.suitTemp, 1) + ' °C'], ['Pressão', num(n.suitKpa, 1) + ' kPa'], ['Ritmo', num(n.speed, 1) + ' km/h'], ['Declive', num(n.slope, 1) + '°']]
-        .map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('');
-  } else $('#hudCrew').innerHTML = $('#hudSuit').innerHTML = '';
+  const st = A.state, n = st.now, t = st.tele || {}, mob = t.eva_mobility || {}, topo = (t.layers && t.layers.topography) || {}, meda = (t.layers && t.layers.atmosphere_meda) || {}, loc = t.location || {};
+  const o2 = Number(mob.o2_remaining_pct), hasO2 = isFinite(o2);
+  /* Widget de mobilidade e dupla (buddy system), com os campos do contrato */
+  $('#hudCrew').innerHTML =
+    `<div class="crew"><b>Você</b><span class="mono">${n ? Math.round(n.hr) + ' bpm' : '—'}</span>${hasO2 ? bar(o2, tone(o2, 45, 30)) : ''}</div>` +
+    `<div class="crew"><b>Dupla</b><span class="mono">a ${mob.buddy_eva2_distance_m != null ? A.num(mob.buddy_eva2_distance_m, 1) + ' m' : '—'}</span></div>` +
+    `<div class="crew"><b>Rover de apoio</b><span class="mono">${statusPt(mob.support_rover_status)}</span></div>` +
+    `<div class="crew"><b>Carga do traje</b><span class="mono">${mob.suit_payload_kg != null ? A.num(mob.suit_payload_kg, 1) + ' kg' : '—'}</span><small>limite de declive ${A.num(A.LIM.safe, 0)}° (${A.NO_LOAD_SLOPE}° sem carga)</small></div>`;
+  const steep = Number(topo.slope_deg) > Number(topo.max_safe_slope_deg);
+  $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
+    [['Declive', topo.slope_deg != null ? `<i style="color:${steep ? 'var(--crit)' : 'var(--ok)'}">${A.num(topo.slope_deg, 1)}°</i> / ${A.num(topo.max_safe_slope_deg, 0)}°` : '—'],
+      ['Terreno', statusPt(topo.terrain_status)], ['Temp.', meda.temp_c != null ? A.num(meda.temp_c, 1) + ' °C' : '—'], ['Vento', meda.wind_speed_ms != null ? A.num(meda.wind_speed_ms, 1) + ' m/s' : '—'],
+      ['Radiação', meda.radiation_msv_day != null ? A.num(meda.radiation_msv_day, 2) + ' mSv' : '—'], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
+      .map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('') +
+    (loc.lat != null ? `<div class="loc mono">${A.num(loc.lat, 4)}° N ${A.num(loc.lng, 4)}° L · ${A.num(loc.elevation_m, 0)} m</div>` : '');
   renderTarget();
-  const crit = (st.alerts || []).find(a => a[0] === 'var(--crit)'), al = $('#hudAlert');
-  const msg = st.emerg ? 'EMERGÊNCIA · siga a rota tracejada até a base' : n && n.o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : crit ? crit[1] : null;
+  const hud = (t.hud_alerts || []).find(a => a.level === 'CRITICAL') || (t.hud_alerts || [])[0], al = $('#hudAlert');
+  const msg = st.emerg ? 'EMERGÊNCIA · siga a rota tracejada até a base'
+    : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
+  $('#hudOffline').hidden = st.linkState === 'online';
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
@@ -167,12 +178,14 @@ function renderHud() {
   } else {
     const p = cur();
     if (!p) src.textContent = panos.length ? '' : 'Carregando panoramas do rover…';
+    else if (!A.link.online) src.textContent = `OFFLINE: as fotos do rover precisam do backend AresNav · parada ${idx + 1} de ${panos.length} · sol ${p.sol}`;
     else {
       const far = !manual && n ? A.metersBetween(n.lat, n.lon, p.lat, p.lon) : 0;
       src.textContent = `Foto real · Perseverance Navcam · sol ${p.sol}${p.t ? ' · ' + p.t + ' LMST' : ''} · parada ${idx + 1} de ${panos.length} · km ${num(p.km, 2)} do trajeto do rover${far > 150 ? ` · panorama mais próximo, a ${dist(far)} de você` : ''}`;
     }
   }
 }
+const hud1Hz = A.throttle(renderHud, 1000);   // o HUD atualiza a 1 Hz
 function renderBar() {
   const photo = mode === 'photo';
   const jumps = photo
@@ -227,13 +240,20 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) A.globe.walk.keys[k] = false; });
 window.addEventListener('blur', () => { A.globe.walk.keys = {}; });
 
-A.on('walk', w => { viewAz = w.heading; if (!visible()) return; renderCompass(); renderHud(); setCam(); });
+const cam1Hz = A.throttle(setCam, 1000);
+A.on('walk', w => { viewAz = w.heading; if (!visible()) return; renderCompass(); renderTarget(); hud1Hz(); cam1Hz(); });
 A.on('view', async v => {
   if (v !== 'helmet') { if (mode === 'terrain') { A.globe.exitWalk(); mode = 'photo'; $('#pano').classList.remove('terrain'); } A.state.cam = null; A.drawRoute(); A.emit('cam'); return; }
   renderBar(); await loaded; follow(); if (idx < 0) setIdx(0);
   build(); setCam(); renderHud(); renderBar();
 });
 A.on('route', () => { if (visible()) { follow(); place(); renderHud(); } });
-A.on('tick', () => { if (visible()) { follow(); place(); renderHud(); } });
+A.on('tick', () => { if (visible()) { follow(); hud1Hz(); } });
+A.on('telemetry', () => { if (visible()) hud1Hz(); });
 window.addEventListener('resize', () => { if (visible() && mode === 'photo') build(); });
+/* Usado pelo pop-up de foto de solo e pelo botão "Ver no capacete" */
+A.pano = {
+  nearest(lat, lon) { const i = nearest(lat, lon); if (i < 0) return null; const p = panos[i], s = p.strips[Math.floor(p.strips.length / 2)]; return { url: s.rel, sol: p.sol, dist: A.metersBetween(lat, lon, p.lat, p.lon) }; },
+  goTo(lat, lon) { loaded.then(() => { manual = true; setIdx(nearest(lat, lon)); build(); renderBar(); }); }
+};
 })();

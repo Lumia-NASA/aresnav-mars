@@ -1,0 +1,56 @@
+{
+  "mission": "AresNav - Jezero Crater EVA",
+  "status": "ONLINE",
+  "degraded": true,
+  "evidenceSha256": "8a329fae4890c9b1399ad88d22c95e192738fa09bcba64b63e8a1d743a4e9999",
+  "location": {
+    "name": "Jezero Crater Delta",
+    "lat": 18.4447,
+    "lng": 77.4508,
+    "elevation_m": -2540.5
+  },
+  "eva_mobility": {
+    "mode": "HELMET_HUD",
+    "suit_payload_kg": 18.5,
+    "o2_remaining_pct": 84,
+    "buddy_eva2_distance_m": 14.2,
+    "support_rover_status": "FOLLOWING_SAFE_CONTOUR"
+  },
+  "layers": {
+    "topography": {
+      "slope_deg": 18.5,
+      "max_safe_slope_deg": 12.0,
+      "terrain_status": "HAZARD_STEEP"
+    },
+    "atmosphere_meda": {
+      "temp_c": -68.4,
+      "wind_speed_ms": 12.3,
+      "dust_storm_alert": true,
+      "radiation_msv_day": 0.64
+    },
+    "science_targets": [
+      {
+        "id": "WP-01",
+        "name": "Carbonate Ridge (Bio-signature Target)",
+        "mineral": "Phyllosilicates / Clays",
+        "lat": 18.4512,
+        "lng": 77.4410,
+        "safe_route": true,
+        "optical_first_person_url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/00450/ids/edr/browse/ncam/NLB_0450_0707123456_000ECM_N0260000NCAM00500_01_295J01_1200.jpg",
+        "geology_context": "Afloramento sedimentar lacustre; alta probabilidade de bioassinaturas preservadas."
+      }
+    ]
+  },
+  "hud_alerts": [
+    {
+      "level": "CRITICAL",
+      "code": "SLOPE_EXCEEDED",
+      "action": "Desviar 120m a Leste: inclinação de 18.5° excede limite seguro do traje (12° com carga de 18.5kg)."
+    }
+  ],
+  "mars_trek_wmts": {
+    "optical_viking": "https://trek.nasa.gov/tiles/Mars/EQ/Viking_MDIM21_ClrMosaic_global_232m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
+    "topography_mola": "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0//default/default028mm/{z}/{y}/{x}.jpg",
+    "thermal_tes": "https://trek.nasa.gov/tiles/Mars/EQ/TES_Thermal_Inertia_global_3km/1.0.0//default/default028mm/{z}/{y}/{x}.png"
+  }
+}

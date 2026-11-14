@@ -1,19 +1,22 @@
-/* Globo 3D de Marte (CesiumJS) com imagens do Mars Trek e relevo real.
-   O elipsoide do Cesium tem o tamanho da Terra, 1,88× maior que Marte. Por isso as alturas
-   são multiplicadas por 1,88 (para manter a proporção) e por 2,5 (exagero para dar leitura).
-   As distâncias mostradas no painel não usam o globo: são calculadas com o raio de Marte.
+/* Globo 3D de Marte (CesiumJS) com imagens do Mars Trek (via backend) e relevo real.
+   Usa o elipsoide marciano (raio equatorial 3396,2 km, polar 3376,2 km). A altura do relevo
+   é exagerada 2,5× para dar leitura. Se o navegador não aceitar trocar o elipsoide, cai para
+   o da Terra com as alturas reescaladas (1,88×).
    O mesmo globo serve ao modo "Terreno 3D" do Capacete: a câmera desce ao nível do chão
    e a pessoa anda por qualquer lugar de Marte. */
 (function () {
 'use strict';
 const A = App, $ = A.$;
-const EX = 2.5, VS = 1.88 * EX, EYE = 14;
+const EX = 2.5;
+let K = 1.88, VS = 1.88 * EX, EYE = 14; // K = tamanho do globo em relação a Marte (1 com o elipsoide marciano)
 let viewer = null, failed = false, C = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
 const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null };
 
 function fail(e) {
   failed = true; console.error('Globo 3D', e);
+  try { if (viewer) viewer.destroy(); } catch (err) { /* já estava quebrado */ }
+  viewer = null;
   const m = $('#globeMsg'); m.hidden = false;
   m.textContent = 'O globo 3D não pôde ser aberto neste navegador (precisa de WebGL e internet). Use o modo Mapa.';
   if (A.state.view === 'globe') A.setView('map');
@@ -24,6 +27,11 @@ function init() {
   try {
     if (!window.Cesium) throw new Error('Cesium não carregou');
     C = Cesium;
+    try { // elipsoide de Marte (skill 01)
+      C.Ellipsoid.default = new C.Ellipsoid(3396200, 3396200, 3376200);
+      if (Math.abs(C.Cartesian3.fromDegrees(0, 0, 0).x - 3396200) < 1) { K = 1; VS = EX; EYE = 7.5; }
+      else C.Ellipsoid.default = C.Ellipsoid.WGS84;
+    } catch (e) { K = 1.88; }
     const geo = new C.GeographicTilingScheme();
     const terrain = new C.CustomHeightmapTerrainProvider({
       width: 33, height: 33, tilingScheme: geo,
@@ -42,14 +50,20 @@ function init() {
     const scene = viewer.scene, globe = scene.globe;
     globe.baseColor = C.Color.fromCssColorString('#3a2218');
     globe.enableLighting = false; globe.showGroundAtmosphere = false; globe.depthTestAgainstTerrain = true;
-    scene.fog.enabled = false; scene.moon.show = false; scene.sun.show = false;
+    scene.fog.enabled = false;
+    if (scene.moon) scene.moon.show = false;
+    if (scene.sun) scene.sun.show = false;
+    // fora do elipsoide da Terra o Cesium não cria céu nem atmosfera: cria aqui, no tamanho de Marte
+    if (!scene.skyBox && C.SkyBox.createEarthSkyBox) scene.skyBox = C.SkyBox.createEarthSkyBox();
+    if (!scene.skyAtmosphere) scene.skyAtmosphere = new C.SkyAtmosphere(C.Ellipsoid.default);
     scene.skyAtmosphere.hueShift = 0.48; scene.skyAtmosphere.saturationShift = -0.25; scene.skyAtmosphere.brightnessShift = -0.35;
-    scene.screenSpaceCameraController.minimumZoomDistance = 400;
+    scene.screenSpaceCameraController.minimumZoomDistance = 220 * K;
     viewer.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     const add = (k, alpha) => {
-      const d = A.LAYERS[k];
-      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, maximumLevel: d.max, rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek' });
+      const d = A.LAYERS[k], range = A.tileRange(k);
+      if (!range) return; // sem backend, só existem as camadas guardadas localmente
+      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
       const l = viewer.imageryLayers.addImageryProvider(provider);
       if (alpha != null) l.alpha = alpha;
@@ -61,7 +75,7 @@ function init() {
       .then(p => { layers.slope = viewer.imageryLayers.addImageryProvider(p); layers.slope.alpha = 0.6; applyLayers(A.layerState()); })
       .catch(e => console.warn('camada de declive', e));
 
-    buildStatic(); applyLayers(A.layerState()); drawRoute(); drawNow();
+    buildStatic(); drawTargets(); applyLayers(A.layerState()); drawRoute(); drawNow();
 
     const h = new C.ScreenSpaceEventHandler(scene.canvas);
     const ll = pos => {
@@ -76,9 +90,9 @@ function init() {
     let last = 0;
     h.setInputAction(e => { if (walk.on) return; const t = Date.now(); if (t - last < 80) return; last = t; const p = ll(e.endPosition); if (p) A.readout(p[0], p[1]); }, C.ScreenSpaceEventType.MOUSE_MOVE);
 
-    viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(60, 12, 1.5e7) });
+    viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(60, 12, 8e6 * K) });
     setTimeout(() => { if (!walk.on) flyJezero(); }, 1200);
-    $('#g-mars').onclick = () => viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(77.4, 10, 1.5e7), duration: 2.5 });
+    $('#g-mars').onclick = () => viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(77.4, 10, 8e6 * K), duration: 2.5 });
     $('#g-jezero').onclick = flyJezero;
   } catch (e) { fail(e); }
 }
@@ -86,18 +100,18 @@ function init() {
 const groundPos = (lat, lon, lift) => C.Cartesian3.fromDegrees(lon, lat, A.heightAt(lat, lon) * VS + (lift || 0));
 function flyJezero() {
   if (!viewer) return;
-  viewer.camera.flyToBoundingSphere(new C.BoundingSphere(groundPos(18.462, 77.415), 9000),
-    { offset: new C.HeadingPitchRange(C.Math.toRadians(-18), C.Math.toRadians(-34), 46000), duration: 3.2 });
+  viewer.camera.flyToBoundingSphere(new C.BoundingSphere(groundPos(18.462, 77.415), 4800 * K),
+    { offset: new C.HeadingPitchRange(C.Math.toRadians(-18), C.Math.toRadians(-34), 24500 * K), duration: 3.2 });
 }
 
 function label(text, far, near) {
   return { text, font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#e8ecf8'), showBackground: true,
-    backgroundColor: C.Color.fromCssColorString('rgba(11,16,32,.85)'), backgroundPadding: new C.Cartesian2(6, 4), pixelOffset: new C.Cartesian2(0, -20),
+    backgroundColor: C.Color.fromCssColorString('rgba(10,13,20,.88)'), backgroundPadding: new C.Cartesian2(6, 4), pixelOffset: new C.Cartesian2(0, -20),
     heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    distanceDisplayCondition: new C.DistanceDisplayCondition(near || 0, far) };
+    distanceDisplayCondition: new C.DistanceDisplayCondition((near || 0) * K / 1.88, far * K / 1.88) };
 }
 function point(color, size, fill) {
-  return { pixelSize: size, color: C.Color.fromCssColorString(fill || '#0b1020'), outlineColor: C.Color.fromCssColorString(color), outlineWidth: 2,
+  return { pixelSize: size, color: C.Color.fromCssColorString(fill || '#0A0D14'), outlineColor: C.Color.fromCssColorString(color), outlineWidth: 2,
     heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY };
 }
 function line(coords, color, width, style) {
@@ -111,45 +125,54 @@ function buildStatic() {
   const B = A.BOX;
   line([B.XMIN, B.YMIN, B.XMAX, B.YMIN, B.XMAX, B.YMAX, B.XMIN, B.YMAX, B.XMIN, B.YMIN], 'rgba(232,236,248,.45)', 1.5, 'dash');
   viewer.entities.add({ position: C.Cartesian3.fromDegrees(77.4, 18.47), label: Object.assign(label('Cratera Jezero', 4e7, 250000), { pixelOffset: new C.Cartesian2(0, -14) }), point: point('#ff8a4c', 9, '#ff8a4c') });
-  if (A.traverse) { // trajeto do rover: junta trechos seguidos para desenhar menos linhas
-    const feats = A.traverse.features.filter(f => f.geometry).sort((a, b) => (a.properties.sol || 0) - (b.properties.sol || 0));
-    let cur = null; const chains = [];
-    feats.forEach(f => {
-      const parts = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
-      parts.forEach(p => {
-        if (p.length < 2) return;
-        const s = p[0], e = cur && cur[cur.length - 1];
-        if (e && Math.abs(e[0] - s[0]) < 2e-4 && Math.abs(e[1] - s[1]) < 2e-4) cur.push(...p.slice(1)); else { cur = p.slice(); chains.push(cur); }
-      });
-    });
-    chains.forEach(ch => { const flat = []; ch.forEach(p => flat.push(p[0], p[1])); ents.rover.push(line(flat, A.cssv('--mars'), 2.5)); });
+  if (A.roverRuns) { // trajeto do rover com gradiente de perigo por declive
+    const col = A.SLOPE_COL(), mars = A.cssv('--mars');
+    let runs = A.roverRuns;
+    if (runs.length > 500) { // muitos trechos: junta os vizinhos para não pesar no globo
+      const merged = []; let cur = null;
+      runs.forEach(r => { const e = cur && cur.ll[cur.ll.length - 1], near = e && Math.abs(e[0] - r.ll[0][0]) < 3e-4 && Math.abs(e[1] - r.ll[0][1]) < 3e-4;
+        if (cur && near && (cur.cls === r.cls || r.ll.length < 4)) cur.ll.push(...r.ll.slice(1)); else { cur = { cls: r.cls, ll: r.ll.slice() }; merged.push(cur); } });
+      runs = merged;
+    }
+    runs.forEach(r => { const flat = []; r.ll.forEach(p => flat.push(p[1], p[0])); ents.rover.push(line(flat, r.cls < 0 ? mars : col[r.cls], 2.5)); });
   }
   A.POIS.forEach(p => {
     if (p.k === 'base') return;
     const e = viewer.entities.add({ position: C.Cartesian3.fromDegrees(p.lon, p.lat), point: point(A.KIND[p.k], 10), label: label(p.n, 26000) });
     (p.k === 'crism' ? ents.crism : ents.pois).push(e);
   });
-  ents.base = viewer.entities.add({ position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0b1020', 12, '#e8ecf8'), label: label('BASE', 200000) });
-  ents.goal = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0b1020', 13, A.cssv('--route')), label: label('DESTINO', 200000) });
-  ents.now = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0b1020', 12, '#ffffff'), label: label('VOCÊ', 120000) });
-  ents.cam = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0b1020', 10, A.cssv('--blue')), label: label('VISTA DO CAPACETE', 60000) });
+  ents.base = viewer.entities.add({ position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 12, '#e8ecf8'), label: label('BASE', 200000) });
+  ents.goal = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 13, A.cssv('--route')), label: label('DESTINO', 200000) });
+  ents.now = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 12, '#ffffff'), label: label('VOCÊ', 120000) });
+  ents.cam = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 10, A.cssv('--blue')), label: label('VISTA DO CAPACETE', 60000) });
 }
 
 function applyLayers(s) {
   if (!viewer) return;
   const show = { viking: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base === 'mosaic', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
   Object.keys(show).forEach(k => { if (layers[k]) layers[k].show = show[k]; });
-  ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
+  ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); (ents.targets || []).forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
 }
 function drawRoute() {
   if (!viewer) return;
   const st = A.state;
   ents.route.forEach(e => viewer.entities.remove(e)); ents.route = [];
   const flat = path => { const f = []; path.forEach(c => { const p = A.cellLL(c); f.push(p[1], p[0]); }); return f; };
-  if (st.path && st.path.length > 1) ents.route.push(line(flat(st.path), A.cssv('--route'), 6, 'outline'));
+  if (st.path && st.path.length > 1) { // rota colorida por declive
+    const col = A.SLOPE_COL();
+    A.slopeRuns(st.path).forEach(r => { const f = []; r.ll.forEach(p => f.push(p[1], p[0])); ents.route.push(line(f, col[r.cls], 6, 'outline')); });
+  }
   if (st.emPath && st.emPath.length > 1) ents.route.push(line(flat(st.emPath), A.cssv('--crit'), 5, 'dash'));
   ents.goal.show = !!st.goalLL;
   if (st.goalLL) ents.goal.position = C.Cartesian3.fromDegrees(st.goalLL[1], st.goalLL[0]);
+}
+/* Alvos científicos do contrato (layers.science_targets) */
+function drawTargets() {
+  if (!viewer) return;
+  (ents.targets || []).forEach(e => viewer.entities.remove(e)); ents.targets = [];
+  const list = (A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || [], show = A.layerState().poi;
+  list.forEach(t => { if (typeof t.lat === 'number' && typeof t.lng === 'number')
+    ents.targets.push(viewer.entities.add({ show, position: C.Cartesian3.fromDegrees(t.lng, t.lat), point: point('#0A0D14', 12, A.KIND.target), label: label(`${t.id || 'Alvo'} · ${t.name || ''}`, 26000) })); });
 }
 let lastEm = null;
 function drawNow() {
@@ -203,7 +226,7 @@ function exitWalk() {
   viewer.scene.fog.enabled = false;
   viewer.useDefaultRenderLoop = A.state.view === 'globe'; viewer.resize();
   applyLayers(A.layerState()); drawNow();
-  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(77.4, 14, 600000) });
+  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(77.4, 14, 320000 * K) });
   flyJezero();
 }
 
@@ -216,6 +239,8 @@ A.on('layers', applyLayers);
 A.on('route', () => { lastEm = null; drawRoute(); drawNow(); });
 A.on('tick', drawNow);
 A.on('cam', drawNow);
+let teleSig = '';
+A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || []); if (sig !== teleSig) { teleSig = sig; drawTargets(); } });
 A.globe = {
   get viewer() { return viewer; }, flyJezero, walk, enterWalk, exitWalk,
   teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },

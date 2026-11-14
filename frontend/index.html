@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AresNav · Trilha Jezero</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css">
 <link rel="stylesheet" href="style.css">
@@ -16,10 +16,15 @@
     <h1>AresNav <span>Trilha Jezero</span></h1>
     <p>Controle de missão para caminhadas em Marte · Cratera Jezero (18,4° N, 77,4° L)</p>
   </div>
+  <div class="opmode" role="group" aria-label="Modo de operação">
+    <button data-op="planner" aria-pressed="true">[ HABITAT PLANNER ]</button>
+    <span aria-hidden="true">⇄</span>
+    <button data-op="helmet" aria-pressed="false">[ HELMET HUD ]</button>
+  </div>
   <div class="chips">
     <span class="chip">Caminhada 07</span>
     <span class="chip">Sol 412 · saída 09:00 LMST</span>
-    <span class="chip live" id="dataChip">Carregando dados da NASA…</span>
+    <span class="chip live" id="dataChip">Conectando ao backend…</span>
   </div>
 </header>
 
@@ -85,6 +90,7 @@
         <div class="hud hud-suit" id="hudSuit"></div>
         <div class="hud hud-target" id="hudTarget"></div>
         <div class="hud hud-alert" id="hudAlert" hidden></div>
+        <div class="hud hud-offline" id="hudOffline" hidden>OFFLINE TELEMETRY (CACHED)</div>
         <div class="hud hud-source" id="hudSource"></div>
         <div class="hud hud-hint" id="hudHint"></div>
         <div class="hud hud-sols" id="hudSols"></div>
@@ -95,8 +101,8 @@
           <div class="gauges" id="gauges"></div>
           <div class="charts" id="charts"></div>
           <div class="tele-side">
-            <h3>Ambiente · MEDA</h3>
-            <div class="meda" id="meda"></div>
+            <h3>Telemetria do contrato</h3>
+            <div id="meda"></div>
             <h3>Registro de eventos</h3>
             <ul class="log mono" id="eventLog"></ul>
           </div>
@@ -106,7 +112,6 @@
       <nav class="tabs" aria-label="Modo de visualização">
         <button data-view="globe" aria-pressed="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Globo 3D</button>
         <button data-view="map" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Mapa</button>
-        <button data-view="helmet" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 14a8 8 0 0116 0v3a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M7 14a5 5 0 0110 0v1H7z"/></svg>Capacete</button>
         <button data-view="telemetry" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>Telemetria</button>
       </nav>
     </div>
@@ -143,11 +148,21 @@
   </aside>
 </main>
 
+<div class="modal" id="truth" hidden role="dialog" aria-modal="true" aria-labelledby="truthTitle">
+  <div class="modal-card">
+    <header><div><small>1st Person Ground Truth · 4ª camada óptica</small><h3 id="truthTitle"></h3><p id="truthSub"></p></div><button id="truthClose" aria-label="Fechar">✕</button></header>
+    <figure><img id="truthImg" alt="Foto de solo tirada pelo Perseverance"><figcaption id="truthCap"></figcaption></figure>
+    <div class="facts" id="truthFacts"></div>
+    <p id="truthCtx"></p>
+    <footer><button id="truthGoal" class="primary">Definir como destino</button><button id="truthHelmet">Ver no capacete</button></footer>
+  </div>
+</div>
+
 <section class="sources">
-  <h2 class="sub">Dados usados (todos oficiais da NASA)</h2>
+  <h2 class="sub">Dados usados (todos oficiais da NASA, sempre pelo backend AresNav)</h2>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Serviço</th><th>Status</th></tr></thead>
+      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Rota do backend</th><th>Status</th></tr></thead>
       <tbody id="srcTable"></tbody>
     </table>
   </div>
@@ -158,6 +173,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/';</script>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+<script>window.ARESNAV_API = window.ARESNAV_API || 'http://localhost:3000'; // endereço do backend AresNav</script>
 <script src="app.js"></script>
 <script src="globe.js"></script>
 <script src="helmet.js"></script>
