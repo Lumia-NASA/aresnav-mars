@@ -32,7 +32,7 @@ aresnav-mars/
 ├── CONTRATO_API.json         # Contrato unificado de integração Frontend <-> Backend
 ├── .gitignore                # Isolamento estrito de segredos e skills confidenciais
 ├── backend/                  # Módulo Extrator Fastify blindado
-│   ├── server.js             # Rotas /health, /api/v1/telemetry e /api/v1/traverse
+│   ├── server.js             # Rotas /health, telemetry, traverse, waypoints, tiles, dem, crism e navcam
 │   ├── package.json          # Dependências do backend
 │   ├── Dockerfile            # Container hardening (Alpine, non-root, dumb-init)
 │   ├── .env.example          # Variáveis de ambiente

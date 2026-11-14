@@ -32,3 +32,7 @@ jobs:
       - name: Execute AresNav Smoke Test Suite (Contract, ScopeGuard & EvidenceGate)
         run: |
           node tests/smoke-test.js
+
+      - name: Suit Payload Physics Tests (GO / NO-GO)
+        run: |
+          node tests/physics-test.js

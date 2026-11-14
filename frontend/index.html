@@ -5,163 +5,224 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AresNav · Trilha Jezero</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header class="top">
-  <div class="brand">
-    <h1>AresNav <span>Trilha Jezero</span></h1>
-    <p>Controle de missão para caminhadas em Marte · Cratera Jezero (18,4° N, 77,4° L)</p>
+<body class="ge" data-view="globe">
+
+<!-- O mapa ocupa a tela toda; os painéis flutuam por cima -->
+<div class="stage" id="stage">
+  <div class="view" id="view-globe">
+    <div id="globe"></div>
+    <div class="floating tl">
+      <button class="ghost" id="g-mars">Marte inteiro</button>
+      <button class="ghost" id="g-jezero">Ir para Jezero</button>
+    </div>
+    <div class="viewmsg" id="globeMsg" hidden></div>
   </div>
-  <div class="chips">
-    <span class="chip">Caminhada 07</span>
-    <span class="chip">Sol 412 · saída 09:00 LMST</span>
-    <span class="chip live" id="dataChip">Carregando dados da NASA…</span>
+  <div class="view" id="view-map" hidden>
+    <div id="map" aria-label="Mapa de Marte"></div>
+    <div class="floating tl"><button class="ghost" id="m-jezero">Ir para Jezero</button></div>
+  </div>
+  <div class="view" id="view-helmet" hidden>
+    <div class="pano" id="pano"></div>
+    <svg class="visor" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="visorTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05070d" stop-opacity=".96"/><stop offset="1" stop-color="#0a0d14" stop-opacity=".7"/></linearGradient>
+        <linearGradient id="visorBottom" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#05070d" stop-opacity=".96"/><stop offset="1" stop-color="#0a0d14" stop-opacity=".7"/></linearGradient>
+        <linearGradient id="visorRim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8a4c" stop-opacity="0"/><stop offset=".5" stop-color="#ff8a4c" stop-opacity=".7"/><stop offset="1" stop-color="#ff8a4c" stop-opacity="0"/></linearGradient>
+      </defs>
+      <path d="M0 0H1000V40Q500 100 0 40Z" fill="url(#visorTop)"/>
+      <path d="M0 40Q500 100 1000 40" fill="none" stroke="url(#visorRim)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <path d="M0 600H1000V560Q500 500 0 560Z" fill="url(#visorBottom)"/>
+      <path d="M0 560Q500 500 1000 560" fill="none" stroke="url(#visorRim)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="hud hud-compass"><div class="tape" id="hudTape"></div><div class="needle"></div><div class="heading mono" id="hudHeading">000°</div></div>
+    <div class="hud hud-crew" id="hudCrew"></div>
+    <div class="hud hud-suit" id="hudSuit"></div>
+    <div class="hud hud-site" id="hudSite" hidden></div>
+    <div class="hud hud-target" id="hudTarget"></div>
+    <div class="hud hud-alert" id="hudAlert" hidden></div>
+    <div class="hud hud-offline" id="hudOffline" hidden>OFFLINE TELEMETRY (CACHED)</div>
+    <div class="hud hud-source" id="hudSource"></div>
+    <div class="hud hud-hint" id="hudHint"></div>
+    <div class="hud hud-sols" id="hudSols"></div>
+    <div class="crosshair" aria-hidden="true"></div>
+  </div>
+  <div class="view" id="view-telemetry" hidden>
+    <div class="tele">
+      <div class="gauges" id="gauges"></div>
+      <div class="charts" id="charts"></div>
+      <div class="tele-side">
+        <h3>Telemetria do contrato</h3>
+        <div id="meda"></div>
+        <h3>Registro de eventos</h3>
+        <ul class="log mono" id="eventLog"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Barra superior -->
+<header class="topbar">
+  <div class="brand" title="Controle de missão para caminhadas em Marte · Cratera Jezero">
+    <span class="logo" aria-hidden="true"></span>
+    <h1>AresNav <span>Trilha Jezero</span></h1>
+  </div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input id="search" type="search" placeholder="Pesquisar em Marte" autocomplete="off" aria-label="Pesquisar um lugar em Marte">
+    <ul class="results" id="searchResults" hidden></ul>
+  </div>
+  <div class="opmode" role="group" aria-label="Modo de operação">
+    <button data-op="planner" aria-pressed="true">Habitat Planner</button>
+    <button data-op="helmet" aria-pressed="false">Helmet HUD</button>
+  </div>
+  <div class="topactions">
+    <button class="pillbtn" id="btnTele" aria-pressed="false">Telemetria</button>
+    <button class="pillbtn" id="btnData" aria-pressed="false">Dados</button>
+    <button class="pillbtn" id="langBtn" title="Language / Idioma">Português</button>
+    <span class="chip live" id="dataChip">Conectando ao backend…</span>
   </div>
 </header>
 
-<main class="grid">
-  <aside class="col left" aria-label="Checklist e camadas">
-    <section class="panel">
-      <h2>Checklist de saída</h2>
+<div class="offline-badge" id="offlineBadge" hidden>
+  <b>ENLACE TERRA–MARTE FORA DO AR.</b> O AresNav segue operando 100% sobre dados locais: matrizes binárias de relevo (.i16), cache <span class="mono">.cached.json</span>, mapa de reserva e panoramas já guardados. A navegação continua viva sem internet.
+</div>
+
+<!-- Painel esquerdo: conteúdo da missão -->
+<aside class="side left" id="leftPanel" aria-label="Conteúdo da missão">
+  <header class="sidehead"><h2>Conteúdo da missão</h2><span class="chip">Caminhada 07 · Sol 412</span></header>
+  <div class="sidebody">
+    <section class="block">
+      <h3>Checklist de saída</h3>
       <ul class="check" id="checklist"></ul>
       <div class="gonogo" id="gonogo"></div>
+      <div class="payload">
+        <label for="payload">Carga de amostras e equipamento <b class="mono" id="payloadVal">18,5 kg</b></label>
+        <input type="range" id="payload" min="0" max="25" step="0.5" value="18.5">
+        <small id="payloadFx">Limite de declive e consumo mudam com a carga.</small>
+      </div>
     </section>
-    <section class="panel">
-      <h2>Imagem</h2>
+    <section class="block">
+      <h3>Imagem</h3>
       <label class="layer"><input type="radio" name="base" value="hirise" checked><b>HiRISE 25 cm + CTX 6 m</b><small>Mars Reconnaissance Orbiter</small></label>
       <label class="layer"><input type="radio" name="base" value="mosaic"><b>Mosaico de pouso Mars 2020</b><small>HiRISE + CTX + HRSC</small></label>
-      <label class="layer"><input type="radio" name="base" value="relief"><b>Relevo colorido</b><small>MOLA (Mars Global Surveyor) + HRSC (Mars Express)</small></label>
-      <h2 class="gap">Camadas</h2>
+      <label class="layer"><input type="radio" name="base" value="relief"><b>Relevo colorido</b><small>MOLA + HRSC</small></label>
+      <h3 class="gap">Camadas</h3>
       <label class="layer"><input type="checkbox" id="ov-slope" checked><b>Declive</b><small>Calculado do relevo HRSC/MOLA (200 m)</small>
-        <span class="sw"><i style="--c:#e8c84a">4–8°</i><i style="--c:#ef8a3c">8–12°</i><i style="--c:#e2463a">&gt;12°</i></span></label>
+        <span class="sw"><i style="--c:#FFB800">4–8°</i><i style="--c:#FF7828">8–12°</i><i style="--c:#FF3344">&gt;12°</i></span></label>
       <label class="layer"><input type="checkbox" id="ov-themis"><b>Infravermelho diurno</b><small>THEMIS · Mars Odyssey</small></label>
       <label class="layer"><input type="checkbox" id="ov-crism" checked><b>Minerais hidratados</b><small>CRISM · MRO. Sinal de água no passado</small></label>
-      <label class="layer"><input type="checkbox" id="ov-rover" checked><b>Trajeto do Perseverance</b><small>Mars 2020 · caminho real do rover</small></label>
-      <label class="layer"><input type="checkbox" id="ov-poi" checked><b>Pontos de interesse</b><small>Locais visitados pelo rover</small></label>
+      <label class="layer"><input type="checkbox" id="ov-rover" checked><b>Trajeto do Perseverance</b><small>Mars 2020 · cor pelo declive</small></label>
+      <label class="layer"><input type="checkbox" id="ov-poi" checked><b>Pontos de interesse</b><small>Locais visitados pelo rover e alvos científicos</small></label>
     </section>
-    <section class="panel">
-      <h2>Destinos</h2>
+    <section class="block">
+      <h3>Destinos</h3>
       <ul class="dest" id="destList"></ul>
     </section>
-  </aside>
+  </div>
+</aside>
+<button class="sidetoggle left" id="leftToggle" aria-label="Recolher o painel da missão" aria-expanded="true">‹</button>
 
-  <section class="col center" aria-label="Visualização">
-    <div class="stagehead">
-      <div class="seg" role="group" aria-label="Tipo de rota">
-        <button id="m-safe" aria-pressed="true">Rota segura</button>
-        <button id="m-short" aria-pressed="false">Mais curta</button>
-      </div>
-      <button class="emerg" id="emerg" aria-pressed="false">Modo emergência</button>
+<!-- Painel direito: plano da caminhada -->
+<aside class="side right" id="rightPanel" aria-label="Plano da caminhada">
+  <header class="sidehead">
+    <h2>Plano da caminhada</h2>
+    <div class="seg" role="group" aria-label="Tipo de rota">
+      <button id="m-safe" aria-pressed="true">Segura</button>
+      <button id="m-short" aria-pressed="false">Mais curta</button>
     </div>
-
-    <div class="stage" id="stage">
-      <div class="view" id="view-globe">
-        <div id="globe"></div>
-        <div class="floating tl">
-          <button class="ghost" id="g-mars">Marte inteiro</button>
-          <button class="ghost" id="g-jezero">Ir para Jezero</button>
-        </div>
-        <div class="floating tr note-chip">Relevo real (MOLA + HRSC), altura exagerada 2,5×</div>
-        <div class="viewmsg" id="globeMsg" hidden></div>
-      </div>
-      <div class="view" id="view-map" hidden>
-        <div id="map" aria-label="Mapa de Marte"></div>
-        <div class="floating tl mapbtn"><button class="ghost" id="m-jezero">Ir para Jezero</button></div>
-      </div>
-      <div class="view" id="view-helmet" hidden>
-        <div class="pano" id="pano"><div class="pano-strip" id="panoStrip"></div></div>
-        <svg class="visor" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 0H1000V40Q500 100 0 40Z" fill="rgba(6,10,20,.82)"/>
-          <path d="M0 40Q500 100 1000 40" fill="none" stroke="rgba(255,138,76,.55)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-          <path d="M0 600H1000V560Q500 500 0 560Z" fill="rgba(6,10,20,.82)"/>
-          <path d="M0 560Q500 500 1000 560" fill="none" stroke="rgba(255,138,76,.55)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-        </svg>
-        <div class="hud hud-compass"><div class="tape" id="hudTape"></div><div class="needle"></div><div class="heading mono" id="hudHeading">000°</div></div>
-        <div class="hud hud-crew" id="hudCrew"></div>
-        <div class="hud hud-suit" id="hudSuit"></div>
-        <div class="hud hud-target" id="hudTarget"></div>
-        <div class="hud hud-alert" id="hudAlert" hidden></div>
-        <div class="hud hud-source" id="hudSource"></div>
-        <div class="hud hud-hint" id="hudHint"></div>
-        <div class="hud hud-sols" id="hudSols"></div>
-        <div class="crosshair" aria-hidden="true"></div>
-      </div>
-      <div class="view" id="view-telemetry" hidden>
-        <div class="tele">
-          <div class="gauges" id="gauges"></div>
-          <div class="charts" id="charts"></div>
-          <div class="tele-side">
-            <h3>Ambiente · MEDA</h3>
-            <div class="meda" id="meda"></div>
-            <h3>Registro de eventos</h3>
-            <ul class="log mono" id="eventLog"></ul>
-          </div>
-        </div>
-      </div>
-
-      <nav class="tabs" aria-label="Modo de visualização">
-        <button data-view="globe" aria-pressed="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Globo 3D</button>
-        <button data-view="map" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Mapa</button>
-        <button data-view="helmet" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 14a8 8 0 0116 0v3a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M7 14a5 5 0 0110 0v1H7z"/></svg>Capacete</button>
-        <button data-view="telemetry" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>Telemetria</button>
-      </nav>
-    </div>
-
-    <div class="transport">
-      <button id="simPlay" class="play" aria-label="Simular a caminhada">▶</button>
-      <input type="range" id="simSlider" min="0" max="1000" value="0" aria-label="Momento da caminhada">
-      <span class="mono" id="simClock">09:00</span>
-      <span class="phase" id="simPhase">Na base</span>
-    </div>
-    <div class="readout mono" id="readout">Passe o mouse sobre o mapa para ver altitude e declive reais.</div>
-    <div class="panel">
-      <h2>Perfil de altitude da ida</h2>
-      <canvas id="profile"></canvas>
-    </div>
-  </section>
-
-  <aside class="col right panel plan" aria-label="Plano da caminhada">
+  </header>
+  <div class="sidebody plan">
     <div id="emcard" class="emcard" hidden></div>
     <div class="status" id="status"></div>
     <div class="stats" id="stats"></div>
-    <div>
-      <h2 class="sub">Horários</h2>
-      <div class="timeline" id="timeline"></div>
-    </div>
-    <div>
-      <h2 class="sub">Alertas</h2>
-      <ul class="list" id="alerts"></ul>
-    </div>
-    <div>
-      <h2 class="sub">Paradas científicas na rota</h2>
-      <div id="stops"></div>
-    </div>
-  </aside>
-</main>
+    <div><h3>Perfil de altitude da ida</h3><canvas id="profile"></canvas></div>
+    <div><h3>Horários</h3><div class="timeline" id="timeline"></div></div>
+    <div><h3>Alertas</h3><ul class="list" id="alerts"></ul></div>
+    <div><h3>Roteiro passo a passo</h3><div id="stops"></div></div>
+  </div>
+</aside>
+<button class="sidetoggle right" id="rightToggle" aria-label="Recolher o plano da caminhada" aria-expanded="true">›</button>
 
-<section class="sources">
-  <h2 class="sub">Dados usados (todos oficiais da NASA)</h2>
+<!-- Barra da simulação -->
+<div class="dock">
+  <div class="transport">
+    <button id="simPlay" class="play" aria-label="Simular a caminhada">▶</button>
+    <input type="range" id="simSlider" min="0" max="1000" value="0" aria-label="Momento da caminhada">
+    <span class="mono" id="simClock">09:00</span>
+    <span class="phase" id="simPhase">Na base</span>
+    <select id="simSpeed" aria-label="Velocidade da simulação">
+      <option value="0.0041667">1× tempo real</option>
+      <option value="0.25">60×</option>
+      <option value="1.5" selected>360×</option>
+    </select>
+    <button id="uplink" class="uplink" aria-pressed="false" title="Clique para simular a queda do enlace Terra–Marte">[ 🟢 UPLINK: NASA LIVE ]</button>
+    <button class="emerg" id="emerg" aria-pressed="false">Emergência</button>
+  </div>
+</div>
+
+<!-- Controles do mapa (canto inferior direito) -->
+<div class="mapctl" role="group" aria-label="Controles do mapa">
+  <button id="ctlHelmet" title="Descer ao chão: clique aqui e depois em qualquer lugar de Marte" aria-label="Descer ao chão em qualquer lugar de Marte" aria-pressed="false">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>
+  </button>
+  <button id="ctl3d" title="Alternar entre globo 3D e mapa 2D" aria-pressed="true">3D</button>
+  <button id="ctlEx" title="Exagero vertical do relevo (1× é a escala real)" aria-pressed="false">1×</button>
+  <button id="ctlNorth" title="Apontar para o norte" aria-label="Apontar para o norte">
+    <svg viewBox="0 0 24 24" id="ctlNeedle"><path d="M12 3l4 9h-8z" fill="#FF3344" stroke="none"/><path d="M12 21l-4-9h8z" fill="currentColor" stroke="none"/></svg>
+  </button>
+  <button id="ctlOut" aria-label="Afastar">−</button>
+  <button id="ctlIn" aria-label="Aproximar">+</button>
+</div>
+<div class="drophint" id="dropHint" hidden>Clique em qualquer lugar de Marte para descer até o chão. Clique de novo no bonequinho para ir até o astronauta. Esc cancela.</div>
+<button class="basepick" id="basePick" title="Trocar a imagem de fundo"><span class="thumb" aria-hidden="true"></span><span id="basePickLabel">HiRISE</span></button>
+
+<!-- Barra de estado -->
+<footer class="statusbar mono">
+  <span class="credit">NASA / JPL / USGS · Mars Trek via backend AresNav</span>
+  <span class="readout" id="readout">Passe o mouse sobre o mapa para ver altitude e declive reais.</span>
+  <span id="camInfo">Câmera: —</span>
+</footer>
+
+<!-- Gaveta de dados e procedência -->
+<section class="drawer" id="dataDrawer" hidden aria-label="Dados e procedência">
+  <header><h2>Dados usados (todos oficiais da NASA, sempre pelo backend AresNav)</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Serviço</th><th>Status</th></tr></thead>
+      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Rota do backend</th><th>Status</th></tr></thead>
       <tbody id="srcTable"></tbody>
     </table>
   </div>
-  <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve pra escolher o caminho geral, mas esconde pedras e degraus menores. O próximo passo é o modelo de terreno HiRISE de 1 m de Jezero (camada <span class="mono">JEZ_hirise_soc_006_DTM</span> no catálogo do Mars Trek).</p>
-  <p>A base Ares-1 é hipotética. Os sinais vitais, o consumo de oxigênio e os dados do traje são simulados a partir da rota e do relevo real. As fotos do modo Capacete são imagens brutas reais da câmera Navcam do Perseverance. No "Terreno 3D" do Capacete a vista é montada só com dados orbitais, por isso fica borrada de perto fora de Jezero.</p>
+  <p class="prov mono"><b>DATA PROVENANCE:</b> MOLA DEM (463 m/px) | HRSC + MOLA (200 m/px) | HiRISE/CTX (0,25–6 m/px) | THEMIS (100 m/px) | MEDA Sol Baseline | Navcam M20
+    <span class="seal">🔒 EvidenceGate SHA-256: <span id="provHash">aguardando o backend</span> <span id="provState"></span></span></p>
+  <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores. O relevo do globo está em escala real; o botão 1× / 2,5× exagera a altura só para facilitar a leitura na vista de cima. As imagens de alta resolução (HiRISE e CTX) são em tons de cinza e recebem por cima a cor real do mosaico Viking.</p>
+  <p>A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje. As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance. No "Terreno 3D" a vista é montada só com dados orbitais: ao descer em qualquer ponto de Marte, o app pede ao backend o relevo real do lugar (HRSC + MOLA, cerca de 230 m por ponto).</p>
 </section>
 
+<div class="modal" id="truth" hidden role="dialog" aria-modal="true" aria-labelledby="truthTitle">
+  <div class="modal-card">
+    <header><div><small>1st Person Ground Truth · 4ª camada óptica</small><h3 id="truthTitle"></h3><p id="truthSub"></p></div><button id="truthClose" aria-label="Fechar">✕</button></header>
+    <figure><img id="truthImg" alt="Foto de solo tirada pelo Perseverance"><figcaption id="truthCap"></figcaption></figure>
+    <div class="facts" id="truthFacts"></div>
+    <p id="truthCtx"></p>
+    <footer><button id="truthGoal" class="primary">Definir como destino</button><button id="truthHelmet">Ver no capacete</button></footer>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/';</script>
+<script src="config.js"></script>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+<script src="physics.js"></script>
 <script src="app.js"></script>
 <script src="globe.js"></script>
 <script src="helmet.js"></script>
 <script src="telemetry.js"></script>
-<script>App.start();</script>
+<script src="ui.js"></script>
+<script src="boot.js"></script>
 </body>
 </html>
