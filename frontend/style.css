@@ -559,3 +559,4 @@ body:not(.left-collapsed) .mission-banner{left:calc(50% + var(--lw) / 2 - var(--
 .hud-fx button[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
 body.geo-enhanced #pano{filter:contrast(1.38) saturate(1.45) hue-rotate(-8deg)}
 @media (max-width:900px){.hud-fx{bottom:170px}}
+.basepick[data-base="fub"] .thumb{background:radial-gradient(circle at 40% 35%,#d9a77a,#9a5f3c 55%,#4a2a1a)}

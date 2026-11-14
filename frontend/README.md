@@ -136,6 +136,22 @@ Ideias tiradas de MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin e NASA 
   - Sem chave da API, ou sem rede, o ARES responde no **modo local**, com as mesmas contas do app.
   - Para ligar a IA, ponha `ANTHROPIC_API_KEY` no `backend/.env`.
 
+## Jezero da FU Berlin
+
+O WebGIS de Jezero da Freie Universität Berlin (`maps.planet.fu-berlin.de/jezero`) entrou como fonte, sempre pelo backend:
+
+- **Imagem padrão "Jezero em cor natural":** mosaico HiRISE 25 cm + CTX + HRSC já colorido, sem o tom artificial que usávamos nas imagens em cinza.
+  - O WMS deles aceita graus (EPSG:4326), então cada bloco do nosso mapa vira um pedido `GetMap` daquele retângulo.
+  - Os blocos ficam em cache em disco, com no máximo 4 pedidos ao mesmo tempo ao servidor da universidade.
+- **Curvas de nível** (camada opcional).
+- **Camadas vetoriais** em `backend/data/fub/`, servidas por `/api/v1/fub/:layer`:
+  - margem do antigo lago;
+  - 20 canais (Neretva, Sava, Pliva);
+  - elipse de pouso do Perseverance;
+  - 64 pontos de panorama 360°. Clicar num ponto abre o tour da FU Berlin em `/jezero/360/<id>`.
+- **Como os dados foram gerados:** o WFS deles só fala EPSG:49911 (Marte, cilíndrica equidistante, R = 3 396 190 m). `tools/build-fub-cache.py` baixa as camadas e converte para graus (x/R, y/R). A conversão bate com os limites que o próprio servidor informa.
+- **Créditos exigidos:** HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX: NASA/JPL-Caltech/MSSS; HiRISE: NASA/JPL/University of Arizona (Fergason et al., 2020). Estão no rodapé do app.
+
 ## Dados (todos oficiais da NASA, sempre pelo backend)
 
 | Camada | Missão / instrumento | Serviço |

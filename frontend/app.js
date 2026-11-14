@@ -40,7 +40,10 @@ const LAYERS = {
   ctx: { ext: 'png', max: 13, box: [77.1605, 18.211, 77.6992, 18.7212], local: [10, 11] },
   hirise: { ext: 'png', max: 17, box: [77.2229, 18.3068, 77.584, 18.6693] },
   mosaic: { ext: 'png', max: 16, box: [76.7913, 17.5792, 77.7314, 18.6926] },
-  themis: { ext: 'png', max: 9, box: [-180, -65, 180, 65] }
+  themis: { ext: 'png', max: 9, box: [-180, -65, 180, 65] },
+  /* WebGIS de Jezero da FU Berlin: cor natural (HiRISE + CTX + HRSC) e curvas de nível, pelo proxy do backend */
+  fubcolor: { ext: 'jpg', max: 17, box: [59.05, 0, 92.79, 33.74] },
+  fubcontour: { ext: 'png', max: 16, box: [76.53, 16.92, 79.2, 20.68] }
 };
 /* Com backend: blocos via proxy. Sem backend: conjunto pequeno guardado em data/tiles (redundância local) */
 const tileUrl = k => link.mapsOnline ? `${API}/tiles/${LAYERS[k].src || k}/{z}/{y}/{x}` : `data/tiles/${k}/{z}/{y}/{x}.${LAYERS[k].ext}`;
@@ -73,6 +76,7 @@ const SOURCES = [
   ['gdem', 'Relevo global (globo 3D)', 'Mars Global Surveyor', 'MOLA', 'camada local'],
   ['dem', 'Altitude e declive (rota)', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC (200 m)', '/api/v1/dem/jezero'],
   ['themis', 'Infravermelho diurno', '2001 Mars Odyssey', 'THEMIS', '/api/v1/tiles/themis'],
+  ['fubcolor', 'Jezero em cor natural (FU Berlin)', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/fubcolor'],
   ['crism', 'Minerais hidratados', 'Mars Reconnaissance Orbiter', 'CRISM', '/api/v1/crism'],
   ['traverse', 'Trajeto do Perseverance', 'Mars 2020', 'Navegação do rover', '/api/v1/traverse'],
   ['navcam', 'Fotos de solo (Capacete e pop-up)', 'Mars 2020', 'Navcam (imagens brutas)', '/api/v1/navcam']
@@ -322,7 +326,7 @@ function buildTiles() {
     });
     return lyr;
   };
-  T = { detail: tiles('detail'), tint: link.mapsOnline ? tiles('viking', { className: 'colorize' }) : L.layerGroup(), wash: tiles('viking', { className: 'colorize' }), viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }) };
+  T = { detail: tiles('detail'), tint: link.mapsOnline ? tiles('viking', { className: 'colorize' }) : L.layerGroup(), wash: tiles('viking', { className: 'colorize' }), viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }), fubcolor: tiles('fubcolor'), fubcontour: tiles('fubcontour', { opacity: 0.8 }) };
 }
 /* Troca a origem dos blocos (backend <-> cópia local) sem recarregar a página */
 function rebuildTiles() {
@@ -351,9 +355,9 @@ function initMap() {
   $('#m-jezero').onclick = () => map.flyTo([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
 }
 /* ordem de baixo para cima: cor Viking, detalhe THEMIS, cor Viking de novo (tingindo o detalhe), mosaico regional, CTX, HiRISE */
-const BASES = { hirise: ['viking', 'detail', 'tint', 'mosaic', 'ctx', 'hirise', 'wash'], mosaic: ['viking', 'detail', 'tint', 'mosaic', 'wash'], relief: ['relief'] };
+const BASES = { fub: ['viking', 'detail', 'tint', 'fubcolor'], hirise: ['viking', 'detail', 'tint', 'mosaic', 'ctx', 'hirise', 'wash'], mosaic: ['viking', 'detail', 'tint', 'mosaic', 'wash'], relief: ['relief'] };
 function layerState() {
-  return { base: document.querySelector('input[name="base"]:checked').value, slope: $('#ov-slope').checked, themis: $('#ov-themis').checked, crism: $('#ov-crism').checked, rover: $('#ov-rover').checked, poi: $('#ov-poi').checked };
+  return { base: document.querySelector('input[name="base"]:checked').value, slope: $('#ov-slope').checked, themis: $('#ov-themis').checked, crism: $('#ov-crism').checked, rover: $('#ov-rover').checked, poi: $('#ov-poi').checked, contour: !!($('#ov-contour') && $('#ov-contour').checked) };
 }
 function applyLayers() {
   const s = layerState();
@@ -361,8 +365,8 @@ function applyLayers() {
   activeBase = BASES[s.base].map(k => T[k]);
   activeBase.forEach(l => l.addTo(map));
   [...activeBase].reverse().forEach(l => l.bringToBack && l.bringToBack());
-  [['slope', groups.slope], ['crism', groups.crism], ['rover', groups.rover], ['poi', groups.poi], ['poi', groups.targets], ['themis', T.themis]].forEach(([k, l]) => s[k] ? l.addTo(map) : map.removeLayer(l));
-  ['hirise', 'ctx', 'mosaic', 'relief', 'themis'].forEach(k => { if (!srcStatus[k] || srcStatus[k] === 'off' || srcStatus[k] === 'wait') setStatus(k, (k === 'themis' ? s.themis : BASES[s.base].includes(k)) ? 'wait' : 'off'); });
+  [['slope', groups.slope], ['crism', groups.crism], ['rover', groups.rover], ['poi', groups.poi], ['poi', groups.targets], ['themis', T.themis], ['contour', T.fubcontour]].forEach(([k, l]) => s[k] ? l.addTo(map) : map.removeLayer(l));
+  ['fubcolor', 'hirise', 'ctx', 'mosaic', 'relief', 'themis'].forEach(k => { if (!srcStatus[k] || srcStatus[k] === 'off' || srcStatus[k] === 'wait') setStatus(k, (k === 'themis' ? s.themis : BASES[s.base].includes(k)) ? 'wait' : 'off'); });
   emit('layers', s);
 }
 /* Alvos científicos vindos do contrato (layers.science_targets) */

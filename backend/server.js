@@ -84,7 +84,7 @@ if (fs.existsSync(path.join(FRONTEND_DIR, 'index.html'))) {
 // ScopeGuard (KhaosForge)
 function assertAuthorizedScope(targetUrl) {
   const parsed = new URL(targetUrl);
-  const authorized = ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov'];
+  const authorized = ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov', 'maps.planet.fu-berlin.de']; // FU Berlin: WebGIS de Jezero (HRSC, ESA/DLR/FU Berlin)
   if (!authorized.includes(parsed.hostname)) {
     throw new Error(`[ScopeGuard Violation] Host externo não autorizado: ${parsed.hostname}`);
   }
@@ -282,8 +282,23 @@ const TILE_LAYERS = {
   themis: { id: 'THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018', ext: 'png', max: 9 },
   dust: { id: 'TES_Dust', ext: 'png', max: 3 },                 // índice de cobertura de poeira (MGS TES)
   inertia: { id: 'TES_Thermal_Inertia', ext: 'png', max: 3 },   // inércia térmica: solo firme x areia fofa (MGS TES)
-  rough: { id: 'mola_roughness', ext: 'png', max: 3 }           // rugosidade da superfície (MGS MOLA)
+  rough: { id: 'mola_roughness', ext: 'png', max: 3 },          // rugosidade da superfície (MGS MOLA)
+  // WebGIS de Jezero da FU Berlin: mosaico em cor natural (HiRISE 25 cm + CTX + HRSC) e curvas de nível
+  fubcolor: { wms: 'base-hsv', ext: 'jpg', max: 17, box: [59.05, 0, 92.79, 33.74] },
+  fubcontour: { wms: 'contour', ext: 'png', max: 16, box: [76.53, 16.92, 79.2, 20.68] }
 };
+const FUB_WMS = 'https://maps.planet.fu-berlin.de/jez-bin/wms';
+/* o servidor da universidade desenha cada bloco na hora: no máximo 4 pedidos ao mesmo tempo */
+let fubBusy = 0; const fubQueue = [];
+const fubSlot = () => new Promise(res => { if (fubBusy < 4) { fubBusy++; res(); } else fubQueue.push(res); });
+const fubFree = () => { const next = fubQueue.shift(); if (next) next(); else fubBusy--; };
+function tileUrlFor(L, z, y, x) {
+  if (!L.wms) return `${TREK_TILES}/${L.id}/1.0.0/default/default028mm/${z}/${y}/${x}.${L.ext}`;
+  const size = 180 / 2 ** z, w = -180 + x * size, n = 90 - y * size, e = w + size, s = n - size;
+  if (e < L.box[0] || w > L.box[2] || n < L.box[1] || s > L.box[3]) return null;   // fora da cobertura: nem pergunta
+  const fmt = L.ext === 'jpg' ? 'image/jpeg' : 'image/png';
+  return `${FUB_WMS}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${L.wms}&STYLES=&SRS=EPSG:4326&BBOX=${w},${s},${e},${n}&WIDTH=256&HEIGHT=256&FORMAT=${encodeURIComponent(fmt)}&TRANSPARENT=${L.ext === 'png' ? 'true' : 'false'}`;
+}
 const PROXY_RATE = { rateLimit: { max: parseInt(process.env.TILE_RATE_LIMIT_MAX, 10) || 3000, timeWindow: '1 minute' } };
 const missing = new Set(); // blocos que a NASA respondeu 404 (sem cobertura)
 
@@ -336,7 +351,12 @@ fastify.get('/api/v1/tiles/:layer/:z/:y/:x', { config: PROXY_RATE }, async (requ
   }
   const key = `${request.params.layer}/${z}/${y}/${x}`;
   if (missing.has(key)) return reply.code(404).send({ error: 'Sem cobertura' });
-  const r = await cachedBinary(`${TREK_TILES}/${L.id}/1.0.0/default/default028mm/${z}/${y}/${x}.${L.ext}`, path.join(TILE_CACHE_DIR, `${key}.${L.ext}`), cacheOnly(request));
+  const url = tileUrlFor(L, z, y, x);
+  if (!url) { missing.add(key); return reply.code(404).send({ error: 'Sem cobertura' }); }
+  const file = path.join(TILE_CACHE_DIR, `${key}.${L.ext}`);
+  let r;
+  if (L.wms && !readCache(file) && !cacheOnly(request)) { await fubSlot(); try { r = await cachedBinary(url, file, false); } finally { fubFree(); } }
+  else r = await cachedBinary(url, file, cacheOnly(request));
   if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e bloco fora do cache' });
   if (r.notFound) { missing.add(key); return reply.code(404).send({ error: 'Sem cobertura' }); }
   return reply.code(200).header('Content-Type', MIME[L.ext]).header('Cache-Control', 'public, max-age=86400').header('X-AresNav-Cache', r.cache).send(r.body);
@@ -461,6 +481,19 @@ fastify.get('/api/v1/copilot', async (request, reply) => {
     },
     evidenceSha256: hash
   });
+});
+
+// Camadas vetoriais do WebGIS de Jezero (FU Berlin): margem do lago, canais, elipse de pouso, pontos e panoramas 360°
+const FUB_DIR = path.join(__dirname, 'data', 'fub');
+const FUB_LAYERS = new Set(['lake', 'channel-lines', 'landingellipse', 'poi', 'panoramas']);
+fastify.get('/api/v1/fub/:layer', async (request, reply) => {
+  const name = request.params.layer;
+  if (!FUB_LAYERS.has(name)) return reply.code(400).send({ error: 'Camada inválida' });
+  const data = loadOfflineCache(path.join(FUB_DIR, `${name}.geojson`));
+  if (!data) return reply.code(404).send({ error: 'Camada fora do cache. Rode python tools/build-fub-cache.py' });
+  const hash = computeEvidenceHash(data);
+  return reply.code(200).header('X-AresNav-Evidence-SHA256', hash).header('Cache-Control', 'public, max-age=86400')
+    .send({ success: true, source: 'FU Berlin Jezero WebGIS', evidenceSha256: hash, data });
 });
 
 // Zonas de exploração para missões humanas (NASA Human Landing Site / Exploration Zone Workshop, 2015)
