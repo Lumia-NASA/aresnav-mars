@@ -284,7 +284,7 @@ const TILE_LAYERS = {
   inertia: { id: 'TES_Thermal_Inertia', ext: 'png', max: 3 },   // inércia térmica: solo firme x areia fofa (MGS TES)
   rough: { id: 'mola_roughness', ext: 'png', max: 3 },          // rugosidade da superfície (MGS MOLA)
   // WebGIS de Jezero da FU Berlin: mosaico em cor natural (HiRISE 25 cm + CTX + HRSC) e curvas de nível
-  fubcolor: { wms: 'base-hsv', ext: 'jpg', max: 17, box: [59.05, 0, 92.79, 33.74] },
+  fubcolor: { wms: 'base-hsv', ext: 'png', max: 17, box: [76.53, 16.92, 79.2, 20.68] },   // PNG transparente: os buracos do mosaico não ficam pretos; só a área com cobertura completa
   fubcontour: { wms: 'contour', ext: 'png', max: 16, box: [76.53, 16.92, 79.2, 20.68] }
 };
 const FUB_WMS = 'https://maps.planet.fu-berlin.de/jez-bin/wms';

@@ -42,12 +42,12 @@ const LAYERS = {
   mosaic: { ext: 'png', max: 16, box: [76.7913, 17.5792, 77.7314, 18.6926] },
   themis: { ext: 'png', max: 9, box: [-180, -65, 180, 65] },
   /* WebGIS de Jezero da FU Berlin: cor natural (HiRISE + CTX + HRSC) e curvas de nível, pelo proxy do backend */
-  fubcolor: { ext: 'jpg', max: 17, box: [59.05, 0, 92.79, 33.74] },
+  fubcolor: { ext: 'png', min: 8, max: 17, box: [76.53, 16.92, 79.2, 20.68] },   // só aparece de perto: de longe o tom difere do mosaico Viking
   fubcontour: { ext: 'png', max: 16, box: [76.53, 16.92, 79.2, 20.68] }
 };
 /* Com backend: blocos via proxy. Sem backend: conjunto pequeno guardado em data/tiles (redundância local) */
 const tileUrl = k => link.mapsOnline ? `${API}/tiles/${LAYERS[k].src || k}/{z}/{y}/{x}` : `data/tiles/${k}/{z}/{y}/{x}.${LAYERS[k].ext}`;
-const tileRange = k => link.mapsOnline ? [0, LAYERS[k].max] : (LAYERS[k].local || null);
+const tileRange = k => link.mapsOnline ? [LAYERS[k].min || 0, LAYERS[k].max] : (LAYERS[k].local || null);
 const NAVCAM_BASE = 'https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/';
 /* Endereço de uma foto da Navcam passando pelo backend (aceita caminho relativo ou URL oficial da NASA) */
 function photoUrl(u) {
@@ -318,7 +318,7 @@ function buildTiles() {
   const tiles = (key, opts) => {
     const d = LAYERS[key], range = tileRange(key);
     if (!range) return L.layerGroup(); // camada sem cópia local: fica vazia em modo offline
-    const lyr = L.tileLayer(tileUrl(key), Object.assign({ maxZoom: 18, minNativeZoom: range[0], maxNativeZoom: range[1], noWrap: true, bounds: d.box ? [[d.box[1], d.box[0]], [d.box[3], d.box[2]]] : [[-90, -180], [90, 180]] }, opts));
+    const lyr = L.tileLayer(tileUrl(key), Object.assign({ maxZoom: 18, minZoom: d.min || 0, minNativeZoom: range[0], maxNativeZoom: range[1], noWrap: true, bounds: d.box ? [[d.box[1], d.box[0]], [d.box[3], d.box[2]]] : [[-90, -180], [90, 180]] }, opts));
     lyr.on('tileload', () => setStatus(key, link.mapsOnline ? 'ok' : 'fb'));
     lyr.on('tileerror', e => { // bloco falhou: tenta de novo até 2 vezes antes de deixar o buraco
       const t = e.tile, n = (t._tries || 0) + 1; if (n > 2 || !link.mapsOnline) return;

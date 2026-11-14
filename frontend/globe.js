@@ -69,9 +69,10 @@ function init() {
     const add = (k, alpha, name, box) => {
       const d = Object.assign({}, A.LAYERS[k], box ? { box } : null), range = A.tileRange(k);
       if (!range) return; // sem backend, só existem as camadas guardadas localmente
-      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
+      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box && !d.min ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
-      const l = viewer.imageryLayers.addImageryProvider(provider);
+      // d.min: a camada só aparece de perto (o tom do mosaico da FU Berlin difere do Viking visto de longe)
+      const l = d.min ? viewer.imageryLayers.add(new C.ImageryLayer(provider, { minimumTerrainLevel: d.min })) : viewer.imageryLayers.addImageryProvider(provider);
       if (alpha != null) l.alpha = alpha;
       layers[name || k] = l;
     };
@@ -259,7 +260,7 @@ function applyLayers(s) {
   if (!viewer) return;
   (ents.sites || []).forEach(e => { e.show = s.poi; }); (ents.beacons || []).forEach(e => { e.show = s.poi && walk.on; });
   ents.pois.concat(ents.crism, ents.targets || [], ents.base ? [ents.base] : []).forEach(e => { if (e.label) e.label.show = !walk.on; }); // no chão, o nome fica no alto do facho
-  const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', wash: s.base === 'hirise' || s.base === 'mosaic', relief: s.base === 'relief', mosaic: s.base !== 'relief', ctx: s.base === 'hirise', hirise: s.base === 'hirise', fubcolor: s.base === 'fub', fubcontour: !!s.contour && !walk.on, themis: s.themis, slope: s.slope && !walk.on };
+  const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', wash: s.base === 'hirise' || s.base === 'mosaic', relief: s.base === 'relief', mosaic: s.base === 'hirise' || s.base === 'mosaic', ctx: s.base === 'hirise', hirise: s.base === 'hirise', fubcolor: s.base === 'fub', fubcontour: !!s.contour && !walk.on, themis: s.themis, slope: s.slope && !walk.on };
   Object.keys(show).forEach(k => { if (layers[k]) layers[k].show = show[k]; });
   ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); (ents.targets || []).forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
 }
