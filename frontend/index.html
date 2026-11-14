@@ -82,6 +82,7 @@
   </div>
   <div class="topactions">
     <button class="pillbtn" id="btnTele" aria-pressed="false">Telemetria</button>
+    <button class="pillbtn" id="btnPois" aria-pressed="false" aria-controls="poiDrawer">Pontos</button>
     <button class="pillbtn" id="btnData" aria-pressed="false">Dados</button>
     <button class="pillbtn" id="langBtn" title="Language / Idioma">Português</button>
     <span class="chip live" id="dataChip">Conectando ao backend…</span>
@@ -189,6 +190,13 @@
   <span id="camInfo">Câmera: —</span>
 </footer>
 
+<!-- Aba de pontos de referência: acesso rápido e coordenadas -->
+<section class="drawer poidrawer" id="poiDrawer" hidden aria-label="Pontos de referência">
+  <header><h2>Pontos de referência</h2><button id="poiClose" aria-label="Fechar">✕</button></header>
+  <p class="poinote">Coordenadas em graus decimais (latitude norte, longitude leste), no mesmo formato aceito pela busca.</p>
+  <ul class="poilist" id="poiList"></ul>
+</section>
+
 <!-- Gaveta de dados e procedência -->
 <section class="drawer" id="dataDrawer" hidden aria-label="Dados e procedência">
   <header><h2>Dados usados: NASA, ESA/DLR e FU Berlin, sempre pelo backend AresNav</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
@@ -225,6 +233,7 @@
 <script src="helmet.js"></script>
 <script src="telemetry.js"></script>
 <script src="mission.js"></script>
+<script src="relief.js"></script>
 <script src="decision.js"></script>
 <script src="exec-core.js"></script>
 <script src="execution.js"></script>
