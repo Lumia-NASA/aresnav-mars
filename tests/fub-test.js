@@ -109,6 +109,16 @@ const panos = JSON.parse(fs.readFileSync(path.join(root, 'backend/data/fub/panor
       const r = await fetch(`${BASE}/api/v1/tiles/fubcolor/${z}/${y}/${x}?offline=1`);
       assert.strictEqual(r.status, 504); assert.strictEqual(r.headers.get('x-aresnav-degraded'), 'true');
     });
+    await test('a página abre com o CSP do frontend (pegaria o 500 do @fastify/static 10)', async () => {
+      for (const f of ['/', '/app.js', '/pano360.js']) {
+        const r = await fetch(BASE + f); assert.strictEqual(r.status, 200, f);
+        assert.ok(/default-src 'self'/.test(r.headers.get('content-security-policy') || ''), 'CSP ausente em ' + f);
+      }
+    });
+    await test('API comprime JSON grande (brotli/gzip)', async () => {
+      const r = await fetch(BASE + '/api/v1/fub/channel-lines', { headers: { 'accept-encoding': 'gzip' } });
+      assert.strictEqual(r.headers.get('content-encoding'), 'gzip');
+    });
     await test('copiloto sem chave da API: status diz modo local', async () => {
       const j = await (await fetch(BASE + '/api/v1/copilot/status')).json();
       assert.strictEqual(j.ai, false);
