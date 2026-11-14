@@ -11,6 +11,7 @@ const VFOV = 34, EL_TOP = 30, EL_BOTTOM = -30;
 const PLACES = [['Olympus Mons (maior vulcão)', 18.3, -133.2], ['Valles Marineris (cânion)', -13.7, -59.2], ['Cratera Gale (Curiosity)', -4.59, 137.44], ['Hellas Planitia', -42.4, 70.5], ['Calota polar norte', 84, 0]];
 let panos = [], prefix = '', idx = -1, mode = 'photo', manual = false;
 let viewAz = 0, viewEl = 2, ppd = 10, spin = 0, anim = null;
+let current = null, buildSeq = 0, stepDir = 0; // camada do panorama na tela, pedido em curso e sentido do passo (+1 avança, -1 volta)
 
 const loaded = fetch('data/pano/index.json').then(r => r.json()).then(d => {
   prefix = d.prefix;
@@ -40,36 +41,120 @@ function setIdx(i, face) {
   i = Math.max(0, Math.min(panos.length - 1, i));
   const changed = i !== idx; idx = i;
   if (face != null) turnTo(face);
-  if (changed) { build(); setCam(); }
+  if (changed) { build(stepDir); setCam(); }
+  stepDir = 0;
   renderHud(); renderBar();
 }
-function build() {
-  const strip = $('#panoStrip'), box = $('#pano').getBoundingClientRect(), p = cur();
+/* Cada panorama é montado numa camada própria, fora da tela. Só entra quando as fotos chegaram, já com o
+   brilho das faixas igualado e o céu/chão pintados com as cores da própria foto. A troca é um avanço de
+   câmera: a vista antiga cresce e some, a nova chega por trás (ou o contrário, ao voltar). */
+const GRAY = 'sepia(.75) saturate(1.5) hue-rotate(-18deg) brightness(.95)';
+const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const probe = document.createElement('canvas'); probe.width = 24; probe.height = 12;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+function sample(img, x0, x1, y0, y1) { // cor média de um retângulo da foto (frações de 0 a 1)
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return null;
+    pctx.drawImage(img, x0 * w, y0 * h, (x1 - x0) * w, (y1 - y0) * h, 0, 0, 24, 12);
+    const d = pctx.getImageData(0, 0, 24, 12).data; let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4; return [r / n, g / n, b / n];
+  } catch (e) { return null; }
+}
+const lum = c => c ? 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] : 0;
+function finish(layer, p, cells) {
+  const n = cells.length, gains = cells.map(() => 1);
+  if (n > 1) { // iguala o brilho de faixas vizinhas comparando o trecho em que elas se sobrepõem
+    const ratio = cells.map((c, i) => {
+      const nx = cells[(i + 1) % n], gap = (((nx.im.cx - c.im.cx) % 360) + 360) % 360, f = Math.min(0.3, (c.im.w - gap) / c.im.w);
+      if (f < 0.06 || !c.img.naturalWidth || !nx.img.naturalWidth) return 1;
+      const a = lum(sample(c.img, 1 - f, 1, 0.25, 0.8)), b = lum(sample(nx.img, 0, f, 0.25, 0.8));
+      return a > 4 && b > 4 ? Math.max(0.6, Math.min(1.7, a / b)) : 1;
+    });
+    for (let i = 1; i < n; i++) gains[i] = gains[i - 1] * ratio[i - 1];
+    const close = gains[n - 1] * ratio[n - 1];                        // de volta à primeira faixa: devia dar 1
+    let geo = 0;
+    for (let i = 0; i < n; i++) { gains[i] *= Math.pow(close, -i / n); geo += Math.log(gains[i]); }
+    geo = Math.exp(geo / n);
+    for (let i = 0; i < n; i++) gains[i] = Math.max(0.7, Math.min(1.45, gains[i] / geo));
+  }
+  let sky = [0, 0, 0], gnd = [0, 0, 0], k = 0, top = 0, bot = 0, gray = false;
+  cells.forEach((c, i) => {
+    const f = (c.im.color ? '' : GRAY + ' ') + `brightness(${gains[i].toFixed(3)})`;
+    c.els.forEach(el => { el.style.filter = f; });
+    const s = sample(c.img, 0.1, 0.9, 0.17, 0.24), g = sample(c.img, 0.1, 0.9, 0.72, 0.79);
+    if (!s || !g) return;
+    for (let j = 0; j < 3; j++) { sky[j] += s[j] * gains[i]; gnd[j] += g[j] * gains[i]; }
+    top += c.im.cy + c.im.h / 2; bot += c.im.cy - c.im.h / 2; k++; gray = gray || !c.im.color;
+  });
+  if (k) { // céu e chão de fundo nas cores da própria foto, para a borda das faixas não aparecer
+    const rgb = (c, m) => `rgb(${c.map(v => Math.round(Math.min(255, v / k * m))).join(',')})`;
+    const y = el => ((EL_TOP - el) / (EL_TOP - EL_BOTTOM) * 100).toFixed(1) + '%';
+    const bg = layer.querySelector('.pano-sky');
+    bg.style.background = `linear-gradient(180deg,${rgb(sky, 0.72)} 0%,${rgb(sky, 1)} ${y(top / k - 3.5)},${rgb(gnd, 1)} ${y(bot / k + 4)},${rgb(gnd, 0.5)} 100%)`;
+    if (gray) bg.style.filter = GRAY;
+  }
+}
+function build(dir) {
+  const host = $('#pano'), box = host.getBoundingClientRect(), p = cur();
   if (!box.height) return;
   ppd = box.height / VFOV;
+  const seq = ++buildSeq, layer = document.createElement('div'), strip = document.createElement('div');
+  layer.className = 'pano-layer'; strip.className = 'pano-strip';
   strip.style.width = 1080 * ppd + 'px'; strip.style.height = (EL_TOP - EL_BOTTOM) * ppd + 'px';
-  strip.innerHTML = '';
-  if (!p) return;
-  const frag = document.createDocumentFragment();
-  for (let copy = 0; copy < 3; copy++) p.strips.forEach(im => {
-    const el = document.createElement('img');
-    const src = A.photoUrl(im.rel); if (!src) return; // as fotos passam pelo backend; sem ele, fica só o fundo
-    el.src = src; el.alt = ''; el.draggable = false; el.decoding = 'async';
-    if (!im.color) el.className = 'gray';
-    el.style.cssText = `left:${(im.cx - im.w / 2 + copy * 360) * ppd}px;top:${(EL_TOP - (im.cy + im.h / 2)) * ppd}px;width:${im.w * ppd}px;height:${im.h * ppd}px`;
-    el.addEventListener('load', () => { el.classList.add('in'); A.setStatus('navcam', A.state.linkState === 'online' ? 'ok' : 'fb'); }, { once: true });
-    el.addEventListener('error', () => el.remove(), { once: true });
-    frag.appendChild(el);
+  strip.innerHTML = '<div class="pano-sky"></div>';
+  layer.appendChild(strip);
+  const cells = [], waits = [];
+  if (p) {
+    const order = p.strips.slice().sort((a, b) => a.cx - b.cx); // em ordem de rumo: cada faixa se funde sobre a anterior
+    for (let copy = 0; copy < 3; copy++) order.forEach((im, i) => {
+      const src = A.photoUrl(im.rel); if (!src) return; // as fotos passam pelo backend; sem ele, fica só o fundo
+      const el = document.createElement('img');
+      el.alt = ''; el.draggable = false; el.decoding = 'async';
+      if (!im.color) el.style.filter = GRAY;
+      el.style.left = (im.cx - im.w / 2 + copy * 360) * ppd + 'px'; el.style.top = (EL_TOP - (im.cy + im.h / 2)) * ppd + 'px';
+      el.style.width = im.w * ppd + 'px'; el.style.height = im.h * ppd + 'px';
+      if (!cells[i]) cells[i] = { im, img: el, els: [] };
+      cells[i].els.push(el);
+      waits.push(new Promise(done => {
+        el.addEventListener('load', () => { A.setStatus('navcam', A.state.linkState === 'online' ? 'ok' : 'fb'); done(); }, { once: true });
+        el.addEventListener('error', () => { el.remove(); done(); }, { once: true });
+      }));
+      el.src = src; strip.appendChild(el);
+    });
+  }
+  host.classList.add('loading');
+  Promise.race([Promise.all(waits), new Promise(r => setTimeout(r, 2500))]).then(() => {
+    if (seq !== buildSeq) return;                 // já pediram outro panorama
+    host.classList.remove('loading');
+    finish(layer, p, cells.filter(Boolean));
+    swap(host, layer, dir);
   });
-  strip.appendChild(frag);
+}
+function swap(host, layer, dir) {
+  const old = current; current = layer;
+  host.querySelectorAll('.pano-layer').forEach(l => { if (l !== old) l.remove(); });
+  host.insertBefore(layer, host.firstChild);
   place();
+  const ease = 'cubic-bezier(.33,0,.15,1)';
+  if (!old || !layer.animate) { if (old) old.remove(); return; }
+  if (!dir || calm) { // sem deslocamento (primeira vista, redimensionar): só funde
+    layer.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+    old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, fill: 'forwards' }).onfinish = () => old.remove();
+    return;
+  }
+  host.appendChild(old);                           // a vista antiga fica por cima enquanto some
+  old.animate([{ transform: 'scale(1)', opacity: 1, filter: 'blur(0)' }, { transform: `scale(${dir > 0 ? 1.5 : 0.72})`, opacity: 0, filter: 'blur(5px)' }],
+    { duration: 720, easing: ease, fill: 'forwards' }).onfinish = () => old.remove();
+  layer.animate([{ transform: `scale(${dir > 0 ? 0.8 : 1.3})` }, { transform: 'scale(1)' }], { duration: 720, easing: ease });
 }
 function place() {
   viewAz = ((viewAz % 360) + 360) % 360;
   if (mode === 'photo') {
-    const box = $('#pano').getBoundingClientRect(), hfov = box.width / ppd;
+    const host = $('#pano'), box = host.getBoundingClientRect(), hfov = box.width / ppd;
     viewEl = Math.max(-3, Math.min(7, viewEl));
-    $('#panoStrip').style.transform = `translate(${-(viewAz + 360 - hfov / 2) * ppd}px,${-(EL_TOP - (viewEl + VFOV / 2)) * ppd}px)`;
+    const tf = `translate(${-(viewAz + 360 - hfov / 2) * ppd}px,${-(EL_TOP - (viewEl + VFOV / 2)) * ppd}px)`;
+    host.querySelectorAll('.pano-strip').forEach(s => { s.style.transform = tf; });
   }
   renderCompass();
 }
@@ -90,6 +175,7 @@ function walkStep(dir) {
   const to = Math.max(0, Math.min(panos.length - 1, idx + dir));
   if (to === idx) return;
   const a = panos[Math.min(idx, to)], b = panos[Math.max(idx, to)];
+  stepDir = dir;
   setIdx(to, A.bearing(a.lat, a.lon, b.lat, b.lon)); // olha no sentido em que o rover avançou
 }
 function follow() {
@@ -191,6 +277,13 @@ function renderHud() {
     : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';
+  /* Perto de um ponto de referência no Terreno 3D: cartão dizendo o que ele é e o que se vê ali */
+  const site = $('#hudSite'), poi = mode === 'terrain' ? A.nearPoi(me.lat, me.lon, 320) : null;
+  site.hidden = !poi;
+  if (poi && site.dataset.n !== poi.n) {
+    site.dataset.n = poi.n; site.textContent = '';
+    [['b', poi.n], ['small', poi.src], ['p', poi.why], ['p', poi.see ? 'No local: ' + poi.see : '']].forEach(([tag, txt]) => { if (!txt) return; const el = document.createElement(tag); el.textContent = txt; site.appendChild(el); });
+  }
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
@@ -210,7 +303,8 @@ function renderBar() {
   const photo = mode === 'photo';
   const jumps = photo
     ? A.POIS.filter(p => p.sol).map((p, i) => `<option value="p${i}">${p.n}</option>`).join('')
-    : `<option value="me">Onde o astronauta está (Jezero)</option>` + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
+    : `<option value="me">Onde o astronauta está (Jezero)</option><optgroup label="${T('Pontos de referência')}">` + A.POIS.map((p, i) => `<option value="s${i}">${p.n}</option>`).join('') + '</optgroup>' + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
+
   const w = A.globe.walk;
   $('#hudSols').innerHTML =
     `<span class="seg2"><button data-mode="photo" aria-pressed="${photo}">Fotos do rover</button><button data-mode="terrain" aria-pressed="${!photo}">Terreno 3D</button></span>` +
@@ -251,6 +345,7 @@ $('#hudSols').addEventListener('change', e => {
   if (e.target.id !== 'hudJump') return;
   const v = e.target.value; if (!v) return;
   if (v[0] === 'p') { const p = A.POIS.filter(q => q.sol)[+v.slice(1)]; manual = true; setIdx(nearest(p.lat, p.lon)); }
+  else if (v[0] === 's') { const p = A.POIS[+v.slice(1)]; setMode('terrain', { lat: p.lat, lon: p.lon }); A.globe.visit(p); }
   else if (v === 'me') { const n = A.state.now || A.BASE; setMode('terrain', { lat: n.lat, lon: n.lon }); }
   else { const p = PLACES[+v.slice(1)]; setMode('terrain', { lat: p[1], lon: p[2] }); }
   e.target.value = '';

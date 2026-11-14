@@ -91,15 +91,15 @@ function setStatus(id, s) {
 /* ---------- Pontos de interesse (posições reais do Perseverance nos sóis indicados) ---------- */
 const KIND = { base: '#E8ECF8', sci: '#FFB800', samp: '#FFB800', crism: '#6EA8FF', target: '#FFB800' };
 const POIS = [
-  { n: 'Base Ares-1 (hipotética)', lat: 18.4405, lon: 77.4625, k: 'base', src: 'Ponto de partida', why: 'Habitat da tripulação em terreno plano, perto do local de pouso do Perseverance.' },
-  { n: 'Local de pouso Octavia E. Butler', lat: 18.44463, lon: 77.45089, k: 'sci', sol: 14, src: 'Mars 2020 · sol 14', why: 'Onde o Perseverance começou a rodar. Referência histórica da missão.' },
-  { n: 'Região da 1ª amostra (Rochette)', lat: 18.43074, lon: 77.44437, k: 'samp', sol: 199, src: 'Mars 2020 · sol 199', why: 'Rocha vulcânica do fundo da cratera. A primeira amostra guardada pelo rover saiu desta área.' },
-  { n: 'Frente do delta', lat: 18.45194, lon: 77.40605, k: 'sci', sol: 415, src: 'Mars 2020 · sol 415', why: 'Camadas de sedimento deixadas pelo rio antigo. Contam a história do lago.' },
-  { n: 'Wildcat Ridge (aprox.)', lat: 18.45889, lon: 77.40617, k: 'sci', sol: 501, src: 'Mars 2020 · sol 501', why: 'Rocha sedimentar onde o rover detectou moléculas orgânicas.' },
-  { n: 'Depósito de amostras Three Forks', lat: 18.45133, lon: 77.40126, k: 'samp', sol: 606, src: 'Mars 2020 · sol 606', why: 'Tubos de amostras deixados no chão para uma missão futura recolher.' },
-  { n: 'Topo do delta', lat: 18.49549, lon: 77.34688, k: 'sci', sol: 1000, src: 'Mars 2020 · sol 1000', why: 'Sedimentos da parte alta do delta, trazidos de fora da cratera pelo rio.' },
-  { n: 'Rumo a Neretva Vallis', lat: 18.49521, lon: 77.30391, k: 'sci', sol: 1176, src: 'Mars 2020 · sol 1176', why: 'Antigo canal do rio. Nessa região o rover achou a rocha Cheyava Falls, com possíveis sinais de vida antiga.' },
-  { n: 'Minerais hidratados (CRISM)', lat: 18.56, lon: 77.35, k: 'crism', src: 'CRISM', why: 'Detecção orbital de minerais que só se formam na presença de água.' }
+  { n: 'Base Ares-1 (hipotética)', lat: 18.4405, lon: 77.4625, k: 'base', src: 'Ponto de partida', why: 'Habitat da tripulação em terreno plano, perto do local de pouso do Perseverance.', site: 'habitat', see: 'Cúpula do habitat, dois módulos, câmara de ar, painéis solares e mastro de comunicação.' },
+  { n: 'Local de pouso Octavia E. Butler', lat: 18.44463, lon: 77.45089, k: 'sci', sol: 14, src: 'Mars 2020 · sol 14', why: 'Onde o Perseverance começou a rodar. Referência histórica da missão.', site: 'landing', see: 'Anel de pouso com as marcas dos motores de descida, marco e bandeira.' },
+  { n: 'Região da 1ª amostra (Rochette)', lat: 18.43074, lon: 77.44437, k: 'samp', sol: 199, src: 'Mars 2020 · sol 199', why: 'Rocha vulcânica do fundo da cratera. A primeira amostra guardada pelo rover saiu desta área.', site: 'rochette', see: 'A rocha Rochette com os dois furos da broca e um tubo de amostra ao lado.' },
+  { n: 'Frente do delta', lat: 18.45194, lon: 77.40605, k: 'sci', sol: 415, src: 'Mars 2020 · sol 415', why: 'Camadas de sedimento deixadas pelo rio antigo. Contam a história do lago.', site: 'strata', see: 'Paredão em camadas: cada faixa é um período de sedimento do rio.' },
+  { n: 'Wildcat Ridge (aprox.)', lat: 18.45889, lon: 77.40617, k: 'sci', sol: 501, src: 'Mars 2020 · sol 501', why: 'Rocha sedimentar onde o rover detectou moléculas orgânicas.', site: 'organics', see: 'Laje de rocha sedimentar com o marcador verde da detecção de orgânicos.' },
+  { n: 'Depósito de amostras Three Forks', lat: 18.45133, lon: 77.40126, k: 'samp', sol: 606, src: 'Mars 2020 · sol 606', why: 'Tubos de amostras deixados no chão para uma missão futura recolher.', site: 'depot', see: 'Os 10 tubos de amostras em zigue-zague, cada um no seu ponto marcado.' },
+  { n: 'Topo do delta', lat: 18.49549, lon: 77.34688, k: 'sci', sol: 1000, src: 'Mars 2020 · sol 1000', why: 'Sedimentos da parte alta do delta, trazidos de fora da cratera pelo rio.', site: 'boulders', see: 'Blocos arredondados que o rio arrastou de fora da cratera.' },
+  { n: 'Rumo a Neretva Vallis', lat: 18.49521, lon: 77.30391, k: 'sci', sol: 1176, src: 'Mars 2020 · sol 1176', why: 'Antigo canal do rio. Nessa região o rover achou a rocha Cheyava Falls, com possíveis sinais de vida antiga.', site: 'cheyava', see: 'A rocha Cheyava Falls, avermelhada, com veios brancos e manchas claras.' },
+  { n: 'Minerais hidratados (CRISM)', lat: 18.56, lon: 77.35, k: 'crism', src: 'CRISM', why: 'Detecção orbital de minerais que só se formam na presença de água.', site: 'crystals', see: 'Área da detecção orbital em azul e cristais indicando os minerais hidratados.' }
 ];
 const BASE = POIS[0];
 const DEFAULT_GOAL = POIS.find(p => p.sol === 606);

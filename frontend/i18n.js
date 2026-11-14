@@ -16,6 +16,7 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  'Pontos de referência': 'Landmarks',
   'Trilha Jezero': 'Jezero Trail', 'Telemetria': 'Telemetry', 'Dados': 'Data', 'Conteúdo da missão': 'Mission content', 'Plano da caminhada': 'Walk plan',
   'Segura': 'Safe', 'Mais curta': 'Shortest', 'Emergência': 'Emergency', 'Checklist de saída': 'Pre-walk checklist', 'Imagem': 'Imagery', 'Camadas': 'Layers', 'Destinos': 'Destinations',
   'Declive': 'Slope', 'Infravermelho diurno': 'Daytime infrared', 'Minerais hidratados': 'Hydrated minerals', 'Trajeto do Perseverance': 'Perseverance traverse', 'Pontos de interesse': 'Points of interest',
@@ -69,6 +70,16 @@ const EXACT = {
 
 /* Frases e pedaços de frase (o maior primeiro). Os números ficam onde estão. */
 const PHRASES = [
+  ['No local: ', 'On site: '],
+  ['Cúpula do habitat, dois módulos, câmara de ar, painéis solares e mastro de comunicação.', 'Habitat dome, two modules, airlock, solar panels and comms mast.'],
+  ['Anel de pouso com as marcas dos motores de descida, marco e bandeira.', 'Landing ring with the descent engine marks, a marker and a flag.'],
+  ['A rocha Rochette com os dois furos da broca e um tubo de amostra ao lado.', 'The Rochette rock with its two drill holes and a sample tube beside it.'],
+  ['Paredão em camadas: cada faixa é um período de sedimento do rio.', 'Layered cliff: each band is a period of river sediment.'],
+  ['Laje de rocha sedimentar com o marcador verde da detecção de orgânicos.', 'Sedimentary rock slab with the green organics-detection marker.'],
+  ['Os 10 tubos de amostras em zigue-zague, cada um no seu ponto marcado.', 'The 10 sample tubes in a zigzag, each at its marked spot.'],
+  ['Blocos arredondados que o rio arrastou de fora da cratera.', 'Rounded boulders the river carried in from outside the crater.'],
+  ['A rocha Cheyava Falls, avermelhada, com veios brancos e manchas claras.', 'The reddish Cheyava Falls rock, with white veins and light spots.'],
+  ['Área da detecção orbital em azul e cristais indicando os minerais hidratados.', 'Orbital detection area in blue, with crystals marking the hydrated minerals.'],
   ['Habitat da tripulação em terreno plano, perto do local de pouso do Perseverance.', 'Crew habitat on flat ground, close to the Perseverance landing site.'],
   ['Onde o Perseverance começou a rodar. Referência histórica da missão.', 'Where Perseverance started driving. A historic landmark of the mission.'],
   ['Rocha vulcânica do fundo da cratera. A primeira amostra guardada pelo rover saiu desta área.', 'Volcanic rock from the crater floor. The first sample cached by the rover came from this area.'],
