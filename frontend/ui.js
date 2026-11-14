@@ -65,9 +65,57 @@ document.title = 'AresNav · ' + T('Trilha Jezero');
 
 /* ---------- gaveta de dados ---------- */
 const drawer = $('#dataDrawer');
-function setDrawer(open) { drawer.hidden = !open; $('#btnData').setAttribute('aria-pressed', open); }
+function setDrawer(open) { drawer.hidden = !open; $('#btnData').setAttribute('aria-pressed', open); if (open) setPois(false); }
 $('#btnData').onclick = () => setDrawer(drawer.hidden);
 $('#dataClose').onclick = () => setDrawer(false);
+
+/* ---------- aba de pontos de referência: lista com coordenadas e atalhos ---------- */
+const poiDrawer = $('#poiDrawer'), poiList = $('#poiList');
+const coordText = p => { const en = window.LANG === 'en'; return `${A.num(Math.abs(p.lat), 5)}° ${p.lat >= 0 ? 'N' : 'S'} · ${A.num(Math.abs(p.lon), 5)}° ${p.lon >= 0 ? (en ? 'E' : 'L') : (en ? 'W' : 'O')}`; };
+const coordPlain = p => p.lat.toFixed(5) + ', ' + p.lon.toFixed(5);   // formato que a busca aceita
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+/* itens da aba: os pontos de referência de Jezero e, depois deles, os radares de Marte (relief.js) */
+const poiItems = () => A.POIS.map(p => ({ p, radar: false })).concat((A.RADARS || []).map(p => ({ p, radar: true })));
+function renderPois() {
+  poiList.textContent = '';
+  poiItems().forEach(({ p, radar }, k) => {
+    if (radar && k === A.POIS.length) poiList.append(el('li', 'poisep', 'Radares'));
+    const li = el('li', 'poicard'), head = el('div', 'poihead'), dot = el('span', 'dot');
+    dot.style.setProperty('--c', radar ? '#5BE7FF' : A.KIND[p.k]);
+    head.append(dot, el('b', '', p.n), el('span', 'tag', p.src));
+    const facts = el('div', 'poifacts mono');
+    facts.append(el('span', 'poicoord', coordText(p)));
+    const h = A.heightAt(p.lat, p.lon);
+    if (Number.isFinite(h)) facts.append(el('span', '', 'Altitude ' + A.num(h, 0) + ' m'));
+    if (!radar && p.k !== 'base') facts.append(el('span', '', A.fmtKm(A.metersBetween(A.BASE.lat, A.BASE.lon, p.lat, p.lon)) + ' ' + T('da base')));
+    const acts = el('div', 'poiacts');
+    [['go', 'Ver no mapa'], !radar && p.k !== 'base' && ['goal', 'Definir como destino'], !radar && ['drop', 'Descer aqui'], ['copy', 'Copiar coordenadas']].filter(Boolean)
+      .forEach(([a, label], i) => { const b = el('button', i === 0 ? 'primary' : '', label); b.dataset.a = a; b.dataset.k = k; acts.append(b); });
+    li.append(head, el('p', '', p.why), facts, acts);
+    poiList.append(li);
+  });
+}
+function setPois(open) {
+  if (open) { setDrawer(false); renderPois(); }
+  poiDrawer.hidden = !open; $('#btnPois').setAttribute('aria-pressed', open);
+}
+$('#btnPois').onclick = () => setPois(poiDrawer.hidden);
+$('#poiClose').onclick = () => setPois(false);
+poiList.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const item = poiItems()[+b.dataset.k], p = item.p, a = b.dataset.a;
+  const far = item.radar && p.kind === 'orbit';                // detecção orbital: mostra a região inteira
+  if (a === 'copy') {
+    const done = ok => { b.textContent = ok ? 'Copiado' : coordPlain(p); setTimeout(() => { b.textContent = 'Copiar coordenadas'; }, 1600); };
+    try { navigator.clipboard.writeText(coordPlain(p)).then(() => done(true), () => done(false)); } catch (err) { done(false); }
+    return;
+  }
+  setPois(false);
+  if (a === 'drop') { A.dropAt(p.lat, p.lon); return; }
+  if (a === 'goal') A.setGoalPoi(p);
+  if (A.state.view !== 'globe' && A.state.view !== 'map') A.setView(mapView);
+  if (onMap()) A.map.flyTo([p.lat, p.lon], far ? 5 : 15); else A.globe.flyTo(p.lat, p.lon, far ? 1200 : 4);
+});
 
 /* ---------- busca de lugares em Marte ---------- */
 const PLACES = [
@@ -116,7 +164,7 @@ input.addEventListener('keydown', e => { if (e.key === 'Enter' && hits[0]) go(hi
 list.addEventListener('mousedown', e => { const b = e.target.closest('button'); if (b) { e.preventDefault(); go(hits[+b.dataset.i]); } });
 document.addEventListener('mousedown', e => { if (!e.target.closest('.search')) list.hidden = true; });
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { setDrawer(false); if (A.state.dropMode) A.setDropMode(false); }
+  if (e.key === 'Escape') { setDrawer(false); setPois(false); if (A.state.dropMode) A.setDropMode(false); }
   if (e.key === '/' && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); input.focus(); }
 });
 

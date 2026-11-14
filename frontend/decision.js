@@ -64,8 +64,9 @@ function actions() {
   const lim = A.LIM.safe, kg = st.payloadKg || 0;
   if (!I && st.goal >= 0) {   // declive: não existe rota segura até o destino
     const si = A.cellOf(A.BASE.lat, A.BASE.lon), shortP = A.route(si, st.goal, 'short');
-    out.title = tr('Nenhuma rota segura até esse ponto');
-    out.text = `${tr('Todo caminho passa por declive acima de')} ${A.num(lim, 1)}° ${tr('com')} ${A.num(kg, 1)} kg.`;
+    // o A* só procura na grade de 200 m da área da missão: "não achei" não prova que não existe caminho
+    out.title = tr('Nenhuma rota segura encontrada neste modelo');
+    out.text = `${tr('Na grade de relevo de 200 m, a busca não achou caminho que fique abaixo de')} ${A.num(lim, 1)}° ${tr('com')} ${A.num(kg, 1)} kg.`;
     if (shortP) {
       const sI = A.analyse(shortP), kSlope = Math.floor((15 - sI.maxS) / 0.2 * 2) / 2;   // limite = 15° − 0,2°/kg
       out.items.push({ label: tr('Mostrar o trecho íngreme'), primary: true, run: () => mark(steepRuns(shortP, lim), '#FF5A6E') });
