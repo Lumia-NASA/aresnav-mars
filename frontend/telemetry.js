@@ -23,6 +23,12 @@ const CHARTS = [
   { k: 'hr', label: 'Frequência cardíaca', unit: 'bpm', color: '--mars', dec: 0 }
 ];
 
+/* Selo de procedência de cada número: medido por instrumento, derivado do relevo, ou simulado pelo modelo */
+const SRC = { m: ['MEASURED', 'Medido por instrumento (MEDA, waypoints do Perseverance)'], d: ['DEM-DERIVED', 'Calculado do relevo orbital MOLA/HRSC'], s: ['SIMULATED', 'Estimado pelo modelo do traje e da caminhada'] };
+const badge = k => `<i class="prov-badge ${k}" title="${SRC[k][1]}">${SRC[k][0]}</i>`;
+const GAUGE_SRC = { o2: 's', hr: 's', co2: 's', suitKpa: 's', suitTemp: 's', batt: 's' };
+const CHART_SRC = { h: 'd', slope: 'd', speed: 's', o2: 's', hr: 's' };
+
 /* arco de 240° */
 const R = 40, CX = 50, CY = 52, A0 = 150, SWEEP = 240;
 const polar = a => [CX + R * Math.cos(a * Math.PI / 180), CY + R * Math.sin(a * Math.PI / 180)];
@@ -31,8 +37,8 @@ function arc(f) {
   return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${R} ${R} 0 ${SWEEP * f > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
 function buildGauges() {
-  $('#gauges').innerHTML = GAUGES.map(g => `<div class="gauge" id="g-${g.k}"><svg viewBox="0 0 100 86"><path class="track" d="${arc(1)}"/><path class="val" d="${arc(0.5)}"/></svg><b class="mono">–</b><small>${g.unit}</small><span>${g.label}</span></div>`).join('');
-  $('#charts').innerHTML = CHARTS.map(c => `<div class="chart"><div class="chead"><span>${c.label}${c.real ? ' <em>dado real</em>' : ' <em class="sim">simulado</em>'}</span><b class="mono" id="cv-${c.k}">–</b></div><canvas id="c-${c.k}"></canvas></div>`).join('');
+  $('#gauges').innerHTML = GAUGES.map(g => `<div class="gauge" id="g-${g.k}"><svg viewBox="0 0 100 86"><path class="track" d="${arc(1)}"/><path class="val" d="${arc(0.5)}"/></svg><b class="mono">–</b><small>${g.unit}</small><span>${g.label} ${badge(GAUGE_SRC[g.k] || 's')}</span></div>`).join('');
+  $('#charts').innerHTML = CHARTS.map(c => `<div class="chart"><div class="chead"><span>${c.label} ${badge(CHART_SRC[c.k] || 's')}</span><b class="mono" id="cv-${c.k}">–</b></div><canvas id="c-${c.k}"></canvas></div>`).join('');
 }
 const fmt = (v, dec) => v.toLocaleString(LOC, { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
@@ -95,13 +101,14 @@ const val = (v, dec, unit) => v == null ? '—' : fmt(Number(v), dec) + (unit ||
 /* Blocos do contrato: ambiente (MEDA), mobilidade, topografia e posição */
 function renderMeda() {
   const t = A.state.tele || {}, L = t.layers || {}, m = L.atmosphere_meda || {}, mob = t.eva_mobility || {}, topo = L.topography || {}, loc = t.location || {};
-  const block = (title, rows) => `<h4>${title}</h4><div class="meda">${rows.map(([a, b]) => `<div><span>${a}</span><b class="mono">${b}</b></div>`).join('')}</div>`;
+  const block = (title, rows) => `<h4>${title}</h4><div class="meda">${rows.map(([a, b, k]) => `<div><span>${a} ${badge(k)}</span><b class="mono">${b}</b></div>`).join('')}</div>`;
   $('#meda').innerHTML =
     (A.state.linkState === 'online' ? '' : '<p class="offline-note">OFFLINE TELEMETRY (CACHED)</p>') +
-    block('Ambiente · MEDA', [['Temperatura', val(m.temp_c, 1, ' °C')], ['Vento', val(m.wind_speed_ms, 1, ' m/s')], ['Radiação', val(m.radiation_msv_day, 2, ' mSv/sol')], ['Poeira', m.dust_storm_alert == null ? '—' : m.dust_storm_alert ? 'Alerta ativo' : 'Normal']]) +
-    block('Mobilidade', [['O₂ restante', val(mob.o2_remaining_pct, 0, '%')], ['Carga do traje', val(mob.suit_payload_kg, 1, ' kg')], ['Dupla', val(mob.buddy_eva2_distance_m, 1, ' m')], ['Rover de apoio', statusPt(mob.support_rover_status)]]) +
-    block('Topografia', [['Declive', val(topo.slope_deg, 1, '°')], ['Limite seguro', val(topo.max_safe_slope_deg, 0, '°')], ['Terreno', statusPt(topo.terrain_status)], ['Modo', statusPt(mob.mode)]]) +
-    block('Posição', [['Latitude', val(loc.lat, 4, '° N')], ['Longitude', val(loc.lng, 4, '° L')], ['Altitude', val(loc.elevation_m, 1, ' m')], ['Local', loc.name || '—']]) +
+    '<p class="comm-line mono" id="teleComm">📡 COMM: —</p>' +
+    block('Ambiente · MEDA', [['Temperatura', val(m.temp_c, 1, ' °C'), 'm'], ['Vento', val(m.wind_speed_ms, 1, ' m/s'), 'm'], ['Radiação', val(m.radiation_msv_day, 2, ' mSv/sol'), 'm'], ['Poeira', m.dust_storm_alert == null ? '—' : m.dust_storm_alert ? 'Alerta ativo' : 'Normal', 'm']]) +
+    block('Mobilidade', [['O₂ restante', val(mob.o2_remaining_pct, 0, '%'), 's'], ['Carga do traje', val(mob.suit_payload_kg, 1, ' kg'), 's'], ['Dupla', val(mob.buddy_eva2_distance_m, 1, ' m'), 's'], ['Rover de apoio', statusPt(mob.support_rover_status), 'm']]) +
+    block('Topografia', [['Declive', val(topo.slope_deg, 1, '°'), 'd'], ['Limite seguro', val(topo.max_safe_slope_deg, 0, '°'), 's'], ['Terreno', statusPt(topo.terrain_status), 'd'], ['Modo', statusPt(mob.mode), 's']]) +
+    block('Posição', [['Latitude', val(loc.lat, 4, '° N'), 'm'], ['Longitude', val(loc.lng, 4, '° L'), 'm'], ['Altitude', val(loc.elevation_m, 1, ' m'), 'd'], ['Local', loc.name || '—', 'm']]) +
     `<p class="note">${A.state.linkState === 'online' ? 'Lido do backend AresNav (/api/v1/telemetry) a cada 5 s.' : 'Sem enlace com o backend: mostrando a última telemetria guardada.'}${t.evidenceSha256 ? ' Evidência SHA-256 ' + String(t.evidenceSha256).slice(0, 12) + '…' : ''}</p>`;
 }
 

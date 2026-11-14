@@ -279,7 +279,10 @@ const TILE_LAYERS = {
   ctx: { id: 'JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0', ext: 'png', max: 13 },
   hirise: { id: 'JEZ_hirise_soc_006_orthoMosaic_25cm_Eqc_latTs0_lon0_first_dd', ext: 'png', max: 17 },
   mosaic: { id: 'NES_JEZ_MID_Visible_Mosaic_HiRISE_CTX_HRSC_GCS_MARS_07-10-2018', ext: 'png', max: 16 },
-  themis: { id: 'THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018', ext: 'png', max: 9 }
+  themis: { id: 'THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018', ext: 'png', max: 9 },
+  dust: { id: 'TES_Dust', ext: 'png', max: 3 },                 // índice de cobertura de poeira (MGS TES)
+  inertia: { id: 'TES_Thermal_Inertia', ext: 'png', max: 3 },   // inércia térmica: solo firme x areia fofa (MGS TES)
+  rough: { id: 'mola_roughness', ext: 'png', max: 3 }           // rugosidade da superfície (MGS MOLA)
 };
 const PROXY_RATE = { rateLimit: { max: parseInt(process.env.TILE_RATE_LIMIT_MAX, 10) || 3000, timeWindow: '1 minute' } };
 const missing = new Set(); // blocos que a NASA respondeu 404 (sem cobertura)
@@ -458,6 +461,83 @@ fastify.get('/api/v1/copilot', async (request, reply) => {
     },
     evidenceSha256: hash
   });
+});
+
+// Zonas de exploração para missões humanas (NASA Human Landing Site / Exploration Zone Workshop, 2015)
+const ZONES_URL = `${TREK_AGS}/EZMars/MapServer/0/query?where=1%3D1&outFields=name,lat,lon,elev,abstract_l&returnGeometry=false&f=json`;
+const CACHE_ZONES = path.join(CACHE_DIR, 'exploration_zones.cached.json');
+fastify.get('/api/v1/zones', async (request, reply) => {
+  let data = null, degraded = false;
+  if (!cacheOnly(request)) {
+    try {
+      assertAuthorizedScope(ZONES_URL);
+      const r = await axios.get(ZONES_URL, { timeout: REQUEST_TIMEOUT_MS, headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: v => v === 200 });
+      if (!Array.isArray(r.data && r.data.features)) throw new Error('resposta sem features');
+      data = r.data.features.map(f => f.attributes).filter(a => Number.isFinite(a.lat) && Number.isFinite(a.lon))
+        .map(a => ({ name: String(a.name).trim(), lat: a.lat, lon: a.lon > 180 ? a.lon - 360 : a.lon, elevKm: a.elev, abstract: a.abstract_l || null }));
+      try { fs.writeFileSync(CACHE_ZONES, JSON.stringify(data), 'utf8'); } catch (e) { /* cache é opcional */ }
+    } catch (err) { fastify.log.warn({ err: err.message }, 'Zonas de exploração: usando cache'); }
+  }
+  if (!data) { data = loadOfflineCache(CACHE_ZONES); degraded = true; }
+  if (!data) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ success: false, error: 'NASA inacessível e zonas fora do cache' });
+  const hash = computeEvidenceHash(data);
+  return reply.code(200).header('X-AresNav-Evidence-SHA256', hash).send({ success: true, degraded, evidenceSha256: hash, data });
+});
+
+/* ---------- ARES: copiloto com IA para o astronauta ----------
+   Recebe a pergunta e um resumo do estado da caminhada (rota, veredito, O2, rádio, clima, posição)
+   e responde em poucas frases, no idioma da pergunta. Usa a API do Claude quando há credencial
+   (ANTHROPIC_API_KEY no .env). Sem credencial responde 503 e o navegador usa o modo local. */
+let anthropic = null, anthropicTried = false;
+function getAnthropic() {
+  if (anthropicTried) return anthropic;
+  anthropicTried = true;
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) return null;
+  try {
+    const sdk = require('@anthropic-ai/sdk');
+    const Anthropic = sdk.Anthropic || sdk.default || sdk;
+    anthropic = new Anthropic();
+  } catch (err) { fastify.log.warn({ err: err.message }, 'Copiloto: SDK da Anthropic indisponível'); }
+  return anthropic;
+}
+const COPILOT_MODEL = process.env.COPILOT_MODEL || 'claude-opus-5-5';
+const COPILOT_SYSTEM = `You are ARES, the support copilot inside the helmet of an astronaut walking on Mars (Jezero crater) and on the planner screen in the habitat.
+You get a JSON snapshot of the mission state computed by the AresNav app from real NASA data (HRSC/MOLA terrain, HiRISE/CTX imagery, Perseverance traverse, MEDA weather) plus simulated suit values.
+Rules:
+- Answer in the same language as the question (Portuguese or English).
+- Be brief and operational: 1 to 4 short sentences, like a mission controller on the radio. No markdown, no lists unless asked.
+- Use only the numbers in the snapshot. If something is not in it, say you do not have that data. Never invent measurements.
+- Safety first: if the verdict is NO-GO or a value is outside its limit, say so plainly and give the safest action (drop payload, turn back at the turn-back point, take the safe route, relay radio through the orbiter).
+- Values marked simulated are estimates, say so when it matters.`;
+fastify.get('/api/v1/copilot/status', async () => ({ ai: !!getAnthropic(), model: COPILOT_MODEL }));
+fastify.post('/api/v1/copilot/ask', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, bodyLimit: 32 * 1024 }, async (request, reply) => {
+  const body = request.body || {};
+  const question = typeof body.question === 'string' ? body.question.trim().slice(0, 600) : '';
+  if (!question) return reply.code(400).send({ error: 'Pergunta vazia' });
+  const client = getAnthropic();
+  if (!client) return reply.code(503).send({ offline: true, error: 'Copiloto sem credencial da API: usando o modo local do navegador' });
+  const context = JSON.stringify(body.context || {}).slice(0, 12000);
+  const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
+    .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string')
+    .map(m => ({ role: m.role, content: m.text.slice(0, 1200) }));
+  while (history.length && history[0].role !== 'user') history.shift();
+  try {
+    const res = await client.beta.messages.create({
+      model: COPILOT_MODEL,
+      max_tokens: 16000,
+      output_config: { effort: 'low' },               // respostas curtas de rádio: esforço baixo responde mais rápido
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',                           // se o modelo recusar, a API tenta outro modelo na mesma chamada
+      system: COPILOT_SYSTEM,
+      messages: history.concat([{ role: 'user', content: `Mission snapshot (JSON):\n${context}\n\nQuestion: ${question}` }])
+    });
+    if (res.stop_reason === 'refusal') return reply.code(200).send({ source: 'claude', model: res.model, answer: null, refused: true });
+    const answer = res.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    return reply.code(200).send({ source: 'claude', model: res.model, answer });
+  } catch (err) {
+    fastify.log.warn({ err: err.message, status: err.status }, 'Copiloto: falha na API do Claude');
+    return reply.code(502).send({ offline: true, error: 'API do Claude indisponível: usando o modo local do navegador' });
+  }
 });
 
 const start = async () => {
