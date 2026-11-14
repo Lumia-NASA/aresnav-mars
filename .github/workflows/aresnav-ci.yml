@@ -36,3 +36,11 @@ jobs:
       - name: Suit Payload Physics Tests (GO / NO-GO)
         run: |
           node tests/physics-test.js
+
+      - name: Install Backend Dependencies
+        run: |
+          npm ci --prefix backend
+
+      - name: FU Berlin Integration Tests (360° viewer logic, tiles & panorama routes, offline)
+        run: |
+          node tests/fub-test.js

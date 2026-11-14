@@ -89,7 +89,7 @@
 </header>
 
 <div class="offline-badge" id="offlineBadge" hidden>
-  <b>ENLACE TERRA–MARTE FORA DO AR.</b> O AresNav segue operando 100% sobre dados locais: matrizes binárias de relevo (.i16), cache <span class="mono">.cached.json</span>, mapa de reserva e panoramas já guardados. A navegação continua viva sem internet.
+  <b>ENLACE TERRA–MARTE FORA DO AR.</b> Rota, veredito e física continuam funcionando sobre dados locais: relevo (.i16), cache <span class="mono">.cached.json</span>, mapa de reserva e fotos da Navcam já guardadas. <b>Ficam indisponíveis</b>: a cor natural e as curvas de nível da FU Berlin, os mapas globais (poeira, firmeza, rugosidade) e os panoramas 360° que ainda não foram abertos.
 </div>
 
 <!-- Painel esquerdo: conteúdo da missão -->
@@ -191,14 +191,14 @@
 
 <!-- Gaveta de dados e procedência -->
 <section class="drawer" id="dataDrawer" hidden aria-label="Dados e procedência">
-  <header><h2>Dados usados (todos oficiais da NASA, sempre pelo backend AresNav)</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
+  <header><h2>Dados usados: NASA, ESA/DLR e FU Berlin, sempre pelo backend AresNav</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
   <div class="tablewrap">
     <table>
-      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Rota do backend</th><th>Status</th></tr></thead>
+      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Rota do backend</th><th>Fonte e crédito</th><th>Status</th></tr></thead>
       <tbody id="srcTable"></tbody>
     </table>
   </div>
-  <p class="prov mono"><b>DATA PROVENANCE:</b> MOLA DEM (463 m/px) | HRSC + MOLA (200 m/px) | HiRISE/CTX (0,25–6 m/px) | THEMIS (100 m/px) | MEDA Sol Baseline | Navcam M20
+  <p class="prov mono"><b>DATA PROVENANCE:</b> MOLA DEM (463 m/px) | HRSC + MOLA (200 m/px) | HiRISE/CTX (0,25–6 m/px) | THEMIS (100 m/px) | Cor natural FU Berlin (HRSC CC BY-SA 3.0 IGO) | Mastcam-Z 360° | MEDA Sol Baseline | Navcam M20
     <span class="seal">🔒 EvidenceGate SHA-256: <span id="provHash">aguardando o backend</span> <span id="provState"></span></span></p>
   <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores. O relevo do globo está em escala real; o botão 1× / 2,5× exagera a altura só para facilitar a leitura na vista de cima. As imagens de alta resolução (HiRISE e CTX) são em tons de cinza e recebem por cima a cor real do mosaico Viking.</p>
   <p>A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje. As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance. No "Terreno 3D" a vista é montada só com dados orbitais: ao descer em qualquer ponto de Marte, o app pede ao backend o relevo real do lugar (HRSC + MOLA, cerca de 230 m por ponto).</p>
@@ -224,6 +224,7 @@
 <script src="helmet.js"></script>
 <script src="telemetry.js"></script>
 <script src="mission.js"></script>
+<script src="pano-tiles.js"></script>
 <script src="pano360.js"></script>
 <script src="copilot.js"></script>
 <script src="ambience.js"></script>

@@ -156,7 +156,7 @@ O WebGIS de Jezero da Freie Universität Berlin (`maps.planet.fu-berlin.de/jezer
 - **Como os dados foram gerados:** o WFS deles só fala EPSG:49911 (Marte, cilíndrica equidistante, R = 3 396 190 m). `tools/build-fub-cache.py` baixa as camadas e converte para graus (x/R, y/R). A conversão bate com os limites que o próprio servidor informa.
 - **Créditos exigidos:** HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX: NASA/JPL-Caltech/MSSS; HiRISE: NASA/JPL/University of Arizona (Fergason et al., 2020). Estão no rodapé do app.
 
-## Dados (todos oficiais da NASA, sempre pelo backend)
+## Dados (NASA, ESA/DLR e FU Berlin, sempre pelo backend)
 
 | Camada | Missão / instrumento | Serviço |
 |---|---|---|
