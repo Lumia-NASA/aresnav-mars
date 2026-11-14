@@ -22,7 +22,10 @@ function snapshot() {
     stops: (st.stops || []).map(s => ({ name: s.p.n, km: +s.km.toFixed(2), goal: s.isGoal })),
     now_simulated: now ? { phase: now.phase, clock: A.clock(A.T0 + now.t), lat: +now.lat.toFixed(5), lon: +now.lon.toFixed(5), elevation_m: n0(now.h), slope_here_deg: +now.slope.toFixed(1), speed_kmh: +now.speed.toFixed(1), o2_pct: n0(now.o2), heart_rate_bpm: n0(now.hr), co2_mmHg: +now.co2.toFixed(1), dist_to_base_m: n0(now.baseDist), simulated: true } : null,
     radio: { now: comm ? comm.text : null, route_los_clear: st.los ? st.los.losClear : null, route_blind_share: st.los ? +st.los.blindShare.toFixed(2) : null },
-    weather_meda: { temp_c: meda.temp_c, wind_ms: meda.wind_speed_ms, radiation_msv_sol: meda.radiation_msv_day, dust_alert: meda.dust_storm_alert, measured: true },
+    weather_measured_meda: st.wx ? { sol: st.wx.sol, date: st.wx.date, age_days: st.wx.ageDays, min_c: st.wx.minC, max_c: st.wx.maxC, pressure_pa: st.wx.pressurePa, measured: true } : null,
+    temperature_estimated_now_c: (t => (t == null ? null : Math.round(t)))(A.tempAt(A.T0 + (now ? now.t : 0))),
+    weather_sample_from_contract: { wind_ms: meda.wind_speed_ms, radiation_msv_sol: meda.radiation_msv_day, dust_alert: meda.dust_storm_alert, note: 'sample values, not a reading' },
+    sun: { sunrise: A.clock(A.SUN.sunrise), sunset: A.clock(A.SUN.sunset), elevation_now_deg: Math.round(A.SUN.elevAt(A.T0 + (now ? now.t : 0))) },
     reachable_science: A.mission ? A.mission.reach.map(r => ({ name: r.p.n, reachable: r.ok, round_trip_min: r.total ? n0(r.total) : null, note: r.why || null })) : [],
     emergency_active: !!st.emerg, emergency_return: st.emInfo ? { distance_m: n0(st.emInfo.dist), minutes: n0(st.emInfo.tOut) } : null,
     link: st.linkState
@@ -55,9 +58,9 @@ function localAnswer(q) {
       : `Declive máximo da rota ${n1(r.max_slope_deg)}°, limite ${n1(s.suit.max_safe_slope_deg)}° com ${n1(s.suit.payload_kg)} kg.${now ? ` Aqui: ${n1(now.slope_here_deg)}°.` : ''} Subida de ${r.climb_m} m.`;
   }
   if (has('tempo', 'clima', 'vento', 'wind', 'weather', 'poeira', 'dust', 'temperat', 'radiac', 'radiat')) {
-    const w = s.weather_meda;
-    return E ? `MEDA: ${w.temp_c ?? '—'} °C, wind ${w.wind_ms ?? '—'} m/s, radiation ${w.radiation_msv_sol ?? '—'} mSv per sol, ${w.dust_alert ? 'dust alert active' : 'no dust alert'}.`
-      : `MEDA: ${w.temp_c ?? '—'} °C, vento ${w.wind_ms ?? '—'} m/s, radiação ${w.radiation_msv_sol ?? '—'} mSv por sol, ${w.dust_alert ? 'alerta de poeira ativo' : 'sem alerta de poeira'}.`;
+    const w = s.weather_measured_meda, x = s.weather_sample_from_contract, t = s.temperature_estimated_now_c;
+    const m = w ? (E ? `Last public MEDA sol ${w.sol} (${w.date}, ${w.age_days} days ago): ${w.min_c} to ${w.max_c} °C, ${w.pressure_pa} Pa.` : `Último sol público do MEDA, ${w.sol} (${w.date}, há ${w.age_days} dias): ${w.min_c} a ${w.max_c} °C, ${w.pressure_pa} Pa.`) : (E ? 'No measured MEDA data.' : 'Sem dado medido do MEDA.');
+    return m + (t != null ? (E ? ` Now about ${t} °C (estimated).` : ` Agora cerca de ${t} °C (estimado).`) : '') + (E ? ` Sunset ${s.sun.sunset}. Wind ${x.wind_ms} m/s is a sample value.` : ` Pôr do sol ${s.sun.sunset}. Vento de ${x.wind_ms} m/s é valor de exemplo.`);
   }
   if (has('onde', 'where', 'posic', 'position', 'local')) {
     if (!now) return E ? 'At the habitat.' : 'Na base.';

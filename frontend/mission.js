@@ -13,15 +13,9 @@ const tr = s => (window.T ? window.T(s) : s);
 const C = window.Cesium;
 
 /* ---------- Relógio de Marte (Allison & McEwen 2000, como o Mars24 da NASA GISS) ---------- */
-function marsTime(date) {
-  const jdUT = (date || new Date()).getTime() / 86400000 + 2440587.5, jdTT = jdUT + 69.184 / 86400;
-  const dt = jdTT - 2451545.0, msd = (jdTT - 2405522.0028779) / 1.0274912517, mtc = ((24 * msd) % 24 + 24) % 24;
-  const r = Math.PI / 180, M = (19.3871 + 0.52402073 * dt) * r, aFMS = 270.3871 + 0.524038496 * dt;
-  const ls = ((aFMS + (10.691 + 3e-7 * dt) * Math.sin(M) + 0.623 * Math.sin(2 * M) + 0.050 * Math.sin(3 * M) + 0.005 * Math.sin(4 * M)) % 360 + 360) % 360;
-  const dec = Math.asin(0.42565 * Math.sin(ls * r)) / r + 0.25 * Math.sin(ls * r);
-  const lmst = (mtc + A.BASE.lon / 15 + 24) % 24;                  // hora solar média local em Jezero
-  const sol = Math.floor(msd + A.BASE.lon / 360) - 52304;          // sol 0 do Perseverance = MSD 52304 (18/02/2021)
-  return { msd, mtc, lmst, ls, dec, sol, subLon: ((12 - mtc) * 15 + 540) % 360 - 180 };
+function marsTime(date) {   // mars-sun.js (Mars24): hora local, Ls, declinação e longitude onde o Sol está a pino
+  const o = MarsSun.localTime(date || new Date(), A.BASE.lon);
+  return Object.assign(o, { subLon: ((12 - o.mtc - o.eot / 15) * 15 + 540) % 360 - 180 });
 }
 const hhmm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor((h % 1) * 60)).padStart(2, '0');
 
@@ -134,8 +128,9 @@ $('#exportBtn').onclick = async () => {
       bbox: [A.BOX.XMIN, A.BOX.YMIN, A.BOX.XMAX, A.BOX.YMAX], retrieved_at: demH && demH.date, sha256: demH && demH.sha256, from_cache: demH ? demH.degraded : null,
       known_bias_vs_m20: calib ? { waypoints: calib.n, bias_m: +calib.bias.toFixed(2), sigma_m: +calib.sd.toFixed(2) } : null },
     payload: { kg: st.payloadKg, slope_limit_deg: A.LIM.safe, metabolic_factor: +Physics.metabolicFactor(st.payloadKg).toFixed(3), slope_rule: Physics.SLOPE_RULE },
-    weather: { source: 'AresNav contract (MEDA sample values)', values: meda, measured_at: null, note: 'the contract carries no measurement time: treat as sample values, not a live reading',
-      file_updated_at: teleH && teleH.date, file_age_h: ageH(teleH && teleH.date) },
+    weather: { measured: st.wx ? { source: 'NASA Mars 2020 MEDA weather feed', sol: st.wx.sol, measured_on: st.wx.date, age_days: st.wx.ageDays, min_c: st.wx.minC, max_c: st.wx.maxC, pressure_pa: st.wx.pressurePa } : null,
+      sample_from_contract: { values: meda, note: 'wind, dust and radiation are not in the public MEDA feed: sample values, not a reading', file_updated_at: teleH && teleH.date, file_age_h: ageH(teleH && teleH.date) },
+      sun: { sol: A.SUN.sol, sunrise_lmst: A.clock(A.SUN.sunrise), sunset_lmst: A.clock(A.SUN.sunset), dark_margin_min: A.DARK_MARGIN, model: 'Mars24 (Allison & McEwen 2000), checked against MEDA sunrise/sunset' } },
     simulated: ['oxygen use', 'heart rate', 'pace vs payload', 'slope limit rule'], measured: ['terrain', 'rover traverse and waypoints', 'imagery'],
   };
   const meta = {

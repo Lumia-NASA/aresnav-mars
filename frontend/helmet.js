@@ -264,8 +264,8 @@ function renderHud() {
   const steep = Number(topo.slope_deg) > Number(topo.max_safe_slope_deg);
   $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
     [['Declive', topo.slope_deg != null ? `<i style="color:${steep ? 'var(--crit)' : 'var(--ok)'}">${A.num(topo.slope_deg, 1)}°</i> / ${A.num(topo.max_safe_slope_deg, 0)}°` : '—'],
-      ['Terreno', statusPt(topo.terrain_status)], ['Temp.', meda.temp_c != null ? A.num(meda.temp_c, 1) + ' °C' : '—'], ['Vento', meda.wind_speed_ms != null ? A.num(meda.wind_speed_ms, 1) + ' m/s' : '—'],
-      ['Radiação', meda.radiation_msv_day != null ? A.num(meda.radiation_msv_day, 2) + ' mSv' : '—'], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
+      ['Terreno', statusPt(topo.terrain_status)], ['Temp.', (tc => tc != null ? '≈ ' + A.num(tc, 0) + ' °C' : '—')(A.tempAt(A.T0 + (n ? n.t : 0)))], ['Vento (ex.)', meda.wind_speed_ms != null ? A.num(meda.wind_speed_ms, 1) + ' m/s' : '—'],
+      ['Radiação (ex.)', meda.radiation_msv_day != null ? A.num(meda.radiation_msv_day, 2) + ' mSv' : '—'], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
       .map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('') +
     (loc.lat != null ? `<div class="loc mono">${A.num(loc.lat, 4)}° N ${A.num(loc.lng, 4)}° L · ${A.num(loc.elevation_m, 0)} m</div>` : '');
   renderTarget();
@@ -274,7 +274,7 @@ function renderHud() {
     ? `NO-GO · SLOPE OVERLOAD · com ${A.num(st.payloadKg, 1)} kg o limite cai para ${A.num(A.LIM.safe, 1)}°. Desvie por terreno plano ou reduza a carga.`
     : `NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ${A.num(st.payloadKg, 1)} kg. Reduza a carga ou encurte a rota.`) : null;
   const msg = st.emerg ? 'EMERGÊNCIA · siga a rota tracejada até a base'
-    : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
+    : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'ALERTA DE POEIRA · valor de exemplo do contrato' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';
   /* Perto de um ponto de referência no Terreno 3D: cartão dizendo o que ele é e o que se vê ali */

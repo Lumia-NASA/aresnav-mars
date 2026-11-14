@@ -68,6 +68,7 @@ const MY = DY * Math.PI / 180 * R_MARS;
 /* ---------- Tabela de fontes ---------- */
 /* [chave, camada, missão, instrumento, rota do backend, fonte e crédito exigido] */
 const SOURCES = [
+  ['meda', 'Tempo medido (mínima, máxima, pressão)', 'Mars 2020', 'MEDA', '/api/v1/weather', 'NASA/JPL-Caltech/CAB (mars.nasa.gov weather feed)'],
   ['telemetry', 'Telemetria unificada (contrato)', 'MOLA + MEDA + Mars 2020', 'CONTRATO_API.json', '/api/v1/telemetry', 'Contrato AresNav (valores de exemplo)'],
   ['viking', 'Mosaico global colorido', 'Viking Orbiter', 'VIS (232 m)', '/api/v1/tiles/viking', 'NASA/JPL/USGS · Mars Trek'],
   ['hirise', 'Imagem HiRISE 25 cm', 'Mars Reconnaissance Orbiter', 'HiRISE', '/api/v1/tiles/hirise', 'NASA/JPL/University of Arizona · Mars Trek'],
@@ -572,6 +573,35 @@ function routeLos(path) {
 
 /* ---------- Simulação da caminhada (ida, paradas, volta) ---------- */
 const T0 = 9 * 60, EVA_MAX = 480;
+/* ---------- Sol e tempo em Jezero ----------
+   Sol: posição real para o sol de hoje (algoritmo do Mars24, conferido contra o nascer e o pôr do sol do MEDA).
+   Tempo, em três níveis: MEDIDO (mínima, máxima e pressão do último sol publicado pelo MEDA, com data e idade),
+   ESTIMADO (temperatura a cada hora pela curva diária entre a mínima e a máxima) e EXEMPLO (vento, poeira e
+   radiação do contrato, que o feed público do MEDA não traz). */
+const DARK_MARGIN = 60;   // minutos de folga antes do pôr do sol
+const SUN = (() => {
+  const o = MarsSun.localTime(Date.now(), BASE.lon), t = MarsSun.sunTimes(BASE.lat, o, 0);
+  return { sol: o.sol, ls: o.ls, sunrise: t.sunrise * 60, sunset: t.sunset * 60, elevAt: m => MarsSun.elevation(BASE.lat, o.dec, MarsSun.lmstToLtst(m / 60, o)) };
+})();
+async function loadWeather() {
+  try {
+    const r = await fetchT(`${API}/weather${state.forceOffline ? '?offline=1' : ''}`, 9000);
+    if (r.ok) { const j = await r.json(); state.wx = j.data && j.data.latest ? Object.assign({ ageDays: j.data.ageDays, degraded: j.degraded }, j.data.latest) : null; }
+  } catch (e) { /* sem backend: fica sem o dado medido */ }
+  setStatus('meda', state.wx ? (link.online ? 'ok' : 'fb') : 'off');
+  if (state.ready) renderPanel();
+  emit('weather', state.wx);
+}
+/* Temperatura estimada numa hora LMST (minutos): mínima no nascer do Sol, máxima às 14:00, curva de cosseno */
+function tempAt(m) {
+  const w = state.wx; if (!w || w.minC == null || w.maxC == null) return null;
+  const rise = SUN.sunrise, peak = 14 * 60, day = 1440, x = ((m % day) + day) % day;
+  const f = x >= rise && x <= peak ? (1 - Math.cos(Math.PI * (x - rise) / (peak - rise))) / 2
+    : 1 - (1 - Math.cos(Math.PI * (((x - peak) + day) % day) / (rise + day - peak))) / 2;
+  return w.minC + (w.maxC - w.minC) * f;
+}
+/* Valores de exemplo do contrato (o feed público do MEDA não traz vento, poeira nem radiação) */
+const sampleWx = () => (state.tele && state.tele.layers && state.tele.layers.atmosphere_meda) || {};
 function buildSim(path, stops, hasPoiGoal) {
   const S = []; let t = 0, dist = 0;
   const last = path.length - 1, pause = {};
@@ -748,8 +778,8 @@ function renderChecklist() {
     [I ? 'ok' : state.ready ? 'crit' : 'wait', 'Rota traçada', I ? fmtKm(I.dist) + ' de ida' : state.ready ? 'Sem caminho possível' : 'Aguardando relevo'],
     [!I ? 'wait' : I.maxS <= LIM.safe ? 'ok' : 'crit', 'Declive dentro do limite', I ? `Máximo ${num(I.maxS, 1)}° de ${num(LIM.safe, 1)}°${payload ? ` (${NO_LOAD_SLOPE}° sem a carga de ${num(payload, 1)} kg)` : ''}` : state.ready ? `Limite ${num(LIM.safe, 1)}° com ${num(payload || 0, 1)} kg` : '—'],
     [!P ? 'wait' : P.o2 >= 30 ? 'ok' : P.o2 >= 15 ? 'warn' : 'crit', 'Reserva de oxigênio', P ? `${Math.max(0, Math.round(P.o2))}% previstos na volta (mín. 30%)` : '—'],
-    [!meda ? 'wait' : meda.dust_storm_alert ? 'warn' : 'ok', 'Tempo em Jezero (MEDA)', meda ? `${meda.dust_storm_alert ? 'Alerta de poeira' : 'Sem alerta'} · vento ${num(meda.wind_speed_ms, 1)} m/s` : '—'],
-    [!P ? 'wait' : P.back <= 17 * 60 ? 'ok' : 'crit', 'Volta com luz do dia', P ? `Retorno ${clock(P.back)} · pôr do sol 17:52` : '—'],
+    (w => [!w ? 'wait' : w.ageDays > 30 ? 'warn' : 'ok', 'Tempo em Jezero (MEDA)', w ? `${num(w.minC, 0)} a ${num(w.maxC, 0)} °C · ${num(w.pressurePa, 0)} Pa · sol ${w.sol} (${w.date}), dado de ${w.ageDays} dias atrás` : 'Sem dado medido']) (state.wx),
+    [!P ? 'wait' : P.back <= SUN.sunset - DARK_MARGIN ? 'ok' : P.back <= SUN.sunset ? 'warn' : 'crit', 'Volta com luz do dia', P ? `Retorno ${clock(P.back)} · Sol a ${num(Math.max(0, SUN.elevAt(P.back)), 0)}° · pôr do sol ${clock(SUN.sunset)} (sol ${SUN.sol})` : '—'],
     ['info', 'Comunicação com a Terra', 'Atraso de 11 min. Ciente']
   ];
   $('#checklist').innerHTML = items.map(([s, a, b]) => `<li class="${s}"><i></i><div><b>${a}</b><small>${b}</small></div></li>`).join('');
@@ -757,7 +787,7 @@ function renderChecklist() {
   /* destino fora da área com relevo não é culpa do declive: fica como NO-GO simples */
   const v = Physics.verdict({ hasRoute: !!I || state.goal < 0, maxSlope: I ? I.maxS : 0, limit: LIM.safe, o2: P ? P.o2 : 100 });
   state.assessment = Physics.assess({ hasRoute: !!I || state.goal < 0, maxSlope: I ? I.maxS : 0, limit: LIM.safe, o2: P ? P.o2 : 100, payloadKg: payload,
-    losClear: state.los ? state.los.losClear : undefined, obstructionM: state.los ? state.los.maxObstructionMeters : 0, lateReturn: !!P && P.back > 17 * 60 });
+    losClear: state.los ? state.los.losClear : undefined, obstructionM: state.los ? state.los.maxObstructionMeters : 0, lateReturn: !!P && P.back > SUN.sunset - DARK_MARGIN });
   const g = $('#gonogo');
   const caution = state.assessment.level === 'CAUTION';
   g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn || caution ? 'warn' : 'ok');
@@ -786,10 +816,10 @@ function renderPanel() {
       ['Duração total', fmtMin(P.total), `${stops.length} parada${stops.length === 1 ? '' : 's'}`], ['Oxigênio na volta', Math.max(0, Math.round(o2)) + '%', 'mín. 30%'],
       ['Subida acumulada', Math.round(I.climb) + ' m', 'descida ' + Math.round(I.desc) + ' m'], ['Declive máximo', num(I.maxS, 1) + '°', 'limite ' + num(LIM[state.mode], 1) + '°']
     ].map(([a, b, c]) => `<div class="stat"><span>${a}</span><b>${b}</b> <em>${c}</em></div>`).join('');
-    tl.innerHTML = `<span class="mono">${clock(T0)}</span><span>Saída da base</span><span class="mono">${clock(P.arrive)}</span><span>Chegada ao destino</span><span class="mono">${clock(P.back - I.tBack)}</span><span>Início do retorno</span><span class="mono">${clock(P.back)}</span><span>De volta à base</span><span class="mono">17:52</span><span>Pôr do sol</span>`;
+    tl.innerHTML = `<span class="mono">${clock(T0)}</span><span>Saída da base</span><span class="mono">${clock(P.arrive)}</span><span>Chegada ao destino</span><span class="mono">${clock(P.back - I.tBack)}</span><span>Início do retorno</span><span class="mono">${clock(P.back)}</span><span>De volta à base</span><span class="mono">${clock(SUN.sunset)}</span><span>Pôr do sol (sol ${SUN.sol})</span>`;
     if (I.steep > 0) alerts.push(['var(--warn)', `${Math.round(I.steep)} m de trecho com declive acima de 8°. Use bastões e passos curtos.`]);
     if (P.back > 14.5 * 60) alerts.push(['var(--crit)', 'O retorno passa das 14:30, quando o vento costuma subir. Antecipe a volta.']);
-    if (P.back > 17 * 60) alerts.push(['var(--crit)', 'A volta termina perto do pôr do sol. Encurte a caminhada ou divida em dois dias.']);
+    if (P.back > SUN.sunset - DARK_MARGIN) alerts.push(['var(--crit)', `A volta termina a menos de 1 h do pôr do sol (${clock(SUN.sunset)}). Encurte a caminhada ou divida em dois dias.`]);
     if (o2 < 30) alerts.push(['var(--crit)', `Reserva de oxigênio prevista de ${Math.max(0, Math.round(o2))}% na chegada, abaixo dos 30% exigidos.`]);
     if (state.mode === 'short' && I.maxS > LIM.safe) alerts.push(['var(--crit)', `A rota curta passa por declive de ${Math.round(I.maxS)}°. A rota segura é recomendada.`]);
     alerts.push(['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']);
@@ -874,6 +904,7 @@ const setOp = op => setView(op === 'helmet' ? 'helmet' : state.plannerView);
 async function start() {
   SOURCES.forEach(([k]) => setStatus(k, 'wait'));
   await pollTelemetry();               // decide online/offline antes de montar os mapas
+  loadWeather();
   link.mapsOnline = link.online;
   initMap();
   $('#destList').innerHTML = POIS.map((p, k) => p.k === 'base' ? '' : `<li><button data-k="${k}"><span class="dot" style="--c:${KIND[p.k]}"></span><span>${p.n}</span><span class="tag">${p.src.replace('Mars 2020 · ', '')}</span></button></li>`).join('');
@@ -890,6 +921,7 @@ async function start() {
     window.FORCE_OFFLINE_MODE = !window.FORCE_OFFLINE_MODE; state.forceOffline = window.FORCE_OFFLINE_MODE;
     await pollTelemetry();
     if (link.online !== link.mapsOnline) { link.mapsOnline = link.online; rebuildTiles(); emit('uplink', state); }
+    loadWeather();
   };
   $('#simSlider').addEventListener('input', e => { if (!state.sim) return; setPlaying(false); state.simT = e.target.value / 1000 * state.sim.total; tick(); });
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
@@ -924,7 +956,7 @@ const api = {
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
   heightAt, slopeAt, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
-  route, analyse, cellDist, losTo, routeLos, recompute, get HGT() { return HGT; }, get SL() { return SL; }, GRID: { W, H },
+  route, analyse, cellDist, losTo, routeLos, recompute, tick, setPlaying, SUN, tempAt, sampleWx, loadWeather, DARK_MARGIN, get HGT() { return HGT; }, get SL() { return SL; }, GRID: { W, H },
   traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null,
   get map() { return map; }
 };
