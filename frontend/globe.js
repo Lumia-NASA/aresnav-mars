@@ -11,7 +11,7 @@ const EX = 2.5;
 let K = 1.88, VS = 1.88 * EX, EYE = 14; // K = tamanho do globo em relação a Marte (1 com o elipsoide marciano)
 let viewer = null, failed = false, C = null, buildImagery = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
-const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0 };
+const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0, vel: 0, gx: 0, gy: 0 };
 /* Passo real: astronauta de traje, 0,8 m/s (2,9 km/h) e 1,6 m/s com Shift. Visualização: sobrevoo rápido. */
 const PACE = { real: [0.8, 1.6], fast: [80, 2500] };
 
@@ -201,8 +201,91 @@ function placeCamera() {
   const h = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh) + EYE + bob;
   viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(walk.lon, walk.lat, h), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(walk.pitch), roll: 0 } });
 }
+/* Acabamento da vista do chão: céu marciano, poeira que cresce com a distância, cor de Marte sobre a
+   imagem orbital (que vem em tons de cinza) e um granulado fino no solo perto dos pés. Roda na placa de vídeo. */
+const WALK_FS = `
+uniform sampler2D colorTexture;
+uniform sampler2D depthTexture;
+uniform vec3 u_east;
+uniform vec3 u_north;
+uniform vec2 u_ground;
+uniform float u_haze;
+uniform float u_unit;
+in vec2 v_textureCoordinates;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void main() {
+  vec3 src = texture(colorTexture, v_textureCoordinates).rgb;
+  float depth = czm_unpackDepth(texture(depthTexture, v_textureCoordinates));
+  vec4 far = czm_inverseProjection * vec4(v_textureCoordinates * 2.0 - 1.0, 0.0, 1.0);
+  vec3 dirWC = normalize(czm_inverseViewRotation * normalize(far.xyz / far.w));
+  vec3 up = normalize(czm_viewerPositionWC);
+  float sinEl = dot(dirWC, up);
+
+  vec3 horizon = vec3(0.86, 0.70, 0.53), zenith = vec3(0.47, 0.36, 0.28);
+  vec3 sunDir = normalize(u_east * 0.55 - u_north * 0.35 + up * 0.42);
+  float sun = max(dot(dirWC, sunDir), 0.0);
+  vec3 sky = mix(horizon, zenith, pow(clamp(sinEl, 0.0, 1.0), 0.6));
+  sky += vec3(0.10, 0.09, 0.08) * exp(-abs(sinEl) * 9.0);                       // faixa clara de poeira no horizonte
+  sky += vec3(0.55, 0.62, 0.70) * pow(sun, 60.0) * 0.55 + vec3(1.0) * smoothstep(0.9993, 0.9997, sun); // sol pequeno com halo azulado
+
+  vec3 col = sky;
+  if (depth > 0.0 && depth < 1.0) {
+    vec4 eye = czm_windowToEyeCoordinates(gl_FragCoord.xy, depth);
+    float dist = length(eye.xyz / eye.w) / u_unit;
+    float lum = dot(src, vec3(0.299, 0.587, 0.114));
+    float sat = max(src.r, max(src.g, src.b)) - min(src.r, min(src.g, src.b));
+    vec3 ramp = mix(vec3(0.16, 0.085, 0.055), vec3(0.66, 0.38, 0.23), smoothstep(0.0, 0.55, lum));
+    ramp = mix(ramp, vec3(0.93, 0.76, 0.58), smoothstep(0.5, 1.0, lum));
+    col = mix(ramp, src, clamp(sat * 3.0, 0.0, 0.65));
+    vec2 g = u_ground + vec2(dot(dirWC, u_east), dot(dirWC, u_north)) * dist;
+    float grain = vnoise(g * 0.35) * 0.45 + vnoise(g * 1.7) * 0.35 + vnoise(g * 7.0) * 0.2;
+    col *= 1.0 + (grain - 0.5) * 0.5 * exp(-dist / 140.0);
+    float haze = (1.0 - exp(-dist / u_haze)) * 0.94;
+    col = mix(col, mix(horizon, sky, 0.35), haze);
+  }
+  col = (col - 0.5) * 1.06 + 0.5;
+  out_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+const fx = { stage: null, east: null, north: null, ground: null, saved: null };
+function fxOn() {
+  const scene = viewer.scene, cam = viewer.camera;
+  fx.saved = { fov: cam.frustum.fov, sse: scene.globe.maximumScreenSpaceError, fxaa: scene.postProcessStages.fxaa.enabled,
+    atm: scene.skyAtmosphere && scene.skyAtmosphere.show, box: scene.skyBox && scene.skyBox.show };
+  cam.frustum.fov = C.Math.toRadians(72);            // campo de visão mais aberto, como dentro de um capacete
+  scene.globe.maximumScreenSpaceError = 1.4;         // pede blocos de imagem mais nítidos
+  scene.postProcessStages.fxaa.enabled = true;
+  try {
+    fx.east = new C.Cartesian3(1, 0, 0); fx.north = new C.Cartesian3(0, 1, 0); fx.ground = new C.Cartesian2(0, 0);
+    fx.stage = scene.postProcessStages.add(new C.PostProcessStage({ fragmentShader: WALK_FS, uniforms: {
+      u_east: () => fx.east, u_north: () => fx.north, u_ground: () => fx.ground,
+      u_haze: () => (walk.pace === 'real' ? 9000 : 60000) * K, u_unit: () => K } }));
+    scene.fog.enabled = false;
+    if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
+    if (scene.skyBox) scene.skyBox.show = false;
+  } catch (e) { console.warn('Efeitos do terreno 3D indisponíveis', e); fx.stage = null; scene.fog.enabled = true; }
+}
+function fxOff() {
+  const scene = viewer.scene, s = fx.saved; if (!s) return;
+  if (fx.stage) { try { scene.postProcessStages.remove(fx.stage); } catch (e) { /* já removido */ } fx.stage = null; }
+  viewer.camera.frustum.fov = s.fov; scene.globe.maximumScreenSpaceError = s.sse; scene.postProcessStages.fxaa.enabled = s.fxaa;
+  if (scene.skyAtmosphere) scene.skyAtmosphere.show = s.atm;
+  if (scene.skyBox) scene.skyBox.show = s.box;
+  scene.fog.enabled = false; fx.saved = null;
+}
+const mScratch = {};
+function fxFrame() {
+  if (!fx.stage) return;
+  const m = C.Transforms.eastNorthUpToFixedFrame(viewer.camera.positionWC, C.Ellipsoid.default, mScratch.m || (mScratch.m = new C.Matrix4()));
+  C.Cartesian3.fromElements(m[0], m[1], m[2], fx.east); C.Cartesian3.fromElements(m[4], m[5], m[6], fx.north);
+  fx.ground.x = walk.gx % 4096; fx.ground.y = walk.gy % 4096;
+}
 function move(m) {
   const r = Math.PI / 180;
+  walk.gx += m * Math.sin(walk.heading * r); walk.gy += m * Math.cos(walk.heading * r); // metros andados, para o granulado do solo não escorregar
   walk.lat = Math.max(-88, Math.min(88, walk.lat + m * Math.cos(walk.heading * r) / (A.R_MARS * r)));
   walk.lon += m * Math.sin(walk.heading * r) / (A.R_MARS * r * Math.cos(walk.lat * r));
   walk.lon = ((walk.lon + 540) % 360) - 180;
@@ -212,18 +295,19 @@ function step() {
   const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0), mv = (k.fwd ? 1 : 0) - (k.back ? 1 : 0);
   if (turn) walk.heading = (walk.heading + turn * 70 * dt + 360) % 360;
   const sp = PACE[walk.pace][k.fast ? 1 : 0];
-  if (mv) move(sp * mv * dt);
+  walk.vel += (sp * mv - walk.vel) * Math.min(1, dt * 7);   // acelera e freia aos poucos, sem tranco
+  if (Math.abs(walk.vel) > sp * 0.01 + 0.001) move(walk.vel * dt); else walk.vel = 0;
   walk.moving = !!mv; walk.speed = mv ? sp : 0;
-  placeCamera();
+  placeCamera(); fxFrame();
   if (now - walk.sent > 100) { walk.sent = now; A.emit('walk', walk); }
 }
 function enterWalk(host, lat, lon, heading) {
   init(); if (!viewer) return false;
   viewer.camera.cancelFlight();
-  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, keys: {}, last: performance.now() });
+  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, keys: {}, last: performance.now(), vel: 0 });
   host.insertBefore($('#globe'), host.firstChild);
   viewer.scene.screenSpaceCameraController.enableInputs = false;
-  viewer.scene.fog.enabled = true;
+  fxOn();
   viewer.useDefaultRenderLoop = true; viewer.resize();
   applyLayers(A.layerState()); drawNow();
   walk.off = viewer.scene.preRender.addEventListener(step);
@@ -234,7 +318,7 @@ function exitWalk() {
   walk.on = false; if (walk.off) walk.off();
   const home = $('#view-globe'); home.insertBefore($('#globe'), home.firstChild);
   viewer.scene.screenSpaceCameraController.enableInputs = true;
-  viewer.scene.fog.enabled = false;
+  fxOff();
   viewer.useDefaultRenderLoop = A.state.view === 'globe'; viewer.resize();
   applyLayers(A.layerState()); drawNow();
   viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(77.4, 14, 320000 * K) });
