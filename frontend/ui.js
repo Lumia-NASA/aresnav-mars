@@ -47,7 +47,7 @@ $('#ctlOut').onclick = () => onMap() ? A.map.zoomOut(1) : A.globe.zoom(2);
 $('#ctlNorth').onclick = () => { if (!onMap()) A.globe.north(); };
 
 /* ---------- troca rápida da imagem de fundo ---------- */
-const BASE_LABEL = { hirise: 'HiRISE', mosaic: 'Mosaico', relief: 'Relevo' };
+const BASE_LABEL = { fub: 'Cor natural', hirise: 'HiRISE', mosaic: 'Mosaico', relief: 'Relevo' };
 function syncBase() {
   const v = document.querySelector('input[name="base"]:checked').value;
   $('#basePickLabel').textContent = BASE_LABEL[v]; $('#basePick').dataset.base = v;

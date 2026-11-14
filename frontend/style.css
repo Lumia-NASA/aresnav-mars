@@ -559,3 +559,91 @@ body:not(.left-collapsed) .mission-banner{left:calc(50% + var(--lw) / 2 - var(--
 .hud-fx button[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
 body.geo-enhanced #pano{filter:contrast(1.38) saturate(1.45) hue-rotate(-8deg)}
 @media (max-width:900px){.hud-fx{bottom:170px}}
+.basepick[data-base="fub"] .thumb{background:radial-gradient(circle at 40% 35%,#d9a77a,#9a5f3c 55%,#4a2a1a)}
+/* visor 360° (panoramas Mastcam-Z montados pela FU Berlin) */
+.pano360{position:fixed;inset:0;z-index:2100;background:#000}
+.p360-stage{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
+.p360-stage:active{cursor:grabbing}
+.p360-cube{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
+.p360-face{position:absolute;left:-512px;top:-512px;width:1024px;height:1024px;display:grid;background-size:100% 600%;backface-visibility:hidden;outline:1px solid transparent;overflow:hidden}
+.p360-face img{width:calc(100% + 1px);height:calc(100% + 1px);margin:-.5px;display:block;user-select:none;pointer-events:none}   /* sobrepõe meio pixel: some a linha entre os blocos */
+.p360-bar{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 16px;background:linear-gradient(180deg,rgba(0,0,0,.75),transparent);pointer-events:none}
+.p360-bar b{display:block;font-size:15px;font-weight:500}
+.p360-bar small{color:var(--muted);font-size:11px}
+.p360-actions{display:flex;gap:6px;pointer-events:auto}
+.p360-actions button{font-size:12px;padding:6px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.25);background:rgba(10,13,20,.7);color:var(--fg);cursor:pointer}
+.p360-actions button[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
+.p360-actions button:disabled{opacity:.4;cursor:not-allowed}
+.p360-hint{position:absolute;left:0;right:0;bottom:10px;margin:0;text-align:center;font-size:11px;color:rgba(255,255,255,.7);text-shadow:0 1px 2px #000}
+.p360-hint a{color:var(--accent)}
+
+
+/* ===================== Visual do Claude Design (telas "AresNav · telas") =====================
+   Controle de missão mais calmo: verde-água só para "seguro", âmbar para atenção, vermelho só no NO-GO;
+   texto em Inter, números em JetBrains Mono; painéis sólidos e escuros sobre as imagens da NASA/FU Berlin.
+   Só sobrescreve cores, fontes e acabamento: a estrutura da página continua a mesma. */
+:root{
+  --bg:#0B0E14; --panel:#10141C; --panel2:#131824; --line:#1E2430; --fg:#E8ECF2; --muted:#8A93A6;
+  --route:#2EE6A6; --ok:#2EE6A6; --warn:#FFB020; --crit:#FF5A6E; --blue:#9CC2FF; --accent:#E8ECF2; --mars:#E07A4F;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --display:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --surface:rgba(16,20,28,.97); --surface2:#161B25; --hover:#1C2230; --edge:#252C3A;
+}
+body.ge{font-size:13.5px}
+body.ge h3{font-weight:600;letter-spacing:.12em;font-size:11px}
+.topbar{background:#10141C;backdrop-filter:none;border-bottom:1px solid var(--line)}
+.topbar .brand h1{font-weight:700}
+.search input{background:var(--surface2);border:1px solid var(--edge)}
+.search input:focus{border-color:#7FD4FF;background:#1A2030}
+body.ge .opmode{border-color:var(--edge);padding:3px;background:var(--surface2)}
+body.ge .opmode button{border-radius:99px;color:#B4BCCB}
+body.ge .opmode button[aria-pressed="true"]{background:#E8ECF2;color:#0B0E14}
+.pillbtn{border-color:var(--edge);height:36px}
+.pillbtn[aria-pressed="true"]{background:#1A2333;border-color:#7FD4FF;color:#CFE0FF}
+.ares-fab{background:#0F2A24!important;border-color:#1F6B57!important;color:#7EF2C8!important;font-weight:600}
+.ares-fab .dot{background:#2EE6A6;box-shadow:none}
+body.ge .chip.live{background:#0F2A24;color:#7EF2C8;border-radius:6px}
+.side{background:#10141C;border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:none}
+.sidetoggle{background:#10141C;border-color:var(--line)}
+.sidehead{border-bottom-color:var(--line)}
+body.ge .sidehead h2{font-size:16px;font-weight:600}
+.block{border-bottom-color:var(--line)}
+.check li{font-size:14px}
+.check li b{font-weight:600}
+.check li.ok{--c:#2EE6A6;--f:#2EE6A6} .check li.warn{--c:#FFB020;--f:#FFB020} .check li.crit{--c:#FF5A6E;--f:#FF5A6E}
+.check li:not(:last-child)::after{display:none}
+body.ge .gonogo{display:flex;flex-direction:column;gap:3px;border-radius:10px;padding:12px;font:700 15px var(--mono);letter-spacing:.08em}
+body.ge .gonogo small{font:400 12px var(--body);letter-spacing:0;text-transform:none;opacity:.85}
+body.ge .gonogo.crit{--c:#FF7A8A;background:#2A1218;border-color:#7A2633}
+body.ge .gonogo.warn{--c:#FFCB66;background:#2A1F0E;border-color:#6B5419}
+body.ge .gonogo.ok{--c:#7EF2C8;background:#0F2A24;border-color:#1F6B57}
+.why-row{gap:8px;margin-top:8px}
+.why{min-height:44px;border-radius:8px;border:1px solid #2E3647;background:var(--surface2);font:600 13px var(--body);letter-spacing:0}
+.why:hover{border-color:#7FD4FF;color:#CFE0FF}
+body.ge .seg{padding:3px;border-color:var(--edge)}
+body.ge .seg button[aria-pressed="true"]{background:#2EE6A6;color:#0B0E14;font-weight:600}
+body.ge .layer input{accent-color:#2EE6A6}
+.stats{border-radius:10px;background:var(--line);border-color:var(--line)}
+.stat{background:var(--panel2);padding:10px}
+body.ge .stat b{font-size:20px;font-weight:600}
+body.ge .status h3{font-size:20px;font-weight:600}
+.pill{border-radius:6px}
+body.ge .transport{background:rgba(13,16,24,.94);border-color:var(--edge);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+body.ge .transport #simPlay{width:44px;height:44px;border-radius:50%;border:1px solid #2EE6A6;background:#0F2A24;color:#2EE6A6}
+body.ge .transport input[type=range]{accent-color:#2EE6A6}
+body.ge .uplink{border-color:#1F6B57;color:#7EF2C8;background:transparent}
+body.ge .emerg{border-color:#7A2633;background:#2A1218;color:#FF7A8A}
+.mapctl button{background:#10141C;border-color:var(--edge)}
+.statusbar{background:rgba(11,14,20,.96);border-top-color:var(--line)}
+.ares{background:rgba(13,16,24,.96);border-color:#1F6B57;border-radius:12px}
+.ares header b{color:#2EE6A6}
+.ares li.user{background:#1A2333}
+.ares li.ares-msg{background:#0F2A24;border-color:#1F6B57}
+.ares-quick button{border-color:#2E3647;min-height:32px}
+.modal-card{background:#10141C;border-color:#2B4A73;border-radius:14px}
+.why-card .calib{color:#9CC2FF}
+.drawer{background:#10141C;border-color:var(--line)}
+.prov-badge.m{color:#7EF2C8} .prov-badge.d{color:#9CC2FF} .prov-badge.s{color:#FFCB66}
+.hud-fx button{border-radius:8px}
+
+.mapctl,.basepick{bottom:136px}   /* a barra da simulação ficou mais alta (botão de 44 px): os controles do mapa sobem junto */
+@media (max-width:1500px){.mapctl,.basepick{bottom:150px}}

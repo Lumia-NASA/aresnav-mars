@@ -46,7 +46,7 @@ function renderComm() {
 /* ---------- WHY? e EXPORT ---------- */
 const g = $('#gonogo');
 const row = document.createElement('div'); row.className = 'why-row';
-row.innerHTML = '<button id="whyBtn" class="why" aria-haspopup="dialog">[ WHY? ]</button><button id="exportBtn" class="why">[ ⬇ EXPORT GEOJSON ]</button>';
+row.innerHTML = '<button id="whyBtn" class="why" aria-haspopup="dialog">Por quê?</button><button id="exportBtn" class="why">Exportar GeoJSON</button>';
 g.after(row);
 const modal = document.createElement('div');
 modal.className = 'modal'; modal.id = 'whyModal'; modal.hidden = true; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
@@ -142,6 +142,12 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-compare" checked><b>Rota curta x rota segura</b><small>Vermelho tracejado: caminho direto perigoso. Verde: desvio seguro</small></label>
   <label class="layer"><input type="checkbox" id="ov-iso" checked><b>Alcance a pé: 15 e 30 min</b><small>Calculado do relevo e da carga do traje</small></label>
   <label class="layer"><input type="checkbox" id="ov-lake"><b>Nível do antigo lago (−2400 m)</b><small>Onde a água cobria Jezero, há ~3,5 bilhões de anos (aprox.)</small></label>
+  <h3 class="gap">Jezero · FU Berlin</h3>
+  <label class="layer"><input type="checkbox" id="ov-shore" checked><b>Margem do antigo lago</b><small>Contorno mapeado pela FU Berlin</small></label>
+  <label class="layer"><input type="checkbox" id="ov-channels" checked><b>Canais dos rios</b><small>Neretva e Sava (entrada), Pliva (saída)</small></label>
+  <label class="layer"><input type="checkbox" id="ov-ellipse" checked><b>Elipse de pouso do Perseverance</b><small>Área-alvo do pouso da Mars 2020</small></label>
+  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>64 pontos · clique para ver em 360° aqui no app</small></label>
+  <label class="layer"><input type="checkbox" id="ov-contour"><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
   <h3 class="gap">Marte inteiro</h3>
   <label class="layer"><input type="checkbox" id="ov-sites" checked><b>Locais de pouso</b><small>14 sondas e rovers, 1971–2021</small></label>
   <label class="layer"><input type="checkbox" id="ov-zones"><b>Zonas de exploração humana</b><small>51 propostas · workshop NASA 2015</small></label>
@@ -341,14 +347,58 @@ setInterval(() => { const v = viewer(); if (v && on('ov-sun')) sunlight(v); }, 6
 const banner = document.createElement('div'); banner.className = 'mission-banner'; banner.innerHTML = '<b>Every step planned. Every breath counted.</b><span>AresNav · Lumia · NASA Space Apps 2026</span>';
 const gview = $('#view-globe'); if (gview) gview.appendChild(banner);
 
+/* ---------- WebGIS de Jezero da FU Berlin: margem do lago, canais, elipse de pouso e panoramas 360° ---------- */
+const FUB = {}, FUB_TOUR = id => `https://maps.planet.fu-berlin.de/jezero/360/${encodeURIComponent(id)}`;
+const fubL = { shore: null, channels: null, ellipse: null, pano360: null }, fubG = { shore: [], channels: [], ellipse: [], pano360: [] };
+async function loadFub() {
+  await Promise.all(['lake', 'channel-lines', 'landingellipse', 'panoramas'].map(async k => {   // no-cache: sempre confere com o servidor
+    try { const r = await fetch(`${A.API}/fub/${k}`, { cache: 'no-cache' }); if (r.ok) FUB[k] = (await r.json()).data; } catch (e) { /* sem backend: camada fica vazia */ }
+  }));
+  buildFubLeaflet(); drawFub();
+}
+/* abre o panorama no visor 360° do próprio app (pano360.js); o site da FU Berlin fica só como crédito */
+const openTour = p => { if (A.pano360) A.pano360.open(p); };
+const panoTxt = p => `${p.name || 'Panorama'} · ${(p.credits || '').replace(/,.*$/, '')} · ${tr('abrir 360°')}`;
+function buildFubLeaflet() {
+  if (!window.L || !A.map) return;
+  if (FUB.lake) fubL.shore = L.geoJSON(FUB.lake, { style: { color: '#4FA3FF', weight: 2, fillColor: '#4FA3FF', fillOpacity: 0.12, dashArray: '6 4' }, interactive: false });
+  if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#7FD4FF', weight: 1.6, opacity: 0.9 }, interactive: false });
+  if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
+  if (FUB.panoramas) fubL.pano360 = L.geoJSON(FUB.panoramas, { pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 5, color: '#0A0D14', weight: 1.5, fillColor: '#FF9F43', fillOpacity: 0.95 }),
+    onEachFeature: (f, l) => { l.bindTooltip(panoTxt(f.properties), { className: 'tag' }); l.on('click', e => { L.DomEvent.stopPropagation(e); openTour(f.properties); }); } });
+}
+function ringsOf(g) { return g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []; }
+function drawFub() {
+  const map = A.map, v = viewer(), walking = A.globe && A.globe.walk && A.globe.walk.on;
+  if (map) Object.keys(fubL).forEach(k => { const l = fubL[k]; if (l) on('ov-' + k) ? l.addTo(map) : map.removeLayer(l); });
+  if (!v) return;
+  const lineE = (ring, color, width, dash) => v.entities.add({ polyline: { positions: C.Cartesian3.fromDegreesArray(ring.flat()), clampToGround: true, width,
+    material: dash ? new C.PolylineDashMaterialProperty({ color: C.Color.fromCssColorString(color), dashLength: 14 }) : C.Color.fromCssColorString(color) } });
+  if (!fubG.shore.length && FUB.lake) FUB.lake.features.forEach(f => ringsOf(f.geometry).forEach(r => {
+    fubG.shore.push(lineE(r, '#4FA3FF', 2.5, true));
+    fubG.shore.push(v.entities.add({ polygon: { hierarchy: C.Cartesian3.fromDegreesArray(r.flat()), material: C.Color.fromCssColorString('#4FA3FF').withAlpha(0.13), classificationType: C.ClassificationType.TERRAIN } }));
+  }));
+  if (!fubG.channels.length && FUB['channel-lines']) FUB['channel-lines'].features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.channels.push(lineE(r, '#7FD4FF', 2))));
+  if (!fubG.ellipse.length && FUB.landingellipse) FUB.landingellipse.features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.ellipse.push(lineE(r, '#FFFFFF', 1.6, true))));
+  if (!fubG.pano360.length && FUB.panoramas) FUB.panoramas.features.forEach(f => {
+    const [lon, lat] = f.geometry.coordinates, e = gLabel(v, lat, lon, '360°', '#FF9F43', 60000);
+    e._aresTour = f.properties; fubG.pano360.push(e);
+  });
+  Object.keys(fubG).forEach(k => fubG[k].forEach(e => { e.show = on('ov-' + k) && !walking; }));
+  if (!v._aresTourClick) {   // clique num ponto 360° abre o tour da FU Berlin
+    v._aresTourClick = new C.ScreenSpaceEventHandler(v.scene.canvas);
+    v._aresTourClick.setInputAction(ev => { const pk = v.scene.pick(ev.position); const p = pk && pk.id && pk.id._aresTour; if (p) openTour(p); }, C.ScreenSpaceEventType.LEFT_CLICK);
+  }
+}
+
 /* ---------- ligações ---------- */
 const recalcAll = A.throttle(() => { computePlanOverlays(); computeReach(); drawPlan(); renderComm(); }, 400);
 A.on('route', recalcAll);
 A.on('tick', A.throttle(renderComm, 500));
 setInterval(renderComm, 1000);   // a telemetria refaz o painel a cada leitura: repõe a linha do rádio
-A.on('layers', () => { drawPlan(); drawGlobal(); });
-A.on('view', () => setTimeout(() => { drawPlan(); drawGlobal(); }, 50));
+A.on('layers', () => { drawPlan(); drawGlobal(); drawFub(); });
+A.on('view', () => setTimeout(() => { drawPlan(); drawGlobal(); drawFub(); }, 50));
 A.on('uplink', () => setTimeout(drawGlobal, 300));
-A.on('ready', () => { computePlanOverlays(); computeReach(); drawPlan(); drawGlobal(); loadZones(); calibrate(); });
-A.marsTime = marsTime; A.mission = { plan, commInfo, get reach() { return reach; }, get calib() { return calib; }, LANDINGS, get zones() { return zones; } };
+A.on('ready', () => { computePlanOverlays(); computeReach(); drawPlan(); drawGlobal(); loadZones(); calibrate(); loadFub(); });
+A.marsTime = marsTime; A.mission = { plan, commInfo, get reach() { return reach; }, get calib() { return calib; }, LANDINGS, get zones() { return zones; }, FUB };
 })();

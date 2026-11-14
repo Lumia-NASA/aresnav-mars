@@ -22,6 +22,7 @@ data/cache/*.tmp
 backend/data/cache/tiles/
 backend/data/cache/navcam/
 backend/data/cache/dem/
+backend/data/cache/fubpano/
 
 # Arquivos de Sistema e IDE
 .DS_Store

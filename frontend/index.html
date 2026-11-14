@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AresNav · Trilha Jezero</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css">
 <link rel="stylesheet" href="style.css">
@@ -108,7 +108,8 @@
     </section>
     <section class="block">
       <h3>Imagem</h3>
-      <label class="layer"><input type="radio" name="base" value="hirise" checked><b>HiRISE 25 cm + CTX 6 m</b><small>Mars Reconnaissance Orbiter</small></label>
+      <label class="layer"><input type="radio" name="base" value="fub" checked><b>Jezero em cor natural</b><small>HiRISE + CTX + HRSC · FU Berlin</small></label>
+      <label class="layer"><input type="radio" name="base" value="hirise"><b>HiRISE 25 cm + CTX 6 m</b><small>Mars Reconnaissance Orbiter</small></label>
       <label class="layer"><input type="radio" name="base" value="mosaic"><b>Mosaico de pouso Mars 2020</b><small>HiRISE + CTX + HRSC</small></label>
       <label class="layer"><input type="radio" name="base" value="relief"><b>Relevo colorido</b><small>MOLA + HRSC</small></label>
       <h3 class="gap">Camadas</h3>
@@ -183,7 +184,7 @@
 
 <!-- Barra de estado -->
 <footer class="statusbar mono">
-  <span class="credit">NASA / JPL / USGS · Mars Trek via backend AresNav</span>
+  <span class="credit">NASA / JPL / USGS · Mars Trek · HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO) · via backend AresNav</span>
   <span class="readout" id="readout">Passe o mouse sobre o mapa para ver altitude e declive reais.</span>
   <span id="camInfo">Câmera: —</span>
 </footer>
@@ -223,6 +224,7 @@
 <script src="helmet.js"></script>
 <script src="telemetry.js"></script>
 <script src="mission.js"></script>
+<script src="pano360.js"></script>
 <script src="copilot.js"></script>
 <script src="ambience.js"></script>
 <script src="ui.js"></script>
