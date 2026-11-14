@@ -35,15 +35,16 @@
 
   /* ---------- Ponto de retorno (bingo de O₂) ----------
      Para cada ponto k da ida: tempo até ali + tempo de volta dali até a base.
-     O ponto de retorno é o último k em que, virando ali, o astronauta chega com pelo menos reservePct de O₂. */
-  function turnBackPoint(segs, payloadKg, autonomyMin, reservePct) {
-    const reserve = reservePct == null ? 30 : reservePct, list = segs || [], n = list.length;
+     O ponto de retorno é o último k em que, virando ali, o astronauta chega com pelo menos reservePct de O₂.
+     extraMin: tempo parado que também gasta O₂ (paradas científicas, trabalho no destino). */
+  function turnBackPoint(segs, payloadKg, autonomyMin, reservePct, extraMin) {
+    const reserve = reservePct == null ? 30 : reservePct, list = segs || [], n = list.length, extra = Math.max(0, Number(extraMin) || 0);
     const outCum = [0], backCum = [0];   // backCum[k]: tempo de volta do ponto k até a base
     for (let k = 0; k < n; k++) { outCum.push(outCum[k] + segMin(list[k], 1, payloadKg)); backCum.push(backCum[k] + segMin(list[k], -1, payloadKg)); }
     let index = -1;
-    for (let k = 0; k <= n; k++) { if (o2AtReturn(outCum[k] + backCum[k], payloadKg, autonomyMin) >= reserve) index = k; else break; }
+    for (let k = 0; k <= n; k++) { if (o2AtReturn(outCum[k] + backCum[k] + extra, payloadKg, autonomyMin) >= reserve) index = k; else break; }
     const at = Math.max(0, index);
-    return { index, reachesEnd: index === n, outMin: outCum[at], o2AtBase: o2AtReturn(outCum[at] + backCum[at], payloadKg, autonomyMin) };
+    return { index, reachesEnd: index === n, outMin: outCum[at], o2AtBase: o2AtReturn(outCum[at] + backCum[at] + extra, payloadKg, autonomyMin) };
   }
 
   /* ---------- Linha de visada do rádio (como o Sightline do MMGIS) ----------
@@ -84,5 +85,26 @@
     return { level, go: level !== 'NO-GO', code: verdict(s).code, reasons: level === 'NO-GO' ? reasons.concat(cautions) : cautions.concat(reasons) };
   }
 
-  return { maxSafeSlope, metabolicFactor, o2AtReturn, verdict, walkSpeedKmh, walkTimes, turnBackPoint, checkLineOfSight, assess, O2_MIN: 30, NO_LOAD_SLOPE: 15 };
+  /* ---------- Decisão: carga máxima que ainda volta com a reserva de O₂ ----------
+     walkMin: tempo de caminhada (ida + volta) calculado com a carga atual kgNow; stopMin: paradas (não dependem da carga).
+     A carga muda o ritmo (Tobler × (1 − 0,012·kg)) e o consumo (×(1 + 0,018·kg)). Devolve null se nem sem carga dá. */
+  function maxPayloadForO2(walkMin, stopMin, kgNow, autonomyMin, reservePct) {
+    const reserve = reservePct == null ? 30 : reservePct;
+    const total = k => walkMin * loadFactor(kgNow) / loadFactor(k) + stopMin;
+    const ok = k => o2AtReturn(total(k), k, autonomyMin) >= reserve;
+    if (!ok(0)) return null;
+    let lo = 0, hi = Math.max(0, kg(kgNow));
+    if (ok(hi)) return hi;
+    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; }
+    return Math.floor(lo * 2) / 2;   // em passos de 0,5 kg, como o controle de carga
+  }
+  /* Agrupa índices consecutivos marcados: [false,true,true,false,true] -> [[1,2],[4,4]] */
+  function runs(flags) {
+    const out = []; let start = -1;
+    (flags || []).forEach((f, i) => { if (f && start < 0) start = i; if (!f && start >= 0) { out.push([start, i - 1]); start = -1; } });
+    if (start >= 0) out.push([start, flags.length - 1]);
+    return out;
+  }
+
+  return { maxSafeSlope, metabolicFactor, o2AtReturn, verdict, walkSpeedKmh, walkTimes, turnBackPoint, checkLineOfSight, assess, maxPayloadForO2, runs, O2_MIN: 30, NO_LOAD_SLOPE: 15 };
 });

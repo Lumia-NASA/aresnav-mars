@@ -21,6 +21,35 @@ def deg(c):
     return [deg(x) for x in c]
 
 
+def _dp(pts, eps):
+    if len(pts) < 3:
+        return pts
+    (x1, y1), (x2, y2) = pts[0], pts[-1]
+    dx, dy = x2 - x1, y2 - y1
+    L = math.hypot(dx, dy)
+    dmax, idx = 0, 0
+    for i in range(1, len(pts) - 1):
+        d = math.hypot(pts[i][0] - x1, pts[i][1] - y1) if L < 1e-12 else abs(dy * pts[i][0] - dx * pts[i][1] + x2 * y1 - y2 * x1) / L
+        if d > dmax:
+            dmax, idx = d, i
+    if dmax > eps:
+        return _dp(pts[:idx + 1], eps)[:-1] + _dp(pts[idx:], eps)
+    return [pts[0], pts[-1]]
+
+
+def simplify(coords, metres=5):
+    """Douglas-Peucker de ~5 m: o relevo da rota tem 200 m, então nada visível muda e o arquivo cai ~80%.
+    Anéis fechados são divididos em duas metades para não colapsarem."""
+    eps = metres / R * 180 / math.pi
+    if isinstance(coords[0][0], (int, float)):
+        if len(coords) > 3 and coords[0] == coords[-1]:
+            h = len(coords) // 2
+            r = _dp(coords[:h + 1], eps)[:-1] + _dp(coords[h:], eps)
+            return r if len(r) >= 4 else coords
+        return _dp(coords, eps)
+    return [simplify(c, metres) for c in coords]
+
+
 def head_ok(url):
     try:
         req = urllib.request.Request(url, method='HEAD', headers={'User-Agent': 'AresNav-Hackathon/1.0 (NASA Space Apps 2026)'})
@@ -76,7 +105,10 @@ def main():
                             props['cube'] = {'folder': folder, 'mono': mono, 'lvl': 1, 'size': 512, 'tile': 512}
                             break
                         time.sleep(0.3)
-            feats.append({'type': 'Feature', 'geometry': {'type': g['type'], 'coordinates': deg(g['coordinates'])}, 'properties': props})
+            coords = deg(g['coordinates'])
+            if name in ('lake', 'channel-lines'):
+                coords = simplify(coords)
+            feats.append({'type': 'Feature', 'geometry': {'type': g['type'], 'coordinates': coords}, 'properties': props})
         fc = {'type': 'FeatureCollection', 'name': name, 'source': 'Freie Universität Berlin, Planetary Sciences — Jezero WebGIS (maps.planet.fu-berlin.de/jezero)',
               'license_note': 'Base data: HRSC ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX NASA/JPL-Caltech/MSSS; HiRISE NASA/JPL/University of Arizona',
               'features': feats}

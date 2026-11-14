@@ -79,4 +79,28 @@ test('veredito em 3 níveis com motivos calculados (whyReasons)', () => {
   const go = P.assess({ hasRoute: true, maxSlope: 4, limit: 12, o2: 70, payloadKg: 5, losClear: true });
   assert.strictEqual(go.level, 'GO'); assert.ok(go.reasons.length >= 2);
 });
+console.log('\nDecisão do NO-GO');
+test('carga máxima: menos carga devolve a reserva de 30% de O₂', () => {
+  const walk = 200, stops = 60, now = 18.5;
+  assert.ok(P.o2AtReturn(walk + stops, now, 480) < 30, 'o caso precisa começar em NO-GO');
+  const k = P.maxPayloadForO2(walk, stops, now, 480);
+  assert.ok(k !== null && k < now && k >= 0, 'carga sugerida: ' + k);
+  const total = kk => walk * (1 - now * 0.012) / (1 - kk * 0.012) + stops;
+  assert.ok(P.o2AtReturn(total(k), k, 480) >= 30, 'com a carga sugerida volta com 30%');
+  assert.ok(P.o2AtReturn(total(k + 0.5), k + 0.5, 480) < 30, 'meio quilo a mais já não volta');
+});
+test('carga máxima: já está ok devolve a carga atual; impossível devolve null', () => {
+  assert.strictEqual(P.maxPayloadForO2(60, 20, 10, 480), 10);
+  assert.strictEqual(P.maxPayloadForO2(900, 0, 10, 480), null);
+});
+test('ponto de retorno conta o tempo parado: virar ali ainda volta com 30%', () => {
+  const segs = Array.from({ length: 30 }, () => ({ d: 200, dh: 2 }));
+  const semParada = P.turnBackPoint(segs, 18.5, 480, 30), comParada = P.turnBackPoint(segs, 18.5, 480, 30, 120);
+  assert.ok(comParada.index < semParada.index, `${comParada.index} >= ${semParada.index}`);
+  assert.ok(comParada.o2AtBase >= 30);
+});
+test('agrupa trechos consecutivos (declive alto, sem rádio)', () => {
+  assert.deepStrictEqual(P.runs([false, true, true, false, true]), [[1, 2], [4, 4]]);
+  assert.deepStrictEqual(P.runs([]), []);
+});
 console.log(`\n${passed} testes passaram.`);

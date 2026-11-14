@@ -663,3 +663,14 @@ body.offline .offline-tag{display:block}
 .p360-status[data-state="failed"]{border-color:#7A2633;color:#FF9AA6}
 .p360-status button{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid currentColor;background:transparent;color:inherit;font:600 12px var(--body);cursor:pointer;flex:none}
 .p360-actions button:focus-visible,.p360-status button:focus-visible{outline:2px solid #7FD4FF;outline-offset:2px}
+
+/* "O que fazer": do alerta à decisão */
+.decide{margin-top:8px;padding:12px;border-radius:10px;background:#131824;border:1px solid var(--edge);display:flex;flex-direction:column;gap:6px}
+.decide b{font-size:13px;font-weight:600}
+.decide p{margin:0;font-size:12.5px;color:var(--muted)}
+.decide-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.decide-actions button{min-height:40px;padding:0 12px;border-radius:8px;border:1px solid #2E3647;background:var(--surface2);color:var(--fg);font:600 12.5px var(--body);cursor:pointer}
+.decide-actions button.primary{border-color:#7FD4FF;color:#CFE0FF;background:#14203A}
+.decide-actions button:hover{border-color:#7FD4FF}
+body.ge .gonogo.clickable{cursor:pointer}
+body.ge .gonogo.clickable:hover,body.ge .gonogo:focus-visible{outline:2px solid #7FD4FF;outline-offset:2px}

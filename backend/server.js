@@ -73,6 +73,21 @@ const FRONTEND_CSP = [
   "img-src 'self' data: blob: https://unpkg.com https://cesium.com",
   "connect-src 'self' data: blob: https://cesium.com"
 ].join('; ');
+// Compressão gzip/brotli. O plugin cuida dos arquivos estáticos; as rotas da API (declaradas antes de o plugin
+// carregar) passam por este gancho global, que comprime JSON e texto acima de 1 KB.
+const zlib = require('zlib');
+fastify.register(require('@fastify/compress'), { global: true, threshold: 1024, encodings: ['br', 'gzip'] });
+fastify.addHook('onSend', async (request, reply, payload) => {
+  if (reply.getHeader('content-encoding') || !(typeof payload === 'string' || Buffer.isBuffer(payload))) return payload;
+  const type = String(reply.getHeader('content-type') || '');
+  if (!/json|text|javascript|xml/.test(type) || payload.length < 1024) return payload;
+  const accept = String(request.headers['accept-encoding'] || '');
+  const enc = /(^|[\s,])br([\s,;]|$)/.test(accept) ? 'br' : /(^|[\s,])gzip([\s,;]|$)/.test(accept) ? 'gzip' : null;
+  if (!enc) return payload;
+  const out = enc === 'br' ? zlib.brotliCompressSync(payload, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }) : zlib.gzipSync(payload, { level: 6 });
+  reply.header('content-encoding', enc); reply.header('vary', 'Accept-Encoding'); reply.removeHeader('content-length');
+  return out;
+});
 if (fs.existsSync(path.join(FRONTEND_DIR, 'index.html'))) {
   fastify.register(require('@fastify/static'), {
     root: FRONTEND_DIR,
