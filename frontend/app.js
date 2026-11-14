@@ -407,7 +407,7 @@ function closeTruth() { $('#truth').hidden = true; truthNow = null; }
 
 /* ---------- Rotas (A* sobre a grade de relevo) ---------- */
 const LIM = { safe: 12, short: 20, time: 16 };
-function speedKmh(grade) { return 2.7 * Math.exp(-3.5 * Math.abs(grade + 0.05)) / Math.exp(-0.175); }
+function speedKmh(grade) { return Physics.walkSpeedKmh(Math.atan(grade) * 180 / Math.PI, state.payloadKg); } // Tobler + massa do traje (physics.js)
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const hIdx = new Int32Array(W * H * 8), hF = new Float64Array(W * H * 8);
 const stepLen = (dc, dr) => Math.hypot(dc * MX, dr * MY);
@@ -500,6 +500,25 @@ function stopsOn(path, goalPoi) {
   return res.sort((a, b) => a.km - b.km);
 }
 
+/* ---------- Rádio: linha de visada habitat -> astronauta ---------- */
+function losTo(lat, lon) {
+  const d = metersBetween(BASE.lat, BASE.lon, lat, lon), n = Math.max(2, Math.min(80, Math.ceil(d / 60))), e = [];
+  for (let i = 0; i <= n; i++) e.push(heightAt(BASE.lat + (lat - BASE.lat) * i / n, BASE.lon + (lon - BASE.lon) * i / n));
+  return Object.assign(Physics.checkLineOfSight(e, { spacingM: d / n }), { distM: d });
+}
+/* Pior ponto da rota inteira: onde o terreno mais esconde o astronauta do habitat */
+function routeLos(path) {
+  if (!path || path.length < 2) return null;
+  let worst = null, blind = 0;
+  for (let k = 1; k < path.length; k += 2) {
+    const p = cellLL(path[k]), r = losTo(p[0], p[1]);
+    if (!r.losClear) blind++;
+    if (!worst || r.maxObstructionMeters > worst.maxObstructionMeters) worst = Object.assign(r, { k, lat: p[0], lon: p[1] });
+  }
+  worst.blindShare = blind / Math.ceil((path.length - 1) / 2);
+  return worst;
+}
+
 /* ---------- Simulação da caminhada (ida, paradas, volta) ---------- */
 const T0 = 9 * 60, EVA_MAX = 480;
 function buildSim(path, stops, hasPoiGoal) {
@@ -556,6 +575,7 @@ function recompute(keepTime) {
   state.stops = state.path ? stopsOn(state.path, state.goalPoi) : [];
   state.sim = state.path ? buildSim(state.path, state.stops, !!state.goalPoi) : null;
   state.plan = null;
+  state.los = state.path ? routeLos(state.path) : null;
   if (state.info) {
     const I = state.info, total = state.sim.total, o2 = Physics.o2AtReturn(total, state.payloadKg, EVA_MAX);
     state.plan = { total, work: total - I.tOut - I.tBack, o2, arrive: T0 + I.tOut, back: T0 + total };
@@ -568,6 +588,7 @@ function recompute(keepTime) {
 }
 function tick(silent) {
   state.now = simAt(state.simT);
+  state.liveLos = state.now ? losTo(state.now.lat, state.now.lon) : null;
   state.emPath = state.emInfo = null;
   if (state.emerg && state.now) {
     state.emPath = route(state.now.cell, cellOf(BASE.lat, BASE.lon), 'time');
@@ -684,9 +705,12 @@ function renderChecklist() {
   const crit = items.some(i => i[0] === 'crit'), warn = items.some(i => i[0] === 'warn'), wait = !state.ready;
   /* destino fora da área com relevo não é culpa do declive: fica como NO-GO simples */
   const v = Physics.verdict({ hasRoute: !!I || state.goal < 0, maxSlope: I ? I.maxS : 0, limit: LIM.safe, o2: P ? P.o2 : 100 });
+  state.assessment = Physics.assess({ hasRoute: !!I || state.goal < 0, maxSlope: I ? I.maxS : 0, limit: LIM.safe, o2: P ? P.o2 : 100, payloadKg: payload,
+    losClear: state.los ? state.los.losClear : undefined, obstructionM: state.los ? state.los.maxObstructionMeters : 0, lateReturn: !!P && P.back > 17 * 60 });
   const g = $('#gonogo');
-  g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn ? 'warn' : 'ok');
-  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? '[ NO-GO: SLOPE OVERLOAD ]' : v.code === 'METABOLIC' ? '[ NO-GO: METABOLIC OVERLOAD ]' : crit ? '[ NO-GO ]' : warn ? '[ GO ] com ressalvas' : '[ GO ]';
+  const caution = state.assessment.level === 'CAUTION';
+  g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn || caution ? 'warn' : 'ok');
+  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? '[ NO-GO: SLOPE OVERLOAD ]' : v.code === 'METABOLIC' ? '[ NO-GO: METABOLIC OVERLOAD ]' : crit ? '[ NO-GO ]' : caution ? '[ CAUTION ]' : warn ? '[ GO ] com ressalvas' : '[ GO ]';
   const prev = state.verdict && state.verdict.code;
   state.verdict = wait ? null : v;
   if (!wait && prev && prev !== v.code) { if (!v.go) announce(v); emit('verdict', v); }
@@ -848,6 +872,7 @@ const api = {
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
   heightAt, slopeAt, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
+  route, analyse, cellDist, losTo, routeLos, recompute, get HGT() { return HGT; }, get SL() { return SL; }, GRID: { W, H },
   traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null,
   get map() { return map; }
 };

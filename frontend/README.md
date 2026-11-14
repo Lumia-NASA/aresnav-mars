@@ -101,6 +101,41 @@ Para apontar para outro endereço de backend, defina `window.ARESNAV_API` em `co
 - **Passo real:** no Terreno 3D do Capacete, "Passo real" anda a 2,9 km/h (5,8 com Shift), como um astronauta de traje; "Visualização" é o sobrevoo rápido. A simulação da caminhada tem 1× (tempo real), 60× e 360×.
 - **Procedência:** o rodapé mostra de onde vêm os dados e o selo SHA-256 do EvidenceGate lido do backend.
 
+## Segurança da caminhada e copiloto (PR #4)
+
+Ideias tiradas de MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin e NASA SUITS, implementadas com os nossos dados:
+
+- **Veredito em 3 níveis** (`GO`, `CAUTION`, `NO-GO`). O botão **[ WHY? ]** mostra:
+  - os motivos com os números (por exemplo `Max slope 14.2° exceeds 12.0° limit for 15.0 kg payload`);
+  - o tempo de ida e de volta, que são diferentes porque a subida da ida vira descida na volta (função de Tobler com a massa do traje);
+  - o **ponto de retorno**: até onde dá para ir e ainda voltar com 30% de O₂;
+  - a nota de calibração. O app compara o nosso relevo com a altitude medida pelo Perseverance em cada parada da rota oficial. Hoje dá **613 paradas, desvio médio de +19,2 m, σ 19,1 m (RMS 27,1 m)**. O número é calculado ao vivo, não é fixo.
+- **Rádio:** linha de visada do habitat (antena a 2 m) até o capacete (1,7 m), pelo relevo real e com a curvatura de Marte, como a ferramenta Sightline do MMGIS. Fica verde (`DIRECT UHF`) ou âmbar (`TERRAIN OCCLUDED -> RELAY MRO`) na barra de estado e na Telemetria.
+- **Selos de procedência** em cada número da Telemetria: `MEASURED` (MEDA, paradas do rover), `DEM-DERIVED` (relevo) ou `SIMULATED` (modelo do traje).
+- **[ ⬇ EXPORT GEOJSON ]:** baixa `aresnav-mission-plan.geojson` com:
+  - a rota, as paradas e o ponto de retorno;
+  - o veredito, os motivos e a carga;
+  - o rádio, a calibração e a hora de Marte;
+  - o hash SHA-256 da telemetria e do próprio plano.
+- **No mapa e no globo:**
+  - **rota curta x segura:** a rota direta perigosa em vermelho tracejado e o desvio seguro em verde;
+  - **alcance a pé** de 15 e 30 min a partir da base;
+  - **ciência alcançável:** quais alvos dá para visitar com a carga atual;
+  - **nível do antigo lago** de Jezero (cota de −2400 m, aproximada).
+- **Marte inteiro (como no ATLAS):**
+  - poeira (MGS TES), firmeza do solo (inércia térmica, MGS TES) e rugosidade (MGS MOLA);
+  - 14 locais de pouso e as 51 zonas de exploração humana do workshop da NASA de 2015;
+  - grade de 10° e o **sol de agora**: dia e noite reais pela hora de Marte.
+- **Relógio de Marte** na barra de estado: hora solar local em Jezero (LMST), sol da missão Mars 2020 e Ls. Usa o algoritmo do Mars24 da NASA GISS.
+- **Capacete:**
+  - **[ 👁️ VIEW: ENHANCED GEOLOGY ]:** falsa cor que realça afloramentos;
+  - **[ 🔊 MARS WIND AMBIENCE ]:** vento de Marte gerado no navegador (ruído filtrado de 180 a 320 Hz, que acompanha o vento do MEDA).
+- **ARES, copiloto com IA** (botão no topo). Pergunte por texto ou voz: "posso sair?", "onde viro para voltar?", "o rádio pega?".
+  - O app manda ao backend um resumo do estado da caminhada, e o backend consulta o Claude (`claude-opus-5-5`, com fallback do servidor se o modelo recusar).
+  - A resposta é falada pelo rádio do capacete.
+  - Sem chave da API, ou sem rede, o ARES responde no **modo local**, com as mesmas contas do app.
+  - Para ligar a IA, ponha `ANTHROPIC_API_KEY` no `backend/.env`.
+
 ## Dados (todos oficiais da NASA, sempre pelo backend)
 
 | Camada | Missão / instrumento | Serviço |
@@ -116,6 +151,10 @@ Para apontar para outro endereço de backend, defina `window.ARESNAV_API` em `co
 | Minerais hidratados | MRO / CRISM | Mars Trek FeatureServer `Hydrous_Mineral_Detections_OMEGA_CRISM_clon0` |
 | Trajeto do Perseverance | Mars 2020 | Mars Trek FeatureServer `Perseverance_Traverse_Path` |
 | Fotos do modo Capacete | Mars 2020 / Navcam | `mars.nasa.gov/rss/api` (imagens brutas) |
+| Poeira, inércia térmica | MGS / TES | Mars Trek WMTS `TES_Dust`, `TES_Thermal_Inertia` |
+| Rugosidade | MGS / MOLA | Mars Trek WMTS `mola_roughness` |
+| Zonas de exploração humana | Workshop NASA 2015 | Mars Trek MapServer `EZMars` (`/api/v1/zones`) |
+| Calibração do relevo | Mars 2020 | Paradas oficiais do rover (`/api/v1/waypoints`, campo `elev_geoid`) |
 
 A tabela no rodapé do app mostra, ao vivo, se cada fonte veio do backend ou do cache local.
 
@@ -141,6 +180,7 @@ Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` o
 - **Do contrato (backend):** O₂ restante, distância da dupla, rover de apoio, carga do traje, declive e limite seguro, MEDA, alvos científicos e alertas. Hoje o backend serve valores de exemplo do `CONTRATO_API.json`.
 - **Simulado no frontend:** batimentos, ritmo, bateria e a previsão de oxigênio ao longo da caminhada. São calculados a partir do declive real da rota.
 - **Hipotético:** a base Ares-1.
+- **Datas:** os 14 locais de pouso usam as coordenadas publicadas pelas missões. Não vêm de um serviço.
 
 ## Limitações conhecidas
 
@@ -164,5 +204,8 @@ Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` o
 - `ui.js`: casca da interface (painéis, busca, controles do mapa, barra de estado)
 - `i18n.js`: idiomas (inglês e português)
 - `telemetry.js`: modo Telemetria
+- `mission.js`: WHY?, rádio, exportação GeoJSON, comparação de rotas, alcance, ciência alcançável, lago, camadas globais e relógio de Marte
+- `copilot.js`: ARES, o copiloto (IA pelo backend ou modo local)
+- `ambience.js`: geologia realçada e vento de Marte no Capacete
 - `data/`: redundância local (relevo, trajeto, telemetria e `tiles/`) e o índice de panoramas
 - `../tools/build-pano-cache.py`: gera o índice de panoramas

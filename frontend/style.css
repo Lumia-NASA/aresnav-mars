@@ -502,3 +502,60 @@ body.drop-mode #globe canvas,body.drop-mode #map{cursor:crosshair}
 @keyframes sitein{from{opacity:0;transform:translateX(-8px)}}
 @media (max-width:900px){.hud-site{display:none}}
 @media (prefers-reduced-motion:reduce){.hud-site{animation:none}}
+
+/* ---------- PR #4: WHY?, procedência, rádio, relógio de Marte, copiloto ARES, capacete ---------- */
+.why-row{display:flex;gap:6px;margin-top:6px}
+.why{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:var(--fg);cursor:pointer}
+.why:hover{border-color:var(--accent);color:var(--accent)}
+.why-card{border-color:var(--accent)}
+.why-card h3.lvl{font-family:var(--mono);letter-spacing:.06em}
+.why-card h3.lvl.crit{color:var(--crit)} .why-card h3.lvl.warn{color:var(--warn)} .why-card h3.lvl.ok{color:var(--route)}
+.why-card h4{margin:4px 0 2px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.why-list{margin:0;padding-left:18px;display:grid;gap:4px;font-family:var(--mono);font-size:12.5px}
+.why-card .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px}
+.why-card .facts div{display:flex;flex-direction:column;gap:2px;padding:7px 9px;border:1px solid var(--line);border-radius:6px}
+.why-card .facts span{font-size:11px;color:var(--muted)}
+.why-card .calib{font-size:11px;color:var(--accent);border-top:1px solid var(--line);padding-top:8px;margin:0}
+.prov-badge{display:inline-block;font-style:normal;font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;padding:1px 4px;border-radius:3px;vertical-align:middle;border:1px solid currentColor;opacity:.85;line-height:1.3}
+.prov-badge.m{color:#6EE7B7} .prov-badge.d{color:#9CC2FF} .prov-badge.s{color:#FFB800}
+.comm-line{font-size:11.5px;color:var(--route);margin:0 0 8px}
+.comm-line.bad,.statusbar .comm.bad{color:var(--warn)}
+.statusbar .comm{color:var(--route)}
+.statusbar #lmst{color:var(--fg)}
+@media (max-width:1100px){.statusbar #lmst{display:none}}
+@media (max-width:800px){.statusbar .comm{display:none}}
+.reach button.no{opacity:.6}
+.reach .tag{white-space:nowrap}
+.block .hint{font-size:11.5px;color:var(--muted);margin:0 0 6px}
+.mission-banner{position:absolute;left:50%;top:calc(var(--bar) + 50px);transform:translateX(-50%);z-index:5;pointer-events:none;text-align:center;display:flex;flex-direction:column;gap:2px;text-shadow:0 1px 3px #000}
+.mission-banner b{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#fff;opacity:.85}
+.mission-banner span{font-size:10.5px;color:var(--muted);letter-spacing:.08em}
+body:not(.left-collapsed) .mission-banner{left:calc(50% + var(--lw) / 2 - var(--rw) / 2)}
+@media (max-width:900px){.mission-banner{display:none}}
+.ares-fab{display:inline-flex;align-items:center;gap:6px;border-color:color-mix(in srgb,var(--route) 55%,transparent)!important}
+.ares-fab .dot{width:7px;height:7px;border-radius:50%;background:var(--route);box-shadow:0 0 8px var(--route)}
+.ares-fab[aria-expanded="true"]{background:color-mix(in srgb,var(--route) 18%,transparent)}
+.ares{position:fixed;top:calc(var(--bar) + 10px);right:14px;z-index:1500;width:min(380px,calc(100vw - 28px));max-height:min(70vh,620px);display:flex;flex-direction:column;
+  background:rgba(13,16,24,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid color-mix(in srgb,var(--route) 45%,transparent);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.ares header{display:flex;align-items:baseline;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.ares header b{font-family:var(--mono);letter-spacing:.2em;color:var(--route)}
+.ares header small{flex:1;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ares header button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:14px}
+.ares ol{list-style:none;margin:0;padding:10px 12px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:8px;min-height:80px}
+.ares li{max-width:88%;padding:7px 10px;border-radius:8px;font-size:13px;line-height:1.4}
+.ares li.user{align-self:flex-end;background:rgba(156,194,255,.16)}
+.ares li.ares-msg{align-self:flex-start;background:rgba(0,255,170,.08);border:1px solid rgba(0,255,170,.2);font-family:var(--mono);font-size:12.5px}
+.ares li.wait{opacity:.6}
+.ares li small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted);font-family:var(--mono)}
+.ares-quick{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 8px}
+.ares-quick button{font-size:11px;padding:4px 8px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.ares-quick button:hover{border-color:var(--route)}
+.ares form{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
+.ares input{flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:6px;color:var(--fg);padding:7px 9px;font:inherit;font-size:13px}
+.ares form button{border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--fg);border-radius:6px;padding:0 10px;cursor:pointer}
+.ares #aresMic.rec{background:var(--crit);border-color:var(--crit)}
+.hud-fx{left:14px;bottom:126px;display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+.hud-fx button{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(10,13,20,.66);color:var(--fg);cursor:pointer;text-align:left;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.hud-fx button[aria-pressed="true"]{border-color:var(--warn);color:var(--warn)}
+body.geo-enhanced #pano{filter:contrast(1.38) saturate(1.45) hue-rotate(-8deg)}
+@media (max-width:900px){.hud-fx{bottom:170px}}

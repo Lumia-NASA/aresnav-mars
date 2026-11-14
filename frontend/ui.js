@@ -79,7 +79,7 @@ const PLACES = [
   ['Meridiani Planum', -1.95, -5.53, 300, 'Local de pouso do Opportunity'],
   ['Elysium Planitia', 4.5, 135.62, 400, 'Local de pouso do InSight'],
   ['Chryse Planitia', 22.27, -47.95, 500, 'Local de pouso da Viking 1'],
-  ['Utopia Planitia', 47.64, 134.29, 600, 'Local de pouso da Viking 2'],
+  ['Utopia Planitia', 47.64, -134.29, 600, 'Local de pouso da Viking 2'],
   ['Hellas Planitia', -42.4, 70.5, 2500, 'Maior bacia de impacto visível'],
   ['Tharsis Montes', 1.57, -112.58, 1800, 'Cadeia de vulcões'],
   ['Elysium Mons', 25.02, 147.21, 700, 'Vulcão'],
