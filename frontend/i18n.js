@@ -209,6 +209,17 @@ const EXACT = {
   'Apontar para o norte': 'Point north', 'Afastar': 'Zoom out', 'Aproximar': 'Zoom in', 'Trocar a imagem de fundo': 'Change the background imagery', 'Fechar': 'Close', 'Mapa de Marte': 'Map of Mars',
   'Foto de solo tirada pelo Perseverance': 'Ground photo taken by Perseverance', 'Virar à esquerda': 'Turn left', 'Virar à direita': 'Turn right', 'Ir para': 'Go to', 'Altura acima do chão': 'Height above ground',
   'Procedência dos dados': 'Data provenance', 'Destino': 'Destination',
+  'Sombras do relevo': 'Terrain shadows', 'Luz rasante de noroeste sobre o relevo real (MOLA + HRSC)': 'Low light from the northwest over the real terrain (MOLA + HRSC)',
+  'Radares': 'Radars', '2 no solo e 4 detecções de radares em órbita (posições aprox.)': '2 on the ground and 4 detections by orbiting radars (approx. positions)',
+  'Perseverance · no solo': 'Perseverance · on the ground', 'Zhurong · no solo': 'Zhurong · on the ground', 'Mars Express · órbita': 'Mars Express · orbit', 'MRO · órbita': 'MRO · orbit',
+  'Radar de penetração no solo do rover: enxerga camadas até cerca de 10 m abaixo do chão ao longo do trajeto em Jezero.': 'The rover\'s ground-penetrating radar: it sees layers down to about 10 m below the surface along the traverse in Jezero.',
+  'Radar de penetração no solo do rover chinês em Utopia Planitia: mostrou camadas de sedimento enterradas.': 'Ground-penetrating radar on the Chinese rover in Utopia Planitia: it revealed buried sediment layers.',
+  'Reflexo forte sob 1,5 km de gelo perto do polo sul (2018), interpretado como possível água líquida salgada. Posição aproximada.': 'Bright reflection under 1.5 km of ice near the south pole (2018), interpreted as possible salty liquid water. Approximate position.',
+  'Depósito de gelo enterrado do tamanho de um grande lago, a poucos metros da superfície (2016). Posição aproximada.': 'Buried ice deposit the size of a large lake, a few metres below the surface (2016). Approximate position.',
+  'Camada extensa de gelo raso sob a planície (2015), candidata a fonte de água para tripulações. Posição aproximada.': 'Extensive layer of shallow ice under the plain (2015), a candidate water source for crews. Approximate position.',
+  'O radar atravessa a calota polar norte e revela as camadas de gelo e poeira que guardam o clima antigo.': 'The radar sees through the north polar cap and reveals the ice and dust layers that record the ancient climate.',
+  'Pontos': 'Landmarks', 'Pontos de referência': 'Landmarks', 'Ver no mapa': 'Show on map', 'Descer aqui': 'Drop here', 'Copiar coordenadas': 'Copy coordinates', 'Copiado': 'Copied', 'da base': 'from base',
+  'Coordenadas em graus decimais (latitude norte, longitude leste), no mesmo formato aceito pela busca.': 'Coordinates in decimal degrees (north latitude, east longitude), the same format the search accepts.',
   'Pesquisar em Marte': 'Search Mars', 'Caminhada 07 · Sol 412': 'Walk 07 · Sol 412', 'Câmera: —': 'Camera: —', '1× tempo real': '1× real time'
 };
 

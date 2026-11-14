@@ -676,3 +676,23 @@ body.ge .gonogo.clickable{cursor:pointer}
 body.ge .gonogo.clickable:hover,body.ge .gonogo:focus-visible{outline:2px solid #7FD4FF;outline-offset:2px}
 
 .prov-badge.e{color:#B4BCCB;border-style:dashed}   /* exemplo do contrato: não é leitura */
+
+/* ---------- Aba de pontos de referência ---------- */
+.poidrawer{width:min(860px,calc(100vw - 28px))}
+.poidrawer .poinote{margin:0 0 12px;font-size:12px}
+.poilist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
+.poicard{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:rgba(255,255,255,.02)}
+.poihead{display:flex;align-items:baseline;gap:8px;min-width:0}
+.poihead b{font-weight:500;min-width:0}
+.poihead .tag{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.poicard p{margin:0;font-size:12px;color:var(--muted);max-width:none}
+.poifacts{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.poifacts .poicoord{color:var(--fg);font-size:13px;flex:1 0 100%;user-select:all}
+.poiacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.poiacts button{height:30px;border-radius:99px;border:1px solid var(--line);background:none;padding:0 12px;font-size:12px;white-space:nowrap}
+.poiacts button:hover{background:var(--hover)}
+.poiacts button.primary{border-color:#7FD4FF;color:#CFE0FF;background:#1A2333}
+@media (max-width:820px){.poilist{grid-template-columns:1fr}}
+.poisep{grid-column:1 / -1;margin-top:6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+/* sombreado do relevo no mapa 2D: escurece o que está na sombra sem lavar a cor da imagem */
+.relief-shade{image-rendering:auto;pointer-events:none}
