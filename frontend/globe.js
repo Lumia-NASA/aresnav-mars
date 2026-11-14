@@ -300,6 +300,7 @@ function drawNow() {
 
 /* ---------- Andar pelo terreno (usado pelo modo Capacete) ---------- */
 function placeCamera() {
+  if (A.fineAround) A.fineAround(walk.lat, walk.lon);   // relevo HiRISE de 1 m em volta de quem anda (onde existe)
   const c = C.Cartographic.fromDegrees(walk.lon, walk.lat), mesh = viewer.scene.globe.getHeight(c);
   const ground = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh);
   const bob = walk.moving && walk.alt < 3 ? Math.sin(performance.now() / 1000 * Math.PI * 2 * 1.7) * 0.035 : 0; // balanço do passo
@@ -345,6 +346,26 @@ void main() {
     vec3 ramp = mix(vec3(0.16, 0.085, 0.055), vec3(0.66, 0.38, 0.23), smoothstep(0.0, 0.55, lum));
     ramp = mix(ramp, vec3(0.93, 0.76, 0.58), smoothstep(0.5, 1.0, lum));
     col = mix(ramp, src, clamp(sat * 3.0, 0.0, 0.65));
+    // relevo perto dos pés: normal do chão reconstruída da profundidade dos pixels vizinhos, iluminada pelo sol do céu
+    // (sem isso o relevo de 1 m só aparece pelas sombras da foto orbital, que tem outro sol)
+    float nearF = exp(-dist / 320.0);
+    if (nearF > 0.02) {
+      vec2 px = 1.0 / czm_viewport.zw;
+      float dR = czm_unpackDepth(texture(depthTexture, v_textureCoordinates + vec2(px.x, 0.0)));
+      float dU = czm_unpackDepth(texture(depthTexture, v_textureCoordinates + vec2(0.0, px.y)));
+      if (dR > 0.0 && dR < 1.0 && dU > 0.0 && dU < 1.0) {
+        vec3 p0 = eye.xyz / eye.w;
+        vec4 eR = czm_windowToEyeCoordinates(gl_FragCoord.xy + vec2(1.0, 0.0), dR), eU = czm_windowToEyeCoordinates(gl_FragCoord.xy + vec2(0.0, 1.0), dU);
+        vec3 a = eR.xyz / eR.w - p0, b = eU.xyz / eU.w - p0;
+        float lim = length(p0) * 0.02;                                   // borda de silhueta: não sombreia
+        if (length(a) < lim && length(b) < lim) {
+          vec3 n = normalize(cross(a, b));
+          vec3 sunEye = normalize(czm_viewRotation * sunDir);
+          float ndl = clamp(dot(n, sunEye), 0.0, 1.0), flatL = clamp(dot(normalize(czm_viewRotation * up), sunEye), 0.2, 1.0);
+          col *= mix(1.0, clamp(0.55 + 0.6 * ndl / flatL, 0.45, 1.35), 0.6 * nearF);
+        }
+      }
+    }
     vec2 g = u_ground + vec2(dot(dirWC, u_east), dot(dirWC, u_north)) * dist;
     float grain = vnoise(g * 0.35) * 0.45 + vnoise(g * 1.7) * 0.35 + vnoise(g * 7.0) * 0.2;
     col *= 1.0 + (grain - 0.5) * 0.5 * exp(-dist / 140.0);
@@ -358,16 +379,20 @@ const fx = { stage: null, east: null, north: null, ground: null, saved: null };
 function fxOn() {
   const scene = viewer.scene, cam = viewer.camera;
   fx.saved = { fov: cam.frustum.fov, sse: scene.globe.maximumScreenSpaceError, fxaa: scene.postProcessStages.fxaa.enabled,
-    atm: scene.skyAtmosphere && scene.skyAtmosphere.show, box: scene.skyBox && scene.skyBox.show };
+    atm: scene.skyAtmosphere && scene.skyAtmosphere.show, box: scene.skyBox && scene.skyBox.show,
+    cache: scene.globe.tileCacheSize, ubr: viewer.useBrowserRecommendedResolution, res: viewer.resolutionScale, fog: { d: scene.fog.density, f: scene.fog.screenSpaceErrorFactor } };
+  scene.globe.tileCacheSize = 1000;                  // girar a cabeça não recarrega o chão que acabou de sair da tela
+  quality.start();
   cam.frustum.fov = C.Math.toRadians(72);            // campo de visão mais aberto, como dentro de um capacete
-  scene.globe.maximumScreenSpaceError = 1.4;         // pede blocos de imagem mais nítidos
   scene.postProcessStages.fxaa.enabled = true;
   try {
     fx.east = new C.Cartesian3(1, 0, 0); fx.north = new C.Cartesian3(0, 1, 0); fx.ground = new C.Cartesian2(0, 0);
     fx.stage = scene.postProcessStages.add(new C.PostProcessStage({ fragmentShader: WALK_FS, uniforms: {
       u_east: () => fx.east, u_north: () => fx.north, u_ground: () => fx.ground,
       u_haze: () => (walk.pace === 'real' ? 9000 : 60000) * K, u_unit: () => K } }));
-    scene.fog.enabled = false;
+    // neblina invisível (o céu e a poeira vêm do shader): serve só para o Cesium pedir menos detalhe e descartar
+    // blocos que a poeira já esconderia. Corta ~40% dos blocos desenhados sem mudar a imagem.
+    scene.fog.enabled = true; scene.fog.renderable = false; scene.fog.density = 2.0e-4 / K; scene.fog.screenSpaceErrorFactor = 4;
     if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
     if (scene.skyBox) scene.skyBox.show = false;
   } catch (e) { console.warn('Efeitos do terreno 3D indisponíveis', e); fx.stage = null; scene.fog.enabled = true; groundLook(true); }
@@ -378,8 +403,36 @@ function fxOff() {
   viewer.camera.frustum.fov = s.fov; scene.globe.maximumScreenSpaceError = s.sse; scene.postProcessStages.fxaa.enabled = s.fxaa;
   if (scene.skyAtmosphere) scene.skyAtmosphere.show = s.atm;
   if (scene.skyBox) scene.skyBox.show = s.box;
+  quality.stop(); scene.globe.tileCacheSize = s.cache; viewer.useBrowserRecommendedResolution = s.ubr; viewer.resolutionScale = s.res;
+  scene.fog.renderable = true; scene.fog.density = s.fog.d; scene.fog.screenSpaceErrorFactor = s.fog.f;
   scene.fog.enabled = false; fx.saved = null;
 }
+/* Governador de qualidade do capacete: começa nítido (até 1,5x em telas de alta densidade) e, se a placa de vídeo
+   não der conta (menos de 24 quadros por segundo por 3 s seguidos), baixa um degrau: primeiro o detalhe dos
+   blocos, depois a resolução. Sobe de novo quando sobra folga (acima de 50 qps). */
+const QSTEPS = [{ sse: 1.4, px: 1.5 }, { sse: 1.8, px: 1.25 }, { sse: 2.2, px: 1 }, { sse: 2.6, px: 0.85 }, { sse: 3.2, px: 0.7 }];
+const quality = {
+  level: 0, frames: 0, t0: 0, low: 0, high: 0, off: null,
+  apply() {
+    const q = QSTEPS[this.level], dpr = window.devicePixelRatio || 1;
+    viewer.scene.globe.maximumScreenSpaceError = q.sse;
+    viewer.useBrowserRecommendedResolution = false; viewer.resolutionScale = Math.min(dpr, q.px) / dpr;
+  },
+  start() {
+    this.stop(); this.level = (window.devicePixelRatio || 1) > 1.5 ? 1 : 0; this.apply();
+    this.frames = 0; this.t0 = performance.now(); this.low = this.high = 0;
+    this.off = viewer.scene.postRender.addEventListener(() => {
+      this.frames++; const now = performance.now(), dt = now - this.t0;
+      if (dt < 1000) return;
+      const fps = this.frames * 1000 / dt; this.frames = 0; this.t0 = now; this.fps = fps;
+      if (document.hidden) return;
+      this.low = fps < 24 ? this.low + 1 : 0; this.high = fps > 50 ? this.high + 1 : 0;
+      if (this.low >= 3 && this.level < QSTEPS.length - 1) { this.level++; this.low = 0; this.apply(); }
+      else if (this.high >= 4 && this.level > 0) { this.level--; this.high = 0; this.apply(); }
+    });
+  },
+  stop() { if (this.off) { this.off(); this.off = null; } }
+};
 const mScratch = {};
 function fxFrame() {
   if (!fx.stage) return;
@@ -485,7 +538,7 @@ A.on('uplink', () => { if (viewer && buildImagery) { buildImagery(); applyLayers
 let teleSig = '';
 A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || []); if (sig !== teleSig) { teleSig = sig; drawTargets(); } });
 A.globe = {
-  get viewer() { return viewer; }, flyJezero, walk, enterWalk, exitWalk,
+  get viewer() { return viewer; }, get quality() { return quality; }, flyJezero, walk, enterWalk, exitWalk,
   teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },
   /* Para a alguns passos ao sul do ponto, olhando para ele */
   visit(p) { const back = ({ habitat: 24, landing: 20, crystals: 22, depot: 17, strata: 15 }[p.site] || 9) * EYE / 1.7; walk.lat = p.lat - back / (A.R_MARS * Math.PI / 180); walk.lon = p.lon; walk.heading = 0; walk.pitch = -6; walk.vel = 0; },

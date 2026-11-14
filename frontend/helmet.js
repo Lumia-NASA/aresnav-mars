@@ -287,7 +287,7 @@ function renderHud() {
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
-    src.textContent = `Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(w.lon, 4)}° L · chão a ${A.num(A.heightAt(w.lat, w.lon), 0)} m · você a ${altText(w.alt)} do chão · declive local ${num(A.slopeAny(w.lat, w.lon), 1)}° · ${num(w.speed * 3.6, 1)} km/h`;
+    src.textContent = `Terreno real da NASA (${A.FINE.weight(w.lat, w.lon) > 0.5 ? 'relevo HiRISE de 1 m' : 'relevo MOLA/HRSC'} em escala 1:1 + imagem orbital) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(w.lon, 4)}° L · chão a ${A.num(A.heightAt(w.lat, w.lon), 0)} m · você a ${altText(w.alt)} do chão · declive local ${num(A.slopeAny(w.lat, w.lon), 1)}° · ${num(w.speed * 3.6, 1)} km/h`;
   } else {
     const p = cur();
     if (!p) src.textContent = panos.length ? '' : 'Carregando panoramas do rover…';

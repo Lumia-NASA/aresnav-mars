@@ -76,6 +76,7 @@ const SOURCES = [
   ['mosaic', 'Mosaico de pouso', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/mosaic', 'NASA/JPL/UA/MSSS · ESA/DLR/FU Berlin · Mars Trek'],
   ['relief', 'Relevo colorido', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC', '/api/v1/tiles/relief', 'NASA/GSFC · ESA/DLR/FU Berlin · Mars Trek'],
   ['gdem', 'Relevo global (globo 3D)', 'Mars Global Surveyor', 'MOLA', 'camada local', 'NASA/GSFC · Mars Trek'],
+  ['hirise', 'Relevo de 1 m no corredor da rota', 'Mars Reconnaissance Orbiter', 'HiRISE (DTM controlado, 1 m)', '/api/v1/dem/hirise', 'NASA/JPL/UArizona · USGS Astrogeology (Mars 2020 TRN)'],
   ['dem', 'Altitude e declive (rota)', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC (200 m)', '/api/v1/dem/jezero', 'NASA/GSFC · ESA/DLR/FU Berlin · Mars Trek'],
   ['themis', 'Infravermelho diurno', '2001 Mars Odyssey', 'THEMIS', '/api/v1/tiles/themis', 'NASA/JPL-Caltech/ASU · Mars Trek'],
   ['fubcolor', 'Jezero em cor natural', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/fubcolor', 'FU Berlin (WebGIS Jezero) · HRSC ESA/DLR/FU Berlin, CC BY-SA 3.0 IGO · HiRISE NASA/JPL/UA (Fergason et al. 2020) · CTX NASA/JPL-Caltech/MSSS'],
@@ -152,10 +153,52 @@ function heightAt(lat, lon) {
     const pt = PATCH.get(patchKey(lat, lon));
     if (pt) { const py = Math.floor(lat / PS) * PS, px = Math.floor(lon / PS) * PS; g = bilinear(pt, PN, PN, (lon - px) / PS * PN - 0.5, (py + PS - lat) / PS * PN - 0.5); }
   }
-  if (!HGT || lon < XMIN || lon > XMAX || lat < YMIN || lat > YMAX) return g;
-  const j = bilinear(HGT, W, H, (lon - XMIN) / DX - 0.5, (YMAX - lat) / DY - 0.5);
-  return g + (j - g) * ramp(XMIN, XMAX, YMIN, YMAX, 0.1);
+  if (HGT && lon >= XMIN && lon <= XMAX && lat >= YMIN && lat <= YMAX) {
+    const j = bilinear(HGT, W, H, (lon - XMIN) / DX - 0.5, (YMAX - lat) / DY - 0.5);
+    g += (j - g) * ramp(XMIN, XMAX, YMIN, YMAX, 0.1);
+  }
+  if (FINE.size) {   // relevo HiRISE de 1 m onde o bloco já chegou (some suave na borda do que foi carregado)
+    const w = FINE.weight(lat, lon);
+    if (w > 0) { const f = FINE.height(lat, lon); if (isFinite(f)) g += (f - g) * w; }
+  }
+  return g;
 }
+/* ---------- Relevo HiRISE de 1 m (USGS, mosaico do pouso do Perseverance) ---------- */
+const FINE = HiRise.Store(), FINE_LOADING = new Map();
+let fineToken = 0;
+const terrainChanged = throttle(() => emit('terrain'), 2500);
+/* Busca os blocos que faltam (no máximo `max`, 6 de cada vez). Devolve quantos chegaram. */
+async function loadFine(list, max) {
+  const want = list.filter(t => !FINE.has(t.tx, t.ty)).slice(0, max || 200);
+  let got = 0, next = 0;
+  const one = t => {
+    const k = HiRise.key(t.tx, t.ty);
+    if (!FINE_LOADING.has(k)) FINE_LOADING.set(k, fetchT(`${API}/dem/hirise/${t.tx}/${t.ty}`, 60000)
+      .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => { if (b && b.byteLength === 256 * 256 * 2) { FINE.put(t.tx, t.ty, new Int16Array(b)); return true; } return false; })
+      .catch(() => false).finally(() => FINE_LOADING.delete(k)));
+    return FINE_LOADING.get(k);
+  };
+  await Promise.all(Array.from({ length: 6 }, async () => { while (next < want.length) if (await one(want[next++])) got++; }));
+  if (got) terrainChanged();
+  return got;
+}
+/* Corredor da rota no relevo de 1 m: declive real a cada metro, medido em 5 m */
+async function fineCorridor() {
+  const my = ++fineToken;
+  if (!state.path) { state.fine = null; return; }
+  const pts = state.path.map(cellLL);
+  if (!pts.some(p => HiRise.inside(p[0], p[1]))) { state.fine = { outside: true }; return; }
+  state.fine = { loading: true }; renderPanel();
+  await loadFine(HiRise.tilesAlong(pts, 12), 220);
+  if (my !== fineToken) return;
+  const c = HiRise.corridor(pts, (lat, lon) => FINE.height(lat, lon), { limitDeg: LIM[state.mode] });
+  delete c.samples;
+  state.fine = c;
+  setStatus('hirise', c.coverage > 0.5 ? 'ok' : 'fb');
+  renderPanel(); drawRoute(); emit('fine', c);
+}
+/* Em volta de um ponto (capacete): blocos num raio de ~300 m */
+const fineAround = throttle((lat, lon) => { if (HiRise.inside(lat, lon)) loadFine(HiRise.tilesAlong([[lat, lon]], 300), 12); }, 1500);
 const slopeAt = (lat, lon) => { const i = cellOf(lat, lon); return i < 0 || !SL ? -1 : SL[i]; };
 /* Declive em qualquer ponto de Marte, pela diferença de altitude a 300 m em cada direção */
 function slopeAny(lat, lon) {
@@ -666,6 +709,7 @@ function recompute(keepTime) {
   tick(true);
   renderPanel(); drawProfile();
   emit('route', state);
+  fineCorridor();
 }
 function tick(silent) {
   state.now = simAt(state.simT);
@@ -723,6 +767,9 @@ function drawRoute() {
     L.polyline(state.path.map(cellLL), { pane: 'routes', color: '#000', opacity: 0.6, weight: 9, lineJoin: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route);
     slopeRuns(state.path).forEach(r => L.polyline(r.ll, { pane: 'routes', color: col[r.cls], weight: 4.5, lineJoin: 'round', lineCap: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route));
   }
+  if (state.path && state.fine && state.fine.steepRuns) state.fine.steepRuns.slice(0, 8).forEach(r =>
+    L.circleMarker([r.lat, r.lon], { pane: 'routes', radius: 6, color: '#0A0D14', weight: 2, fillColor: r.maxDeg > LIM.short ? cc : cssv('--warn'), fillOpacity: 1, interactive: true })
+      .bindTooltip(`${num(r.maxDeg, 0)}° em ${Math.max(2, Math.round(r.lengthM))} m (HiRISE 1 m)`, { direction: 'top', className: 'tag', offset: [0, -6] }).addTo(groups.route));
   if (state.emPath) {
     const ll = state.emPath.map(cellLL);
     L.polyline(ll, { pane: 'routes', color: '#000', opacity: 0.55, weight: 8, interactive: false }).addTo(groups.route);
@@ -822,7 +869,14 @@ function renderPanel() {
     if (P.back > SUN.sunset - DARK_MARGIN) alerts.push(['var(--crit)', `A volta termina a menos de 1 h do pôr do sol (${clock(SUN.sunset)}). Encurte a caminhada ou divida em dois dias.`]);
     if (o2 < 30) alerts.push(['var(--crit)', `Reserva de oxigênio prevista de ${Math.max(0, Math.round(o2))}% na chegada, abaixo dos 30% exigidos.`]);
     if (state.mode === 'short' && I.maxS > LIM.safe) alerts.push(['var(--crit)', `A rota curta passa por declive de ${Math.round(I.maxS)}°. A rota segura é recomendada.`]);
-    alerts.push(['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']);
+    const F = state.fine;
+    if (F && F.loading) alerts.push(['var(--route)', 'Carregando o relevo HiRISE de 1 m ao longo da rota…']);
+    else if (F && F.lengthM && F.coverage > 0.5) {
+      const r = F.steepRuns, worst = r[0];
+      alerts.push(F.steepM > 0
+        ? [F.maxDeg > LIM.short ? 'var(--crit)' : 'var(--warn)', `Relevo HiRISE de 1 m: ${r.length} trecho${r.length === 1 ? '' : 's'} curto${r.length === 1 ? '' : 's'} acima de ${num(F.limitDeg, 0)}° (${Math.round(F.steepM)} m no total), o mais íngreme com ${num(worst ? worst.maxDeg : F.maxDeg, 0)}° a ${fmtKm(worst ? worst.fromM : 0)} da base. Marcados no mapa: passe devagar ou contorne.`]
+        : ['var(--ok)', `Relevo HiRISE de 1 m confirma a rota: declive máximo de ${num(F.maxDeg, 1)}° medido a cada 5 m.`]);
+    } else alerts.push(['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']);
     sp.innerHTML = renderItinerary();
   }
   state.alerts = alerts;
@@ -955,7 +1009,7 @@ const api = {
   $, cssv, on, emit, throttle, start, state, setPayload, API_BASE, ensurePatch, slopeAny, setDropMode, dropAt, speak, helmet: null, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
-  heightAt, slopeAt, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
+  heightAt, slopeAt, fineAround, get FINE() { return FINE; }, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
   route, analyse, cellDist, losTo, routeLos, recompute, tick, setPlaying, SUN, tempAt, sampleWx, loadWeather, DARK_MARGIN, get HGT() { return HGT; }, get SL() { return SL; }, GRID: { W, H },
   traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null,
   get map() { return map; }

@@ -44,6 +44,7 @@ jobs:
       - name: EVA Execution Engine (position, O2, turn-back by O2 or daylight, callouts)
         run: |
           node tests/exec-test.js
+          node tests/hirise-test.js
 
       - name: Install Backend Dependencies
         run: |

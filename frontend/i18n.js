@@ -16,6 +16,9 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  'Relevo de 1 m no corredor da rota': '1 m relief along the route corridor',
+  'HiRISE (DTM controlado, 1 m)': 'HiRISE (controlled DTM, 1 m)',
+  'Carregando o relevo HiRISE de 1 m ao longo da rota…': 'Loading the 1 m HiRISE relief along the route…',
   'Parado': 'Stopped', 'Indo': 'Outbound',
   'Executar caminhada': 'Run the walk',
   'Encerrar execução': 'End the walk',
@@ -321,7 +324,7 @@ const PHRASES = [
   ['NO-GO · SLOPE OVERLOAD · com ', 'NO-GO · SLOPE OVERLOAD · with '], [' kg o limite cai para ', ' kg the limit drops to '], ['°. Desvie por terreno plano ou reduza a carga.', '°. Divert over flat ground or reduce the payload.'],
   ['NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ', 'NO-GO · METABOLIC OVERLOAD · O₂ at return forecast below 30% with '], [' kg. Reduza a carga ou encurte a rota.', ' kg. Reduce the payload or shorten the route.'],
   ['EMERGÊNCIA · siga a rota tracejada até a base', 'EMERGENCY · follow the dashed route to base'], ['TEMPESTADE DE POEIRA · alerta ativo (MEDA)', 'DUST STORM · alert active (MEDA)'], ['OXIGÊNIO ABAIXO DE 30% · volte agora', 'OXYGEN BELOW 30% · head back now'],
-  ['Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital)', 'Real NASA terrain (MOLA/HRSC elevation at 1:1 scale + orbital imagery)'], [' · chão a ', ' · ground at '], [' · você a ', ' · you are '], [' do chão · declive local ', ' above ground · local slope '],
+  ['Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital)', 'Real NASA terrain (MOLA/HRSC elevation at 1:1 scale + orbital imagery)'], ['Terreno real da NASA (relevo HiRISE de 1 m em escala 1:1 + imagem orbital)', 'Real NASA terrain (1 m HiRISE elevation at 1:1 scale + orbital imagery)'], [' · chão a ', ' · ground at '], [' · você a ', ' · you are '], [' do chão · declive local ', ' above ground · local slope '],
   ['OFFLINE: as fotos do rover precisam do backend AresNav', 'OFFLINE: rover photos need the AresNav backend'], ['Foto real · Perseverance Navcam', 'Real photo · Perseverance Navcam'],
   [' do trajeto do rover', ' along the rover traverse'], [' · panorama mais próximo, a ', ' · nearest panorama, '], [' de você', ' from you'], ['ponto de recarga e extração a ', 'recharge and extraction point at '],
   ['Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram', 'Drag to look around · ↑ ↓ arrows walk along the rover path · ← → turn'],
@@ -347,6 +350,9 @@ const PHRASES = [
 
 /* Padrões em que a ordem das palavras muda */
 const RULES = [
+  [/^Relevo HiRISE de 1 m: (\d+) trechos? curtos? acima de (\d+)° \((\d+) m no total\), o mais íngreme com (\d+)° a (.+) da base\. Marcados no mapa: passe devagar ou contorne\.$/, '1 m HiRISE relief: $1 short stretch(es) above $2° ($3 m in total), the steepest at $4° $5 from base. Marked on the map: go slowly or walk around.'],
+  [/^Relevo HiRISE de 1 m confirma a rota: declive máximo de (.+)° medido a cada 5 m\.$/, '1 m HiRISE relief confirms the route: maximum slope $1° measured every 5 m.'],
+  [/^(\d+)° em (\d+) m \(HiRISE 1 m\)$/, '$1° over $2 m (HiRISE 1 m)'],
   [/^(.+) a (.+) °C · (.+) Pa · sol (\d+) \((.+)\), dado de (\d+) dias atrás$/, '$1 to $2 °C · $3 Pa · sol $4 ($5), data from $6 days ago'],
   [/^Retorno (\d\d:\d\d) · Sol a (\d+)° · pôr do sol (\d\d:\d\d) \(sol (\d+)\)$/, 'Back at $1 · Sun at $2° · sunset $3 (sol $4)'],
   [/^Pôr do sol \(sol (\d+)\)$/, 'Sunset (sol $1)'],

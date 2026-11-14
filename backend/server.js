@@ -100,7 +100,8 @@ if (fs.existsSync(path.join(FRONTEND_DIR, 'index.html'))) {
 // ScopeGuard (KhaosForge)
 function assertAuthorizedScope(targetUrl) {
   const parsed = new URL(targetUrl);
-  const authorized = ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov', 'maps.planet.fu-berlin.de']; // FU Berlin: WebGIS de Jezero (HRSC, ESA/DLR/FU Berlin)
+  // FU Berlin: WebGIS de Jezero (HRSC, ESA/DLR/FU Berlin). USGS Astrogeology (bucket de dados do PDS): relevo HiRISE de 1 m de Jezero, o mesmo listado no Mars Trek
+  const authorized = ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov', 'maps.planet.fu-berlin.de', 'asc-pds-services.s3.us-west-2.amazonaws.com'];
   if (!authorized.includes(parsed.hostname)) {
     throw new Error(`[ScopeGuard Violation] Host externo não autorizado: ${parsed.hostname}`);
   }
@@ -438,6 +439,81 @@ fastify.get('/api/v1/dem/patch/:lat/:lon', { config: PROXY_RATE }, async (reques
   if (!body) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e bloco fora do cache' });
   reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
   return reply.code(200).header('Content-Type', 'application/octet-stream').header('Cache-Control', 'public, max-age=86400').header('X-AresNav-Cache', source).send(body);
+});
+
+// Relevo HiRISE de 1 m de Jezero (USGS Astrogeology, mosaico do pouso do Perseverance, listado no Mars Trek como
+// "MRO HiRISE, Jezero DEM, Controlled"). O arquivo tem 1,8 GB, mas não é comprimido e cada linha fica num lugar fixo:
+// o backend lê só as linhas do bloco pedido (uma requisição de faixa de bytes por linha) e guarda o bloco em disco.
+// Bloco: 256 x 256 m. Resposta: Int16, decímetros acima de -2500 m (altura = v/10 - 2500); -32768 = sem dado.
+const HIRISE = {
+  url: 'https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/mars2020_trn/HiRISE/JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40.tif',
+  width: 21400, height: 21488, dataStart: 172609, x0: 4577366, y0: 1106618, px: 1, radius: 3396190, tile: 256, nodata: -1e30
+};
+HIRISE.rowBytes = HIRISE.width * 4;
+HIRISE.tilesX = Math.ceil(HIRISE.width / HIRISE.tile); HIRISE.tilesY = Math.ceil(HIRISE.height / HIRISE.tile);
+const http = require('https');
+const hiriseAgent = new http.Agent({ keepAlive: true, maxSockets: 24 });
+const hiriseInflight = new Map();
+async function hiriseRange(start, end) {
+  assertAuthorizedScope(HIRISE.url);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await axios.get(HIRISE.url, { responseType: 'arraybuffer', timeout: 15000, httpsAgent: hiriseAgent,
+        headers: { Range: `bytes=${start}-${end}`, 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 206 });
+      const b = Buffer.from(r.data);
+      if (b.length !== end - start + 1) throw new Error('faixa incompleta');
+      return b;
+    } catch (e) {
+      if (attempt >= 2) throw e;
+      await jitter();
+    }
+  }
+}
+async function hiriseTile(tx, ty) {
+  const T = HIRISE.tile, c0 = tx * T, r0 = ty * T, cols = Math.min(T, HIRISE.width - c0), rows = Math.min(T, HIRISE.height - r0);
+  const out = Buffer.alloc(T * T * 2);
+  out.fill(0); for (let i = 0; i < T * T; i++) out.writeInt16LE(-32768, i * 2);
+  let next = 0, valid = 0;
+  const worker = async () => {
+    while (next < rows) {
+      const j = next++, off = HIRISE.dataStart + (r0 + j) * HIRISE.rowBytes + c0 * 4;
+      const b = await hiriseRange(off, off + cols * 4 - 1);
+      for (let i = 0; i < cols; i++) {
+        const v = b.readFloatLE(i * 4);
+        if (v > -9000 && v < 30000) { out.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round((v + 2500) * 10))), (j * T + i) * 2); valid++; }
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: 16 }, worker));
+  return { body: out, valid };
+}
+fastify.get('/api/v1/dem/hirise/info', async () => ({
+  source: 'USGS Astrogeology / NASA MRO HiRISE (University of Arizona)', product: 'JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40',
+  resolution_m: HIRISE.px, tile: HIRISE.tile, tilesX: HIRISE.tilesX, tilesY: HIRISE.tilesY, x0: HIRISE.x0, y0: HIRISE.y0, radius: HIRISE.radius,
+  encoding: 'int16 LE, height_m = v/10 - 2500, -32768 = no data', datum: 'MOLA areoid (DeltaGeoid)'
+}));
+fastify.get('/api/v1/dem/hirise/:tx/:ty', { config: PROXY_RATE }, async (request, reply) => {
+  const tx = Number(request.params.tx), ty = Number(request.params.ty);
+  if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx >= HIRISE.tilesX || ty >= HIRISE.tilesY) {
+    return reply.code(400).send({ error: 'Bloco HiRISE inválido' });
+  }
+  const file = path.join(CACHE_DIR, 'hirise', `t_${tx}_${ty}.i16`);
+  let body = readCache(file), source = 'CACHE';
+  if (!body && !cacheOnly(request)) {
+    const key = tx + '_' + ty;
+    if (!hiriseInflight.has(key)) hiriseInflight.set(key, hiriseTile(tx, ty).finally(() => hiriseInflight.delete(key)));
+    try {
+      const t = await hiriseInflight.get(key);
+      body = t.body; source = 'USGS';
+      writeCache(file, body);   // blocos sem dado também ficam em cache (não adianta pedir de novo)
+    } catch (e) {
+      fastify.log.warn({ err: e.message, tx, ty }, 'Relevo HiRISE indisponível');
+    }
+  }
+  if (!body) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'USGS inacessível e bloco fora do cache' });
+  reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
+  return reply.code(200).header('Content-Type', 'application/octet-stream').header('Cache-Control', 'public, max-age=604800, immutable')
+    .header('X-AresNav-Cache', source).header('X-AresNav-Data-Date', '2020-08-03').send(body);
 });
 
 // Detecções de minerais hidratados (CRISM) em Jezero

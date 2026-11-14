@@ -132,11 +132,11 @@ runTest('4. Verificação de Cache Offline Resiliente (Backend)', () => {
 });
 
 // 5. Teste de Lógica do ScopeGuard (KhaosForge)
-runTest('5. Teste de Lógica do ScopeGuard (Allowlist NASA + FU Berlin)', () => {
+runTest('5. Teste de Lógica do ScopeGuard (Allowlist NASA + FU Berlin + USGS)', () => {
   // a mesma lista do backend/server.js (assertAuthorizedScope): se um lado mudar, este teste falha
   const serverSrc = fs.readFileSync(path.join(rootDir, 'backend', 'server.js'), 'utf8');
   const allowlist = JSON.parse(serverSrc.match(/const authorized = (\[[^\]]+\])/)[1].replace(/'/g, '"'));
-  assert.deepStrictEqual(allowlist, ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov', 'maps.planet.fu-berlin.de']);
+  assert.deepStrictEqual(allowlist, ['mars.nasa.gov', 'trek.nasa.gov', 'api.nasa.gov', 'maps.planet.fu-berlin.de', 'asc-pds-services.s3.us-west-2.amazonaws.com']);
   function checkScope(urlStr) {
     const h = new URL(urlStr).hostname;
     if (!allowlist.includes(h)) throw new Error(`Scope violation: ${h}`);
@@ -147,6 +147,7 @@ runTest('5. Teste de Lógica do ScopeGuard (Allowlist NASA + FU Berlin)', () => 
   assert(checkScope('https://trek.nasa.gov/tiles/Mars/EQ/test.jpg'));
   assert(checkScope('https://api.nasa.gov/insight_weather/'));
   assert(checkScope('https://maps.planet.fu-berlin.de/jez-bin/wms?SERVICE=WMS'));
+  assert(checkScope('https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/mars2020_trn/HiRISE/x.tif'));
   assert.throws(() => checkScope('https://maps.planet.fu-berlin.de.evil.com/x'), /Scope violation/);
 
   assert.throws(() => {

@@ -23,6 +23,7 @@ backend/data/cache/tiles/
 backend/data/cache/navcam/
 backend/data/cache/dem/
 backend/data/cache/fubpano/
+backend/data/cache/hirise/
 
 # Arquivos de Sistema e IDE
 .DS_Store
