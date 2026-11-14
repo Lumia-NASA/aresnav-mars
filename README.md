@@ -13,7 +13,9 @@ O **AresNav** é um protótipo de planejamento de caminhadas (EVA) em Marte. Jun
 
 ## 🛰️ As 3 Camadas Científicas da NASA Unificadas
 1. **Topografia & Altimetria (MGS MOLA + Mars Express HRSC):** relevo de 200 m por ponto e declive calculado dele. Mostra o caminho geral e as encostas fortes; não enxerga pedras nem degraus menores que isso.
-2. **Meteorologia Marciana (Perseverance MEDA):** vento, temperatura (−68,4 °C), alerta de poeira e radiação, lidos do contrato do AresNav (valores de exemplo de um sol, não leitura ao vivo do rover).
+2. **Meteorologia Marciana (Perseverance MEDA):** mínima, máxima e pressão do último sol que a NASA publicou (`/api/v1/weather`), com a data e a idade do dado.
+   - O feed público do MEDA não traz vento, poeira nem radiação. Esses valores vêm do contrato e aparecem com o selo **SAMPLE**.
+   - O nascer e o pôr do Sol de hoje são calculados com o algoritmo do Mars24 e conferidos contra os horários do próprio MEDA (menos de 1 min de diferença).
 3. **Mineralogia & Rota do Rover (Mars 2020 + CRISM):** trajeto real do Perseverance e detecções orbitais de minerais hidratados (CRISM), que indicam onde houve água.
 
 ---
@@ -27,7 +29,10 @@ Rota científica → risco explicado → comparação → panorama real do local
 4. **Comparação:** a rota curta perigosa aparece em vermelho tracejado e o desvio seguro em verde. O mapa também mostra o alcance a pé de 15 e 30 min e o que dá para alcançar com a carga atual.
 5. **Panorama real:** um panorama 360° da Mastcam-Z no local. As vistas sintéticas aparecem em roxo e com a etiqueta "não é foto".
 6. **Copiloto ARES:** responde por voz ("Onde viro para voltar?") usando só os números do app. Funciona com o Claude ou em modo local.
-7. **Corte de enlace:** o botão UPLINK simula a queda Terra–Marte. Rota, veredito e física continuam funcionando. As camadas que dependem da internet avisam "indisponível offline".
+7. **Executar a caminhada:** o botão **Executar caminhada** acompanha a EVA ao vivo (simulada) no Capacete.
+   - **Painel:** plano x real (tempo e O₂), contagem até o ponto de retorno (pelo O₂ ou pela luz do dia, o que vencer primeiro), próxima parada, rádio e desvio da rota.
+   - **ARES:** fala sozinho nos pontos-chave. Com o ritmo real em 85%, aparecem o atraso, o "vire em 5 min" e o "vire agora".
+8. **Corte de enlace:** o botão UPLINK simula a queda Terra–Marte. Rota, veredito e física continuam funcionando. As camadas que dependem da internet avisam "indisponível offline".
 
 ---
 
@@ -63,6 +68,8 @@ aresnav-mars/
 ├── tests/
 │   ├── smoke-test.js         # Contrato, ScopeGuard e EvidenceGate
 │   ├── physics-test.js       # Física do traje, Tobler, ponto de retorno, rádio, veredito e decisão
+│   ├── sun-test.js           # Sol e hora em Marte contra o MEDA e o pouso do Perseverance
+│   ├── exec-test.js          # Motor da execução: posição, O₂, ponto de retorno por O₂ e luz, avisos
 │   ├── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
 │   └── demo-flow-test.js     # Percurso completo da apresentação num Chrome sem janela
 ├── tools/build-fub-cache.py  # Baixa e converte as camadas da FU Berlin
