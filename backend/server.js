@@ -51,7 +51,7 @@ fastify.register(require('@fastify/cors'), {
     return cb(new Error('Origem não autorizada pela política AresNav'), false);
   },
   methods: ['GET'],
-  exposedHeaders: ['X-AresNav-Evidence-SHA256', 'X-AresNav-Degraded', 'X-AresNav-Cache']
+  exposedHeaders: ['X-AresNav-Evidence-SHA256', 'X-AresNav-Degraded', 'X-AresNav-Cache', 'X-AresNav-Data-Date']
 });
 
 // 3. Heavy Rate Limiting
@@ -121,6 +121,9 @@ function verifyEvidenceIntegrity(rawData) {
   return true;
 }
 
+// Data em que um arquivo de dados foi gravado (quando o dado veio da fonte): vai no cabeçalho X-AresNav-Data-Date
+const dataDate = file => { try { return fs.statSync(file).mtime.toISOString(); } catch (e) { return null; } };
+
 // Fallback Helper
 function loadOfflineCache(filePath) {
   try {
@@ -161,6 +164,7 @@ fastify.get('/api/v1/telemetry', async (request, reply) => {
     cached.degraded = false;
 
     reply.header('X-AresNav-Evidence-SHA256', hash);
+    const d = dataDate(CACHE_TELEMETRY); if (d) reply.header('X-AresNav-Data-Date', d);
     return reply.code(200).send(cached);
   } catch (error) {
     fastify.log.error(error);
@@ -395,6 +399,7 @@ fastify.get('/api/v1/dem/jezero', async (request, reply) => {
   }
   if (!body) return reply.code(504).send({ error: 'NASA inacessível e relevo fora do cache' });
   reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
+  const d = dataDate(file); if (d) reply.header('X-AresNav-Data-Date', d);
   return reply.code(200).header('Content-Type', 'application/octet-stream').header('X-AresNav-Degraded', String(degraded)).send(body);
 });
 

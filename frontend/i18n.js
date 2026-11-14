@@ -290,6 +290,7 @@ const PHRASES = [
 
 /* Padrões em que a ordem das palavras muda */
 const RULES = [
+  [/\(15° sem carga, regra simulada\)/, '(15° unloaded, simulated rule)'], [/ · consumo de O₂ ×/, ' · O₂ use ×'],
   [/^\+?(.+) na ida \(mais subida\)$/, '+$1 on the way out (more climbing)'],
   [/^\+?(.+) na volta \(mais subida\)$/, '$1 on the way back (more climbing)'],
   [/^([\d.,]+ km) da base · (.+)$/, '$1 from base · $2'],

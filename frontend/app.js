@@ -273,7 +273,7 @@ function setPayload(kg, silent) {
   LIM.safe = Physics.maxSafeSlope(kg);
   const sl = $('#payload'); if (sl && Number(sl.value) !== kg) sl.value = kg;
   $('#payloadVal').textContent = num(kg, 1) + ' kg';
-  $('#payloadFx').textContent = `Limite de declive ${num(LIM.safe, 1)}° (${NO_LOAD_SLOPE}° sem carga) · consumo de O₂ ×${num(Physics.metabolicFactor(kg), 2)}`;
+  $('#payloadFx').textContent = `Limite de declive ${num(LIM.safe, 1)}° (${NO_LOAD_SLOPE}° sem carga, regra simulada) · consumo de O₂ ×${num(Physics.metabolicFactor(kg), 2)}`;
   if (!silent && state.ready) { if (state.goalLL) setGoalLL(state.goalLL[0], state.goalLL[1], state.goalPoi); else renderPanel(); }
 }
 /* ---------- Voz do copiloto ---------- */

@@ -79,6 +79,24 @@ test('veredito em 3 níveis com motivos calculados (whyReasons)', () => {
   const go = P.assess({ hasRoute: true, maxSlope: 4, limit: 12, o2: 70, payloadKg: 5, losClear: true });
   assert.strictEqual(go.level, 'GO'); assert.ok(go.reasons.length >= 2);
 });
+console.log('\nRegra de declive: hipótese de simulação e sensibilidade');
+test('a regra está marcada como hipótese e com parâmetros explícitos', () => {
+  assert.strictEqual(P.SLOPE_RULE.status, 'simulation hypothesis');
+  assert.deepStrictEqual([P.SLOPE_RULE.base, P.SLOPE_RULE.perKg, P.SLOPE_RULE.floor], [15, 0.2, 8]);
+  assert.strictEqual(P.ALGORITHM.slopeRule, P.SLOPE_RULE);
+});
+test('sensibilidade: para uma rota de 11° de pico, a carga que vira NO-GO muda muito com os parâmetros', () => {
+  const flip = rule => { for (let k = 0; k <= 40; k += 0.5) if (P.maxSafeSlope(k, rule) < 11) return k; return null; };
+  const base = flip(P.SLOPE_RULE);
+  assert.strictEqual(base, 20.5);                                                    // regra atual: NO-GO a partir de 20,5 kg
+  assert.strictEqual(flip(Object.assign({}, P.SLOPE_RULE, { base: 13 })), 10.5);     // base 2° menor: já com 10,5 kg
+  assert.strictEqual(flip(Object.assign({}, P.SLOPE_RULE, { perKg: 0.25 })), 16.5);  // 25% mais sensível à carga
+  assert.strictEqual(flip(Object.assign({}, P.SLOPE_RULE, { perKg: 0.15 })), 27);    // 25% menos sensível
+});
+test('a regra nunca aumenta o limite com mais carga e respeita o piso', () => {
+  for (let k = 0; k < 60; k += 0.5) assert.ok(P.maxSafeSlope(k + 0.5) <= P.maxSafeSlope(k));
+  assert.strictEqual(P.maxSafeSlope(1000, { base: 15, perKg: 0.2, floor: 6 }), 6);
+});
 console.log('\nDecisão do NO-GO');
 test('carga máxima: menos carga devolve a reserva de 30% de O₂', () => {
   const walk = 200, stops = 60, now = 18.5;
