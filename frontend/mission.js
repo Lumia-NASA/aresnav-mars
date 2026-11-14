@@ -46,7 +46,7 @@ function renderComm() {
 /* ---------- WHY? e EXPORT ---------- */
 const g = $('#gonogo');
 const row = document.createElement('div'); row.className = 'why-row';
-row.innerHTML = '<button id="whyBtn" class="why" aria-haspopup="dialog">[ WHY? ]</button><button id="exportBtn" class="why">[ ⬇ EXPORT GEOJSON ]</button>';
+row.innerHTML = '<button id="whyBtn" class="why" aria-haspopup="dialog">Por quê?</button><button id="exportBtn" class="why">Exportar GeoJSON</button>';
 g.after(row);
 const modal = document.createElement('div');
 modal.className = 'modal'; modal.id = 'whyModal'; modal.hidden = true; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');

@@ -80,7 +80,8 @@
     if (s.lateReturn) cautions.push('Return ends close to sunset');
     const level = reasons.length ? 'NO-GO' : cautions.length ? 'CAUTION' : 'GO';
     if (level !== 'NO-GO') reasons.push(`Max slope ${f1(slope)}° within ${f1(limit)}° limit for ${f1(p)} kg payload`, `Return O2 margin ${Math.round(o2)}% ≥ 30% safety threshold`);
-    return { level, go: level !== 'NO-GO', code: verdict(s).code, reasons: cautions.concat(reasons) };
+    // NO-GO: o motivo decisivo vem primeiro; GO e CAUTION: as ressalvas vêm primeiro
+    return { level, go: level !== 'NO-GO', code: verdict(s).code, reasons: level === 'NO-GO' ? reasons.concat(cautions) : cautions.concat(reasons) };
   }
 
   return { maxSafeSlope, metabolicFactor, o2AtReturn, verdict, walkSpeedKmh, walkTimes, turnBackPoint, checkLineOfSight, assess, O2_MIN: 30, NO_LOAD_SLOPE: 15 };

@@ -714,7 +714,8 @@ function renderChecklist() {
   const g = $('#gonogo');
   const caution = state.assessment.level === 'CAUTION';
   g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn || caution ? 'warn' : 'ok');
-  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? '[ NO-GO: SLOPE OVERLOAD ]' : v.code === 'METABOLIC' ? '[ NO-GO: METABOLIC OVERLOAD ]' : crit ? '[ NO-GO ]' : caution ? '[ CAUTION ]' : warn ? '[ GO ] com ressalvas' : '[ GO ]';
+  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? 'NO-GO · SLOPE' : v.code === 'METABOLIC' ? 'NO-GO · METABOLIC' : crit ? 'NO-GO' : caution ? 'CAUTION' : warn ? 'GO · com ressalvas' : 'GO';
+  if (!wait && state.assessment.reasons.length) { const why = document.createElement('small'); why.textContent = state.assessment.reasons[0]; g.appendChild(why); }   // o motivo principal fica à vista
   const prev = state.verdict && state.verdict.code;
   state.verdict = wait ? null : v;
   if (!wait && prev && prev !== v.code) { if (!v.go) announce(v); emit('verdict', v); }

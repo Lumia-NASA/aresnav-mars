@@ -16,6 +16,9 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  'Por quê?': 'Why?',
+  'Exportar GeoJSON': 'Export GeoJSON',
+  'GO · com ressalvas': 'GO · with caveats',
   '64 pontos · clique para ver em 360° aqui no app': '64 spots · click to view in 360° inside the app',
   'Cor natural': 'Natural color',
   'Realce de minerais': 'Mineral enhancement',
