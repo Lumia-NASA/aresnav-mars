@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trilha Jezero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Trilha <span>Jezero</span></h1>
+    <p>Planejador de caminhada para astronautas · Cratera Jezero, Marte (18,4° N, 77,4° L)</p>
+  </div>
+  <div class="chips">
+    <span class="chip">EVA-07</span>
+    <span class="chip">Sol 412 · saída 09:00 LMST</span>
+    <span class="chip live" id="dataChip">Carregando dados da NASA…</span>
+  </div>
+</header>
+
+<main class="grid">
+  <aside class="panel layers" aria-label="Camadas do mapa">
+    <div class="group">
+      <h2>Imagem</h2>
+      <label class="layer"><input type="radio" name="base" value="hirise" checked><b>HiRISE 25 cm + CTX 6 m</b><small>Mars Reconnaissance Orbiter</small></label>
+      <label class="layer"><input type="radio" name="base" value="mosaic"><b>Mosaico de pouso Mars 2020</b><small>HiRISE + CTX + HRSC</small></label>
+      <label class="layer"><input type="radio" name="base" value="relief"><b>Relevo colorido</b><small>MOLA (Mars Global Surveyor) + HRSC (Mars Express)</small>
+        <span class="sw"><i style="--c:#3c55c8">baixo</i><i style="--c:#7cc36a">médio</i><i style="--c:#e0603a">alto</i></span></label>
+    </div>
+    <div class="group">
+      <h2>Camadas</h2>
+      <label class="layer"><input type="checkbox" id="ov-slope" checked><b>Declive</b><small>Calculado do relevo HRSC/MOLA (200 m)</small>
+        <span class="sw"><i style="--c:#e8c84a">4–8°</i><i style="--c:#ef8a3c">8–12°</i><i style="--c:#e2463a">&gt;12°</i></span></label>
+      <label class="layer"><input type="checkbox" id="ov-themis"><b>Infravermelho diurno</b><small>THEMIS · Mars Odyssey. Claro = mais quente (areia); escuro = rocha</small></label>
+      <label class="layer"><input type="checkbox" id="ov-crism" checked><b>Minerais hidratados</b><small>CRISM · MRO. Sinal de água no passado</small></label>
+      <label class="layer"><input type="checkbox" id="ov-rover" checked><b>Trajeto real do Perseverance</b><small>Mars 2020 · cor por sol da missão</small></label>
+      <label class="layer"><input type="checkbox" id="ov-poi" checked><b>Pontos de interesse</b><small>Locais visitados pelo rover</small></label>
+    </div>
+    <div class="group">
+      <h2>Destinos</h2>
+      <ul class="dest" id="destList"></ul>
+    </div>
+  </aside>
+
+  <section class="mapcol" aria-label="Mapa e rota">
+    <div class="maphead">
+      <div class="seg" role="group" aria-label="Tipo de rota">
+        <button id="m-safe" aria-pressed="true">Rota segura</button>
+        <button id="m-short" aria-pressed="false">Mais curta</button>
+      </div>
+      <button class="emerg" id="emerg" aria-pressed="false">Modo emergência</button>
+    </div>
+    <div class="mapwrap">
+      <div id="map" aria-label="Mapa da Cratera Jezero"></div>
+      <div class="hint">Clique no mapa para escolher o destino</div>
+    </div>
+    <div class="readout mono" id="readout">Passe o mouse sobre o mapa para ver altitude e declive reais.</div>
+    <div class="card">
+      <h3>Perfil de altitude da ida</h3>
+      <canvas id="profile"></canvas>
+    </div>
+  </section>
+
+  <aside class="panel plan" aria-label="Plano da caminhada">
+    <div id="emcard" class="card emcard" hidden></div>
+    <div class="status" id="status"></div>
+    <div class="stats" id="stats"></div>
+    <div>
+      <h2 class="sub">Horários</h2>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <div>
+      <h2 class="sub">Alertas</h2>
+      <ul class="list" id="alerts"></ul>
+    </div>
+    <div>
+      <h2 class="sub">Paradas científicas na rota</h2>
+      <div id="stops"></div>
+    </div>
+    <div>
+      <h2 class="sub">Condições hoje · MEDA</h2>
+      <div class="cond">
+        <div>Temperatura<b>−71 / −14 °C</b></div>
+        <div>Vento<b>6 → 14 m/s</b></div>
+        <div>Poeira (τ)<b>0,62</b></div>
+        <div>Pressão<b>7,4 hPa</b></div>
+        <div>Radiação<b>0,67 mSv/sol</b></div>
+        <div>Pôr do sol<b>17:52</b></div>
+      </div>
+      <p class="note">Valores de exemplo, dentro das faixas medidas pelo MEDA (Perseverance) e RAD (Curiosity). Na versão final, vêm do PDS Atmospheres.</p>
+    </div>
+  </aside>
+</main>
+
+<section class="sources">
+  <h2 class="sub">Dados usados (todos oficiais da NASA, carregados ao vivo)</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Serviço</th><th>Status</th></tr></thead>
+      <tbody id="srcTable"></tbody>
+    </table>
+  </div>
+  <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve bem pra escolher o caminho geral, mas esconde pedras e degraus menores. Numa missão real, o próximo passo é usar o modelo de terreno HiRISE de 1 m de Jezero, que existe no catálogo do Mars Trek (camada <span class="mono">JEZ_hirise_soc_006_DTM</span>) e no PDS.</p>
+  <p>A base Ares-1 é hipotética. Os pontos de interesse vêm da posição real do Perseverance nos sóis indicados.</p>
+</section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
