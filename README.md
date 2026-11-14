@@ -63,11 +63,14 @@ aresnav-mars/
 ├── tests/
 │   ├── smoke-test.js         # Contrato, ScopeGuard e EvidenceGate
 │   ├── physics-test.js       # Física do traje, Tobler, ponto de retorno, rádio, veredito e decisão
-│   └── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
+│   ├── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
+│   └── demo-flow-test.js     # Percurso completo da apresentação num Chrome sem janela
 ├── tools/build-fub-cache.py  # Baixa e converte as camadas da FU Berlin
+├── tools/prewarm-demo.js     # Pré-carrega e confere offline o que a demo usa
 └── docs/
     ├── PITCH.md              # Roteiro da demo para os jurados (inglês)
-    └── DESEMPENHO.md         # Medições de carregamento, 360° e memória
+    ├── DESEMPENHO.md         # Medições de carregamento, 360° e memória
+    └── HIPOTESES.md          # Hipóteses do modelo e sensibilidade do veredito
 ```
 
 ---
@@ -77,5 +80,12 @@ aresnav-mars/
 node tests/smoke-test.js
 node tests/physics-test.js
 npm ci --prefix backend && node tests/fub-test.js
+node tests/demo-flow-test.js   # percurso completo da demo num Chrome sem janela
 ```
-Os três rodam no CI a cada pull request.
+Ou tudo de uma vez: `cd backend && npm test`. Os quatro rodam no CI a cada pull request.
+
+**Antes da apresentação** (com o backend rodando e internet):
+```bash
+cd backend && npm run prewarm         # grava no cache tudo o que a demo usa (~45 s)
+npm run check-offline                 # confere sem internet que os 813 itens abrem do cache
+```
