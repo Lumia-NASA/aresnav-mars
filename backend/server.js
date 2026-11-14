@@ -57,8 +57,29 @@ fastify.register(require('@fastify/cors'), {
 // 3. Heavy Rate Limiting
 fastify.register(require('@fastify/rate-limit'), {
   max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 60,
-  timeWindow: '1 minute'
+  timeWindow: '1 minute',
+  allowList: req => !req.url.startsWith('/api/')
 });
+
+// 4. Frontend na mesma origem (porta única na VPS). O CSP rígido continua valendo para a API;
+//    as páginas estáticas recebem um CSP próprio, restrito às origens que o HUD usa.
+const FRONTEND_DIR = process.env.FRONTEND_DIR || path.join(__dirname, '..', 'frontend');
+const FRONTEND_CSP = [
+  "default-src 'self'", "base-uri 'none'", "frame-ancestors 'none'", "object-src 'none'",
+  "script-src 'self' 'unsafe-eval' blob: https://unpkg.com https://cesium.com",
+  "worker-src 'self' blob: https://cesium.com",
+  "style-src 'self' 'unsafe-inline' https://unpkg.com https://cesium.com https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://unpkg.com https://cesium.com",
+  "connect-src 'self' data: blob: https://cesium.com"
+].join('; ');
+if (fs.existsSync(path.join(FRONTEND_DIR, 'index.html'))) {
+  fastify.register(require('@fastify/static'), {
+    root: FRONTEND_DIR,
+    prefix: '/',
+    setHeaders: res => { res.setHeader('Content-Security-Policy', FRONTEND_CSP); }
+  });
+}
 
 // ScopeGuard (KhaosForge)
 function assertAuthorizedScope(targetUrl) {
@@ -268,18 +289,29 @@ function writeCache(file, buf) {
   try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); }
   catch (e) { fastify.log.warn({ err: e.message }, 'Não foi possível gravar cache em disco'); }
 }
-async function fetchBinary(url) {
+const jitter = () => new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 450));
+async function fetchBinary(url, retries = 2) {
   assertAuthorizedScope(url);
-  const r = await axios.get(url, {
-    responseType: 'arraybuffer', timeout: REQUEST_TIMEOUT_MS, maxContentLength: 20 * 1024 * 1024,
-    headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 200 || st === 404
-  });
-  return { status: r.status, body: Buffer.from(r.data) };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await axios.get(url, {
+        responseType: 'arraybuffer', timeout: REQUEST_TIMEOUT_MS, maxContentLength: 20 * 1024 * 1024,
+        headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 200 || st === 404
+      });
+      return { status: r.status, body: Buffer.from(r.data) };
+    } catch (e) {
+      if (attempt >= retries) throw e;
+      await jitter(); // espera aleatória de 150 a 600 ms antes de tentar de novo
+    }
+  }
 }
+/* ?offline=1 simula a queda do enlace Terra-Marte: o backend responde só com o que já tem em disco */
+const cacheOnly = request => request.query && request.query.offline === '1';
 /* Busca na NASA com cache em disco. Devolve { body, cache } ou { notFound } ou null (NASA fora do ar) */
-async function cachedBinary(url, file) {
+async function cachedBinary(url, file, offline) {
   const hit = readCache(file);
-  if (hit) return { body: hit, cache: 'HIT' };
+  if (hit) return { body: hit, cache: offline ? 'OFFLINE' : 'HIT' };
+  if (offline) return null;
   try {
     const r = await fetchBinary(url);
     if (r.status === 404) return { notFound: true };
@@ -301,7 +333,7 @@ fastify.get('/api/v1/tiles/:layer/:z/:y/:x', { config: PROXY_RATE }, async (requ
   }
   const key = `${request.params.layer}/${z}/${y}/${x}`;
   if (missing.has(key)) return reply.code(404).send({ error: 'Sem cobertura' });
-  const r = await cachedBinary(`${TREK_TILES}/${L.id}/1.0.0/default/default028mm/${z}/${y}/${x}.${L.ext}`, path.join(TILE_CACHE_DIR, `${key}.${L.ext}`));
+  const r = await cachedBinary(`${TREK_TILES}/${L.id}/1.0.0/default/default028mm/${z}/${y}/${x}.${L.ext}`, path.join(TILE_CACHE_DIR, `${key}.${L.ext}`), cacheOnly(request));
   if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e bloco fora do cache' });
   if (r.notFound) { missing.add(key); return reply.code(404).send({ error: 'Sem cobertura' }); }
   return reply.code(200).header('Content-Type', MIME[L.ext]).header('Cache-Control', 'public, max-age=86400').header('X-AresNav-Cache', r.cache).send(r.body);
@@ -353,7 +385,7 @@ const NAVCAM_PATH = /^\d{5}\/ids\/(edr|fdr)\/browse\/ncam\/[A-Za-z0-9_]+\.(jpg|p
 fastify.get('/api/v1/navcam/*', { config: PROXY_RATE }, async (request, reply) => {
   const rel = request.params['*'];
   if (!NAVCAM_PATH.test(rel)) return reply.code(400).send({ error: 'Caminho de foto inválido' });
-  const r = await cachedBinary(NAVCAM_BASE + rel, path.join(NAVCAM_CACHE_DIR, rel));
+  const r = await cachedBinary(NAVCAM_BASE + rel, path.join(NAVCAM_CACHE_DIR, rel), cacheOnly(request));
   if (!r) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e foto fora do cache' });
   if (r.notFound) return reply.code(404).send({ error: 'Foto não encontrada na NASA' });
   return reply.code(200).header('Content-Type', MIME[rel.split('.').pop()]).header('Cache-Control', 'public, max-age=604800').header('X-AresNav-Cache', r.cache).send(r.body);

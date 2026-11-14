@@ -84,7 +84,7 @@ function turnTo(az) { // gira suavemente até o rumo pedido
   anim = requestAnimationFrame(stepFn);
 }
 function walkStep(dir) {
-  if (mode === 'terrain') { A.globe.stepBy(dir * 60); return; }
+  if (mode === 'terrain') { A.globe.stepBy(dir * (A.globe.walk.pace === 'real' ? 5 : 60)); return; }
   if (!panos.length) return;
   manual = true;
   const to = Math.max(0, Math.min(panos.length - 1, idx + dir));
@@ -151,13 +151,17 @@ const statusPt = v => STATUS_PT[v] || String(v || '—').toLowerCase().replace(/
 function renderHud() {
   if (!visible()) return;
   const st = A.state, n = st.now, t = st.tele || {}, mob = t.eva_mobility || {}, topo = (t.layers && t.layers.topography) || {}, meda = (t.layers && t.layers.atmosphere_meda) || {}, loc = t.location || {};
-  const o2 = Number(mob.o2_remaining_pct), hasO2 = isFinite(o2);
-  /* Widget de mobilidade e dupla (buddy system), com os campos do contrato */
-  $('#hudCrew').innerHTML =
-    `<div class="crew"><b>Você</b><span class="mono">${n ? Math.round(n.hr) + ' bpm' : '—'}</span>${hasO2 ? bar(o2, tone(o2, 45, 30)) : ''}</div>` +
-    `<div class="crew"><b>Dupla</b><span class="mono">a ${mob.buddy_eva2_distance_m != null ? A.num(mob.buddy_eva2_distance_m, 1) + ' m' : '—'}</span></div>` +
-    `<div class="crew"><b>Rover de apoio</b><span class="mono">${statusPt(mob.support_rover_status)}</span></div>` +
-    `<div class="crew"><b>Carga do traje</b><span class="mono">${mob.suit_payload_kg != null ? A.num(mob.suit_payload_kg, 1) + ' kg' : '—'}</span><small>limite de declive ${A.num(A.LIM.safe, 0)}° (${A.NO_LOAD_SLOPE}° sem carga)</small></div>`;
+  const o2 = n ? n.o2 : Number(mob.o2_remaining_pct), hasO2 = isFinite(o2); // previsão viva (com a carga); sem rota, vale o contrato
+  /* Squad Mesh Link: você, a dupla e o rover de apoio (requisito de caminhada em dupla com veículo robótico) */
+  const me = position() || A.BASE, kg = st.payloadKg != null ? st.payloadKg : mob.suit_payload_kg;
+  const buddy0 = mob.buddy_eva2_distance_m != null ? Number(mob.buddy_eva2_distance_m) : 14.2;
+  const live = st.playing && n, buddy = live ? 14 + 2 * Math.sin(n.t * 0.9) : buddy0;       // oscila de 12 a 16 m durante a simulação
+  const buddyBpm = Math.round(92 + (live ? 4 * Math.sin(n.t * 0.6) : 0));
+  const extract = A.metersBetween(me.lat, me.lon, A.BASE.lat, A.BASE.lon);
+  $('#hudCrew').innerHTML = '<div class="squad-title">Squad Mesh Link</div>' +
+    `<div class="crew"><b>Helena · você</b><span class="mono">${n ? Math.round(n.hr) + ' bpm' : '—'}</span>${hasO2 ? bar(o2, tone(o2, 45, 30)) : ''}<small>O₂ ${hasO2 ? Math.round(o2) + '%' : '—'} · carga ${kg != null ? A.num(kg, 1) + ' kg' : '—'} · limite ${A.num(A.LIM.safe, 1)}° (${A.NO_LOAD_SLOPE}° sem carga)</small></div>` +
+    `<div class="crew"><b>Parceiro</b><span class="mono">a ${A.num(buddy, 1)} m</span><small>${buddyBpm} bpm · <i class="oknote">LINK NOMINAL</i></small></div>` +
+    `<div class="crew"><b>Rover M20 de apoio</b><span class="mono">${statusPt(mob.support_rover_status)}</span><small>ponto de recarga e extração a ${dist(extract)}</small></div>`;
   const steep = Number(topo.slope_deg) > Number(topo.max_safe_slope_deg);
   $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
     [['Declive', topo.slope_deg != null ? `<i style="color:${steep ? 'var(--crit)' : 'var(--ok)'}">${A.num(topo.slope_deg, 1)}°</i> / ${A.num(topo.max_safe_slope_deg, 0)}°` : '—'],
@@ -167,8 +171,11 @@ function renderHud() {
     (loc.lat != null ? `<div class="loc mono">${A.num(loc.lat, 4)}° N ${A.num(loc.lng, 4)}° L · ${A.num(loc.elevation_m, 0)} m</div>` : '');
   renderTarget();
   const hud = (t.hud_alerts || []).find(a => a.level === 'CRITICAL') || (t.hud_alerts || [])[0], al = $('#hudAlert');
+  const nogo = st.verdict && !st.verdict.go ? (st.verdict.code === 'SLOPE'
+    ? `NO-GO · SLOPE OVERLOAD · com ${A.num(st.payloadKg, 1)} kg o limite cai para ${A.num(A.LIM.safe, 1)}°. Desvie por terreno plano ou reduza a carga.`
+    : `NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ${A.num(st.payloadKg, 1)} kg. Reduza a carga ou encurte a rota.`) : null;
   const msg = st.emerg ? 'EMERGÊNCIA · siga a rota tracejada até a base'
-    : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
+    : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'TEMPESTADE DE POEIRA · alerta ativo (MEDA)' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';
   const src = $('#hudSource');
@@ -195,8 +202,10 @@ function renderBar() {
     `<span class="seg2"><button data-mode="photo" aria-pressed="${photo}">Fotos do rover</button><button data-mode="terrain" aria-pressed="${!photo}">Terreno 3D</button></span>` +
     `<button data-turn="-1" aria-label="Virar à esquerda">◀</button><button data-walk="-1">▼ voltar</button><button data-walk="1" class="go">▲ avançar</button><button data-turn="1" aria-label="Virar à direita">▶</button>` +
     `<select id="hudJump" aria-label="Ir para"><option value="">Ir para…</option>${jumps}</select>` +
-    (photo ? `<button data-follow="1" aria-pressed="${!manual}">Seguir caminhada</button>` : '');
-  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram' : 'Segure W/S ou ↑ ↓ para andar · A/D ou ← → para virar · Shift para correr · arraste para olhar';
+    (photo ? `<button data-follow="1" aria-pressed="${!manual}">Seguir caminhada</button>`
+      : `<span class="seg2"><button data-pace="real" aria-pressed="${A.globe.walk.pace === 'real'}">Passo real</button><button data-pace="fast" aria-pressed="${A.globe.walk.pace === 'fast'}">Visualização</button></span>`);
+  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram' : A.globe.walk.pace === 'real' ? 'Passo real: 2,9 km/h, como um astronauta de traje (Shift = 5,8 km/h) · W/S ou ↑ ↓ andam · A/D ou ← → viram · arraste para olhar'
+      : 'Visualização: sobrevoo rápido (Shift = muito rápido) · W/S ou ↑ ↓ andam · A/D ou ← → viram · arraste para olhar';
 }
 
 /* ---------- Interação ---------- */
@@ -220,6 +229,7 @@ $('#hudSols').addEventListener('click', e => {
   if (b.dataset.mode) setMode(b.dataset.mode);
   else if (b.dataset.walk) walkStep(+b.dataset.walk);
   else if (b.dataset.turn) turnTo((mode === 'terrain' ? A.globe.walk.heading : viewAz) + 30 * b.dataset.turn);
+  else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); renderBar(); }
   else if (b.dataset.follow) { manual = false; follow(); setCam(); renderHud(); renderBar(); }
 });
 $('#hudSols').addEventListener('change', e => {
@@ -250,6 +260,8 @@ A.on('view', async v => {
 A.on('route', () => { if (visible()) { follow(); place(); renderHud(); } });
 A.on('tick', () => { if (visible()) { follow(); hud1Hz(); } });
 A.on('telemetry', () => { if (visible()) hud1Hz(); });
+A.on('verdict', () => { if (visible()) renderHud(); });
+A.on('uplink', () => { if (visible() && mode === 'photo') build(); });
 window.addEventListener('resize', () => { if (visible() && mode === 'photo') build(); });
 /* Usado pelo pop-up de foto de solo e pelo botão "Ver no capacete" */
 A.pano = {

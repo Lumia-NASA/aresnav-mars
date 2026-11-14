@@ -19,6 +19,17 @@ O navegador **nunca chama a NASA direto** (skill `01-frontend-hud-skill`). Image
 
 Se o backend cair ou responder `degraded: true`, o app entra em **redundância local** e mostra `OFFLINE TELEMETRY (CACHED)`: usa a última telemetria guardada, o relevo e o trajeto da pasta `data/` e um conjunto pequeno de imagens em `data/tiles/`. As fotos do rover e o zoom de alta resolução só funcionam com o backend.
 
+## Interface
+
+O mapa ocupa a tela toda e os painéis flutuam por cima, no formato dos exploradores de planeta:
+
+- **Barra superior:** busca de lugares em Marte (nome ou "lat, lon"; atalho `/`), troca de modo, Telemetria e Dados.
+- **Painel esquerdo (Conteúdo da missão):** checklist de saída, carga do traje, camadas e destinos. Recolhe pela aba lateral.
+- **Painel direito (Plano da caminhada):** veredito, números da rota, perfil de altitude, horários, alertas e paradas.
+- **Canto inferior direito:** entrar no capacete, alternar 3D/2D, apontar para o norte e zoom.
+- **Canto inferior esquerdo:** troca rápida da imagem de fundo.
+- **Barra de baixo:** simulação da caminhada, corte de enlace e emergência; no rodapé, a posição sob o cursor e a altitude da câmera.
+
 ## Modos de operação
 
 O botão no topo alterna entre os dois modos pedidos pela skill:
@@ -52,7 +63,25 @@ cd frontend && python -m http.server 5183
 
 3. Abra http://localhost:5183.
 
-Para apontar para outro endereço de backend, defina `window.ARESNAV_API` no `index.html`. Se usar outra porta para o frontend, inclua a origem em `ALLOWED_ORIGIN` no `.env` do backend.
+**Porta única (produção / VPS):** o backend também serve o frontend. Basta ligar o backend e abrir http://localhost:3000. Nesse caso a API é chamada na mesma origem, sem CORS. Com Docker, a partir da raiz do repositório:
+
+```bash
+docker build -t aresnav .
+```
+
+```bash
+docker run -d -p 3000:3000 --read-only --tmpfs /tmp --security-opt=no-new-privileges:true --cap-drop=ALL --user 1000:1000 aresnav
+```
+
+Para apontar para outro endereço de backend, defina `window.ARESNAV_API` em `config.js`. Se usar outra porta para o frontend em desenvolvimento, inclua a origem em `ALLOWED_ORIGIN` no `.env` do backend.
+
+## Demonstração para os jurados
+
+- **Carga do traje:** o slider "Carga de amostras e equipamento" (0 a 25 kg) muda na hora o limite de declive (`max(8, 15 − 0,2 × kg)`) e o consumo (`1 + 0,018 × kg`). A rota é recalculada; se não houver caminho dentro do limite ou o oxigênio previsto na volta cair abaixo de 30%, o veredito vira `[ NO-GO: SLOPE OVERLOAD ]` ou `[ NO-GO: METABOLIC OVERLOAD ]`, o visor alerta e o navegador fala o aviso. As fórmulas estão em `physics.js` e têm testes em `tests/physics-test.js`.
+- **Corte de enlace:** o botão `[ 🟢 UPLINK: NASA LIVE ]`, ao lado do ▶, simula a queda da comunicação Terra–Marte. O app passa a usar só dados locais e o cache do backend, e a navegação continua funcionando.
+- **Squad Mesh Link:** no Capacete, o painel da esquerda mostra você, o parceiro (a distância oscila durante a simulação) e o rover de apoio com a distância até o ponto de extração.
+- **Passo real:** no Terreno 3D do Capacete, "Passo real" anda a 2,9 km/h (5,8 com Shift), como um astronauta de traje; "Visualização" é o sobrevoo rápido. A simulação da caminhada tem 1× (tempo real), 60× e 360×.
+- **Procedência:** o rodapé mostra de onde vêm os dados e o selo SHA-256 do EvidenceGate lido do backend.
 
 ## Dados (todos oficiais da NASA, sempre pelo backend)
 
@@ -108,9 +137,12 @@ Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` o
 ## Estrutura
 
 - `index.html`, `style.css`: página e visual
+- `config.js`, `boot.js`: configuração e partida (sem scripts embutidos no HTML, por causa do CSP)
+- `physics.js`: física da carga do traje (limite de declive, consumo, veredito)
 - `app.js`: acesso ao backend, contrato, rota (A*), simulação da caminhada, mapa 2D, checklist, plano e pop-up de foto de solo
 - `globe.js`: globo 3D (CesiumJS)
 - `helmet.js`: modo Capacete (fotos do rover e terreno 3D)
+- `ui.js`: casca da interface (painéis, busca, controles do mapa, barra de estado)
 - `telemetry.js`: modo Telemetria
 - `data/`: redundância local (relevo, trajeto, telemetria e `tiles/`) e o índice de panoramas
 - `../tools/build-pano-cache.py`: gera o índice de panoramas

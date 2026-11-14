@@ -21,7 +21,10 @@ function throttle(fn, ms) {
 }
 
 /* ---------- Backend AresNav ---------- */
-const API = (window.ARESNAV_API || 'http://localhost:3000').replace(/\/$/, '') + '/api/v1';
+/* Em desenvolvimento o frontend roda na porta 5183 e o backend na 3000. Em produção (VPS) o Fastify
+   serve tudo na mesma porta: a base fica vazia, sem CORS e sem porta extra no firewall. */
+const API_BASE = window.ARESNAV_API != null ? String(window.ARESNAV_API).replace(/\/$/, '') : (window.location.port === '5183' ? 'http://localhost:3000' : '');
+const API = `${API_BASE}/api/v1`;
 const link = { online: false, degraded: false, mapsOnline: false };
 async function fetchT(url, ms) {
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), ms || 8000);
@@ -32,20 +35,24 @@ async function fetchT(url, ms) {
 const LAYERS = {
   viking: { ext: 'jpg', max: 7, local: [0, 2] },
   relief: { ext: 'jpg', max: 8 },
+  /* detalhe global: infravermelho THEMIS (100 m), usado por baixo da cor do Viking para Marte não virar borrão de perto */
+  detail: { src: 'themis', ext: 'png', max: 9, box: [-180, -65, 180, 65] },
   ctx: { ext: 'png', max: 13, box: [77.1605, 18.211, 77.6992, 18.7212], local: [10, 11] },
   hirise: { ext: 'png', max: 17, box: [77.2229, 18.3068, 77.584, 18.6693] },
   mosaic: { ext: 'png', max: 16, box: [76.7913, 17.5792, 77.7314, 18.6926] },
   themis: { ext: 'png', max: 9, box: [-180, -65, 180, 65] }
 };
 /* Com backend: blocos via proxy. Sem backend: conjunto pequeno guardado em data/tiles (redundância local) */
-const tileUrl = k => link.mapsOnline ? `${API}/tiles/${k}/{z}/{y}/{x}` : `data/tiles/${k}/{z}/{y}/{x}.${LAYERS[k].ext}`;
+const tileUrl = k => link.mapsOnline ? `${API}/tiles/${LAYERS[k].src || k}/{z}/{y}/{x}` : `data/tiles/${k}/{z}/{y}/{x}.${LAYERS[k].ext}`;
 const tileRange = k => link.mapsOnline ? [0, LAYERS[k].max] : (LAYERS[k].local || null);
 const NAVCAM_BASE = 'https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/';
 /* Endereço de uma foto da Navcam passando pelo backend (aceita caminho relativo ou URL oficial da NASA) */
 function photoUrl(u) {
   if (!u) return null;
   const rel = u.startsWith(NAVCAM_BASE) ? u.slice(NAVCAM_BASE.length) : /^https?:/.test(u) ? null : u;
-  return rel && link.online ? `${API}/navcam/${rel}` : null;
+  if (!rel) return null;
+  if (state.forceOffline) return `${API}/navcam/${rel}?offline=1`; // enlace cortado: só o que o backend já tem em disco
+  return link.online ? `${API}/navcam/${rel}` : null;
 }
 
 /* Área com relevo detalhado (graus, longitude leste) e grade usada na rota */
@@ -178,7 +185,7 @@ async function loadGeo(key, route, fallback) {
 const NO_LOAD_SLOPE = 15; // limite de declive sem a carga do traje; o contrato reduz para max_safe_slope_deg
 async function pollTelemetry() {
   let t = null;
-  try { const r = await fetchT(`${API}/telemetry`, 2500); if (r.ok) t = await r.json(); } catch (e) { t = null; }
+  if (!window.FORCE_OFFLINE_MODE) try { const r = await fetchT(`${API}/telemetry`, 2500); if (r.ok) t = await r.json(); } catch (e) { t = null; }
   if (t && t.layers && t.eva_mobility) {
     link.online = true; link.degraded = !!t.degraded;
     try { localStorage.setItem('aresnav.telemetry', JSON.stringify(t)); } catch (e) { /* sem armazenamento local */ }
@@ -192,8 +199,10 @@ async function pollTelemetry() {
   state.tele = t;
   state.linkState = !link.online ? 'offline' : link.degraded ? 'degraded' : 'online';
   setStatus('telemetry', state.linkState === 'online' ? 'ok' : 'fb');
-  const lim = t && t.layers && t.layers.topography && Number(t.layers.topography.max_safe_slope_deg);
-  if (lim > 0) LIM.safe = lim;
+  if (state.payloadKg == null) { // a carga inicial vem do contrato; depois quem manda é o slider
+    const kg = t && t.eva_mobility ? Number(t.eva_mobility.suit_payload_kg) : NaN;
+    setPayload(isFinite(kg) && kg >= 0 ? Math.min(25, kg) : 18.5, true);
+  }
   renderLink();
   if (state.ready && LIM.safe !== limBefore && state.goalLL) setGoalLL(state.goalLL[0], state.goalLL[1], state.goalPoi);
   else if (state.ready && before !== state.linkState) renderPanel();
@@ -201,29 +210,72 @@ async function pollTelemetry() {
   emit('telemetry', state);
 }
 function renderLink() {
-  const off = state.linkState !== 'online', chip = $('#dataChip');
+  const off = state.linkState !== 'online', chip = $('#dataChip'), up = $('#uplink');
   chip.textContent = state.linkState === 'online' ? 'Backend AresNav · NASA ao vivo' : 'OFFLINE TELEMETRY (CACHED)';
   chip.classList.toggle('warn', off);
   document.body.classList.toggle('offline', off);
+  up.textContent = off ? '[ 🟠 UPLINK: OFFLINE CACHE FALLBACK ]' : '[ 🟢 UPLINK: NASA LIVE ]';
+  up.classList.toggle('off', off); up.setAttribute('aria-pressed', !!window.FORCE_OFFLINE_MODE);
+  $('#offlineBadge').hidden = !off;
+  const h = state.tele && state.tele.evidenceSha256;
+  $('#provHash').textContent = /^[a-f0-9]{64}$/.test(h || '') ? h : 'aguardando o backend';
+  $('#provState').textContent = off ? '(último selo guardado, enlace offline)' : '(lido de /api/v1/telemetry)';
+}
+/* Carga do traje: muda o limite de declive seguro e o consumo (ver physics.js) */
+function setPayload(kg, silent) {
+  state.payloadKg = kg;
+  LIM.safe = Physics.maxSafeSlope(kg);
+  const sl = $('#payload'); if (sl && Number(sl.value) !== kg) sl.value = kg;
+  $('#payloadVal').textContent = num(kg, 1) + ' kg';
+  $('#payloadFx').textContent = `Limite de declive ${num(LIM.safe, 1)}° (${NO_LOAD_SLOPE}° sem carga) · consumo de O₂ ×${num(Physics.metabolicFactor(kg), 2)}`;
+  if (!silent && state.ready) { if (state.goalLL) setGoalLL(state.goalLL[0], state.goalLL[1], state.goalPoi); else renderPanel(); }
+}
+/* Aviso por voz quando o veredito vira NO-GO */
+function announce(v) {
+  const kg = num(state.payloadKg, 1), lim = num(LIM.safe, 1);
+  const msg = v.code === 'SLOPE'
+    ? `Atenção. Com ${kg} quilos de carga, o limite de declive cai para ${lim} graus e a rota fica bloqueada. Reduza a carga ou desvie por terreno mais plano.`
+    : `Atenção. Com ${kg} quilos de carga, o oxigênio previsto na volta cai para ${Math.max(0, Math.round(state.plan ? state.plan.o2 : 0))} por cento. Reduza a carga ou encurte a rota.`;
+  state.lastVoice = msg;
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(msg); u.lang = 'pt-BR'; u.rate = 1.05;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* navegador sem voz: o alerta visual continua valendo */ }
 }
 
 /* ---------- Mapa 2D (Leaflet) ---------- */
 let map, T = {}, groups = {}, activeBase = [];
 const SLOPE_COL = () => [cssv('--route'), cssv('--warn'), cssv('--crit')];
 const slopeClass = s => s > 8 ? 2 : s > 4 ? 1 : 0;
-function initMap() {
-  map = L.map('map', { crs: L.CRS.EPSG4326, minZoom: 1, maxZoom: 18, zoomSnap: 0.5, maxBounds: [[-90, -200], [90, 200]], maxBoundsViscosity: 0.8, worldCopyJump: false })
-    .setView([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
-  map.attributionControl.setPrefix(false);
-  map.attributionControl.addAttribution('Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend AresNav');
+function buildTiles() {
   const tiles = (key, opts) => {
     const d = LAYERS[key], range = tileRange(key);
     if (!range) return L.layerGroup(); // camada sem cópia local: fica vazia em modo offline
     const lyr = L.tileLayer(tileUrl(key), Object.assign({ maxZoom: 18, minNativeZoom: range[0], maxNativeZoom: range[1], noWrap: true, bounds: d.box ? [[d.box[1], d.box[0]], [d.box[3], d.box[2]]] : [[-90, -180], [90, 180]] }, opts));
     lyr.on('tileload', () => setStatus(key, link.mapsOnline ? 'ok' : 'fb'));
+    lyr.on('tileerror', e => { // bloco falhou: tenta de novo até 2 vezes antes de deixar o buraco
+      const t = e.tile, n = (t._tries || 0) + 1; if (n > 2 || !link.mapsOnline) return;
+      t._tries = n; setTimeout(() => { t.src = t.src.split('?')[0] + '?retry=' + n; }, 700 * n);
+    });
     return lyr;
   };
-  T = { viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }) };
+  T = { detail: tiles('detail'), tint: link.mapsOnline ? tiles('viking', { className: 'colorize' }) : L.layerGroup(), viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }) };
+}
+/* Troca a origem dos blocos (backend <-> cópia local) sem recarregar a página */
+function rebuildTiles() {
+  Object.values(T).forEach(l => map.removeLayer(l));
+  activeBase = [];
+  ['viking', 'hirise', 'ctx', 'mosaic', 'relief', 'themis'].forEach(k => { srcStatus[k] = 'wait'; });
+  buildTiles(); applyLayers();
+}
+function initMap() {
+  map = L.map('map', { crs: L.CRS.EPSG4326, minZoom: 1, maxZoom: 18, zoomSnap: 0.5, maxBounds: [[-90, -200], [90, 200]], maxBoundsViscosity: 0.8, worldCopyJump: false })
+    .setView([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
+  map.attributionControl.setPrefix(false);
+  map.attributionControl.addAttribution('Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend AresNav');
+  buildTiles();
   map.createPane('routes').style.zIndex = 450;
   groups = { slope: L.layerGroup(), crism: L.layerGroup(), rover: L.layerGroup(), poi: L.layerGroup(), targets: L.layerGroup(), route: L.layerGroup().addTo(map), marks: L.layerGroup().addTo(map) };
   POIS.forEach(p => {
@@ -237,7 +289,8 @@ function initMap() {
   map.on('click', e => pick(e.latlng.lat, e.latlng.lng));
   $('#m-jezero').onclick = () => map.flyTo([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
 }
-const BASES = { hirise: ['viking', 'ctx', 'hirise'], mosaic: ['viking', 'mosaic'], relief: ['relief'] };
+/* ordem de baixo para cima: cor Viking, detalhe THEMIS, cor Viking de novo (tingindo o detalhe), mosaico regional, CTX, HiRISE */
+const BASES = { hirise: ['viking', 'detail', 'tint', 'mosaic', 'ctx', 'hirise'], mosaic: ['viking', 'detail', 'tint', 'mosaic'], relief: ['relief'] };
 function layerState() {
   return { base: document.querySelector('input[name="base"]:checked').value, slope: $('#ov-slope').checked, themis: $('#ov-themis').checked, crism: $('#ov-crism').checked, rover: $('#ov-rover').checked, poi: $('#ov-poi').checked };
 }
@@ -419,20 +472,20 @@ function simAt(t) {
   const moving = a.k !== b.k, speed = moving ? b.v : 0, cell = state.path[f < 0.5 ? a.k : b.k];
   const slope = SL[cell], h = HGT[state.path[a.k]] + (HGT[state.path[b.k]] - HGT[state.path[a.k]]) * f;
   const climbing = moving && HGT[state.path[b.k]] > HGT[state.path[a.k]];
-  const hr = (moving ? 104 + slope * 4 + (climbing ? 8 : 0) : t === 0 ? 76 : 88) + wob(t, 0.9, 3);
+  const hr = 76 + ((moving ? 104 + slope * 4 + (climbing ? 8 : 0) : t === 0 ? 76 : 88) - 76) * Physics.metabolicFactor(state.payloadKg) + wob(t, 0.9, 3);
   return {
     t, lat, lon, cell, k: f < 0.5 ? a.k : b.k, h, slope, speed, hr,
     phase: t >= sim.total ? 'De volta à base' : t <= 0 ? 'Na base' : b.phase, label: moving ? null : b.label,
     heading: moving ? bearing(pa[0], pa[1], pb[0], pb[1]) : null,
     dist: a.dist + (b.dist - a.dist) * f,
-    o2: Math.max(0, 100 - t / EVA_MAX * 100), batt: Math.max(0, 100 - t / 600 * 100),
+    o2: Physics.o2AtReturn(t, state.payloadKg, EVA_MAX), batt: Math.max(0, 100 - t / 600 * 100),
     co2: 2.1 + (hr - 76) * 0.035 + wob(t, 0.5, 0.1), suitTemp: 20.5 + (hr - 76) * 0.05 + wob(t, 0.3, 0.3),
     suitKpa: 29.6 + wob(t, 0.7, 0.08), baseDist: metersBetween(lat, lon, BASE.lat, BASE.lon)
   };
 }
 
 /* ---------- Estado ---------- */
-const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [] };
+const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [], payloadKg: null, forceOffline: false, verdict: null, speed: 1.5 };
 
 function recompute(keepTime) {
   if (!HGT) return;
@@ -443,7 +496,7 @@ function recompute(keepTime) {
   state.sim = state.path ? buildSim(state.path, state.stops, !!state.goalPoi) : null;
   state.plan = null;
   if (state.info) {
-    const I = state.info, total = state.sim.total, o2 = 100 - total / EVA_MAX * 100;
+    const I = state.info, total = state.sim.total, o2 = Physics.o2AtReturn(total, state.payloadKg, EVA_MAX);
     state.plan = { total, work: total - I.tOut - I.tBack, o2, arrive: T0 + I.tOut, back: T0 + total };
   }
   if (!keepTime) state.simT = state.sim ? state.sim.tArrive * 0.45 : 0;
@@ -468,7 +521,7 @@ function setGoalLL(lat, lon, poi) {
   state.goal = HGT ? cellOf(lat, lon) : -1;
   state.msg = '';
   if (state.goal < 0) state.msg = 'Esse ponto está fora da área com relevo detalhado (o retângulo pontilhado em Jezero). Escolha um local dentro dele.';
-  else if (SL[state.goal] > LIM[state.mode]) state.msg = `Esse ponto tem declive de ${Math.round(SL[state.goal])}°, acima do limite de ${LIM[state.mode]}°. Escolha um local mais plano.`;
+  else if (SL[state.goal] > LIM[state.mode]) state.msg = `Esse ponto tem declive de ${Math.round(SL[state.goal])}°, acima do limite de ${num(LIM[state.mode], 1)}°. Reduza a carga ou escolha um local mais plano.`;
   recompute();
 }
 const setGoalPoi = p => setGoalLL(p.lat, p.lon, p);
@@ -537,7 +590,7 @@ function drawProfile() {
   x.fillStyle = 'rgba(0,255,170,.08)'; x.fill();
   x.lineWidth = 2.2;
   for (let k = 1; k < pr.length; k++) { x.strokeStyle = col[slopeClass(pr[k].s)]; x.beginPath(); x.moveTo(X(pr[k - 1].d), Y(pr[k - 1].h)); x.lineTo(X(pr[k].d), Y(pr[k].h)); x.stroke(); }
-  x.fillStyle = muted; const kmT = tot / 1000, step = kmT > 8 ? 2 : kmT > 4 ? 1 : kmT > 2 ? 0.5 : 0.25;
+  x.fillStyle = muted; const kmT = tot / 1000, step = (kmT > 8 ? 2 : kmT > 4 ? 1 : kmT > 2 ? 0.5 : 0.25) * (w < 380 ? 2 : 1); // menos marcas quando o gráfico é estreito
   for (let k = 0; k <= kmT + 1e-6; k += step) { const px = X(k * 1000); x.fillText(k.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' km', Math.min(Math.max(px - 10, L0 - 10), w - R0 - 50), h - 6); }
 }
 
@@ -548,21 +601,26 @@ const clock = m => { m = Math.round(m); return String(Math.floor(m / 60) % 24).p
 const num = (v, d) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 function renderChecklist() {
   const I = state.info, P = state.plan, t = state.tele, ls = state.linkState;
-  const meda = t && t.layers && t.layers.atmosphere_meda, payload = t && t.eva_mobility && t.eva_mobility.suit_payload_kg;
+  const meda = t && t.layers && t.layers.atmosphere_meda, payload = state.payloadKg;
   const items = [
     [!state.ready ? 'wait' : ls === 'online' ? 'ok' : 'warn', 'Enlace com o backend', !state.ready ? 'Conectando…' : ls === 'online' ? 'Telemetria ao vivo' : 'OFFLINE TELEMETRY (CACHED)'],
     [I ? 'ok' : state.ready ? 'crit' : 'wait', 'Rota traçada', I ? fmtKm(I.dist) + ' de ida' : state.ready ? 'Sem caminho possível' : 'Aguardando relevo'],
-    [!I ? 'wait' : I.maxS <= LIM.safe ? 'ok' : 'crit', 'Declive dentro do limite', I ? `Máximo ${num(I.maxS, 1)}° de ${num(LIM.safe, 0)}°${payload ? ` (${NO_LOAD_SLOPE}° sem a carga de ${num(payload, 1)} kg)` : ''}` : '—'],
+    [!I ? 'wait' : I.maxS <= LIM.safe ? 'ok' : 'crit', 'Declive dentro do limite', I ? `Máximo ${num(I.maxS, 1)}° de ${num(LIM.safe, 1)}°${payload ? ` (${NO_LOAD_SLOPE}° sem a carga de ${num(payload, 1)} kg)` : ''}` : state.ready ? `Limite ${num(LIM.safe, 1)}° com ${num(payload || 0, 1)} kg` : '—'],
     [!P ? 'wait' : P.o2 >= 30 ? 'ok' : P.o2 >= 15 ? 'warn' : 'crit', 'Reserva de oxigênio', P ? `${Math.max(0, Math.round(P.o2))}% previstos na volta (mín. 30%)` : '—'],
     [!meda ? 'wait' : meda.dust_storm_alert ? 'warn' : 'ok', 'Tempo em Jezero (MEDA)', meda ? `${meda.dust_storm_alert ? 'Alerta de poeira' : 'Sem alerta'} · vento ${num(meda.wind_speed_ms, 1)} m/s` : '—'],
     [!P ? 'wait' : P.back <= 17 * 60 ? 'ok' : 'crit', 'Volta com luz do dia', P ? `Retorno ${clock(P.back)} · pôr do sol 17:52` : '—'],
     ['info', 'Comunicação com a Terra', 'Atraso de 11 min. Ciente']
   ];
   $('#checklist').innerHTML = items.map(([s, a, b]) => `<li class="${s}"><i></i><div><b>${a}</b><small>${b}</small></div></li>`).join('');
-  const crit = items.some(i => i[0] === 'crit'), warn = items.some(i => i[0] === 'warn'), wait = items.some(i => i[0] === 'wait');
+  const crit = items.some(i => i[0] === 'crit'), warn = items.some(i => i[0] === 'warn'), wait = !state.ready;
+  /* destino fora da área com relevo não é culpa do declive: fica como NO-GO simples */
+  const v = Physics.verdict({ hasRoute: !!I || state.goal < 0, maxSlope: I ? I.maxS : 0, limit: LIM.safe, o2: P ? P.o2 : 100 });
   const g = $('#gonogo');
-  g.className = 'gonogo ' + (wait ? 'wait' : crit ? 'crit' : warn ? 'warn' : 'ok');
-  g.textContent = wait ? 'Aguardando dados' : crit ? 'NO-GO · não sair' : warn ? 'GO com ressalvas' : 'GO · liberado para sair';
+  g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn ? 'warn' : 'ok');
+  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? '[ NO-GO: SLOPE OVERLOAD ]' : v.code === 'METABOLIC' ? '[ NO-GO: METABOLIC OVERLOAD ]' : crit ? '[ NO-GO ]' : warn ? '[ GO ] com ressalvas' : '[ GO ]';
+  const prev = state.verdict && state.verdict.code;
+  state.verdict = wait ? null : v;
+  if (!wait && prev && prev !== v.code) { if (!v.go) announce(v); emit('verdict', v); }
 }
 function renderPanel() {
   renderChecklist();
@@ -577,11 +635,11 @@ function renderPanel() {
   } else {
     const I = state.info, P = state.plan, stops = state.stops, o2 = P.o2;
     const [pc, pt] = o2 >= 30 ? ['var(--ok)', 'Dentro da margem'] : o2 >= 15 ? ['var(--warn)', 'Margem apertada'] : ['var(--crit)', 'Não recomendado'];
-    st.innerHTML = `<span class="pill" style="--c:${pc}">${pt}</span><h3>${name}</h3><p>${state.mode === 'safe' ? `Rota segura: evita declives acima de ${num(LIM.safe, 0)}° e prefere terreno plano.` : `Rota mais curta: aceita declives até ${LIM.short}°.`}</p>`;
+    st.innerHTML = `<span class="pill" style="--c:${pc}">${pt}</span><h3>${name}</h3><p>${state.mode === 'safe' ? `Rota segura: evita declives acima de ${num(LIM.safe, 1)}° e prefere terreno plano.` : `Rota mais curta: aceita declives até ${LIM.short}°.`}</p>`;
     stats.innerHTML = [
       ['Distância (ida)', fmtKm(I.dist), ''], ['Tempo de ida', fmtMin(I.tOut), 'volta ' + fmtMin(I.tBack)],
       ['Duração total', fmtMin(P.total), `${stops.length} parada${stops.length === 1 ? '' : 's'}`], ['Oxigênio na volta', Math.max(0, Math.round(o2)) + '%', 'mín. 30%'],
-      ['Subida acumulada', Math.round(I.climb) + ' m', 'descida ' + Math.round(I.desc) + ' m'], ['Declive máximo', num(I.maxS, 1) + '°', 'limite ' + num(LIM[state.mode], 0) + '°']
+      ['Subida acumulada', Math.round(I.climb) + ' m', 'descida ' + Math.round(I.desc) + ' m'], ['Declive máximo', num(I.maxS, 1) + '°', 'limite ' + num(LIM[state.mode], 1) + '°']
     ].map(([a, b, c]) => `<div class="stat"><span>${a}</span><b>${b}</b> <em>${c}</em></div>`).join('');
     tl.innerHTML = `<span class="mono">${clock(T0)}</span><span>Saída da base</span><span class="mono">${clock(P.arrive)}</span><span>Chegada ao destino</span><span class="mono">${clock(P.back - I.tBack)}</span><span>Início do retorno</span><span class="mono">${clock(P.back)}</span><span>De volta à base</span><span class="mono">17:52</span><span>Pôr do sol</span>`;
     if (I.steep > 0) alerts.push(['var(--warn)', `${Math.round(I.steep)} m de trecho com declive acima de 8°. Use bastões e passos curtos.`]);
@@ -620,7 +678,7 @@ function setPlaying(p) {
   if (state.playing) {
     if (state.simT >= state.sim.total - 0.01) state.simT = 0;
     playTimer = setInterval(() => {
-      state.simT = Math.min(state.sim.total, state.simT + 1.5);
+      state.simT = Math.min(state.sim.total, state.simT + state.speed);
       if (state.simT >= state.sim.total) setPlaying(false);
       tick();
     }, 250);
@@ -657,6 +715,13 @@ async function start() {
   $('#m-short').onclick = () => setMode('short');
   $('#emerg').onclick = () => { state.emerg = !state.emerg; $('#emerg').setAttribute('aria-pressed', state.emerg); tick(); };
   $('#simPlay').onclick = () => setPlaying(!state.playing);
+  $('#simSpeed').addEventListener('change', e => { state.speed = Number(e.target.value) || 1.5; });
+  $('#payload').addEventListener('input', e => setPayload(Number(e.target.value)));
+  $('#uplink').onclick = async () => { // kill-switch de demonstração: corta o enlace com a NASA
+    window.FORCE_OFFLINE_MODE = !window.FORCE_OFFLINE_MODE; state.forceOffline = window.FORCE_OFFLINE_MODE;
+    await pollTelemetry();
+    if (link.online !== link.mapsOnline) { link.mapsOnline = link.online; rebuildTiles(); emit('uplink', state); }
+  };
   $('#simSlider').addEventListener('input', e => { if (!state.sim) return; setPlaying(false); state.simT = e.target.value / 1000 * state.sim.total; tick(); });
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
   document.querySelectorAll('.opmode button').forEach(b => b.addEventListener('click', () => setOp(b.dataset.op)));
@@ -686,11 +751,12 @@ async function start() {
 }
 
 const api = {
-  $, cssv, on, emit, throttle, start, state, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
+  $, cssv, on, emit, throttle, start, state, setPayload, API_BASE, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
   heightAt, slopeAt, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
-  traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null
+  traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null,
+  get map() { return map; }
 };
 return api;
 })();

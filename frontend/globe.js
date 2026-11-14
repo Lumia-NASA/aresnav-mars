@@ -9,9 +9,11 @@
 const A = App, $ = A.$;
 const EX = 2.5;
 let K = 1.88, VS = 1.88 * EX, EYE = 14; // K = tamanho do globo em relação a Marte (1 com o elipsoide marciano)
-let viewer = null, failed = false, C = null;
+let viewer = null, failed = false, C = null, buildImagery = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
-const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null };
+const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0 };
+/* Passo real: astronauta de traje, 0,8 m/s (2,9 km/h) e 1,6 m/s com Shift. Visualização: sobrevoo rápido. */
+const PACE = { real: [0.8, 1.6], fast: [80, 2500] };
 
 function fail(e) {
   failed = true; console.error('Globo 3D', e);
@@ -60,20 +62,26 @@ function init() {
     scene.screenSpaceCameraController.minimumZoomDistance = 220 * K;
     viewer.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
-    const add = (k, alpha) => {
+    buildImagery = () => { // refeito quando o enlace cai ou volta (backend <-> cópia local)
+    viewer.imageryLayers.removeAll(); Object.keys(layers).forEach(k => delete layers[k]);
+    const add = (k, alpha, name) => {
       const d = A.LAYERS[k], range = A.tileRange(k);
       if (!range) return; // sem backend, só existem as camadas guardadas localmente
       const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
       const l = viewer.imageryLayers.addImageryProvider(provider);
       if (alpha != null) l.alpha = alpha;
-      layers[k] = l;
+      layers[name || k] = l;
     };
-    ['viking', 'relief', 'mosaic', 'ctx', 'hirise'].forEach(k => add(k));
+    add('viking'); add('detail');
+    if (layers.detail) { add('viking', 0.5, 'tint'); layers.tint.saturation = 1.8; } // cor do Viking por cima do detalhe THEMIS
+    ['relief', 'mosaic', 'ctx', 'hirise'].forEach(k => add(k));
     add('themis', 0.6);
     if (A.slopeURL) C.SingleTileImageryProvider.fromUrl(A.slopeURL, { rectangle: C.Rectangle.fromDegrees(A.BOX.XMIN, A.BOX.YMIN, A.BOX.XMAX, A.BOX.YMAX) })
       .then(p => { layers.slope = viewer.imageryLayers.addImageryProvider(p); layers.slope.alpha = 0.6; applyLayers(A.layerState()); })
       .catch(e => console.warn('camada de declive', e));
+    };
+    buildImagery();
 
     buildStatic(); drawTargets(); applyLayers(A.layerState()); drawRoute(); drawNow();
 
@@ -107,12 +115,12 @@ function flyJezero() {
 function label(text, far, near) {
   return { text, font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#e8ecf8'), showBackground: true,
     backgroundColor: C.Color.fromCssColorString('rgba(10,13,20,.88)'), backgroundPadding: new C.Cartesian2(6, 4), pixelOffset: new C.Cartesian2(0, -20),
-    heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 400000 * K,
     distanceDisplayCondition: new C.DistanceDisplayCondition((near || 0) * K / 1.88, far * K / 1.88) };
 }
 function point(color, size, fill) {
   return { pixelSize: size, color: C.Color.fromCssColorString(fill || '#0A0D14'), outlineColor: C.Color.fromCssColorString(color), outlineWidth: 2,
-    heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY };
+    heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 400000 * K };
 }
 function line(coords, color, width, style) {
   const col = C.Color.fromCssColorString(color);
@@ -149,7 +157,7 @@ function buildStatic() {
 
 function applyLayers(s) {
   if (!viewer) return;
-  const show = { viking: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base === 'mosaic', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
+  const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base !== 'relief', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
   Object.keys(show).forEach(k => { if (layers[k]) layers[k].show = show[k]; });
   ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); (ents.targets || []).forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
 }
@@ -189,7 +197,8 @@ function drawNow() {
 /* ---------- Andar pelo terreno (usado pelo modo Capacete) ---------- */
 function placeCamera() {
   const c = C.Cartographic.fromDegrees(walk.lon, walk.lat), mesh = viewer.scene.globe.getHeight(c);
-  const h = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh) + EYE;
+  const bob = walk.moving && walk.pace === 'real' ? Math.sin(performance.now() / 1000 * Math.PI * 2 * 1.7) * 0.02 * EYE : 0; // balanço do passo
+  const h = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh) + EYE + bob;
   viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(walk.lon, walk.lat, h), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(walk.pitch), roll: 0 } });
 }
 function move(m) {
@@ -202,7 +211,9 @@ function step() {
   const now = performance.now(), dt = Math.min(0.1, (now - walk.last) / 1000), k = walk.keys; walk.last = now;
   const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0), mv = (k.fwd ? 1 : 0) - (k.back ? 1 : 0);
   if (turn) walk.heading = (walk.heading + turn * 70 * dt + 360) % 360;
-  if (mv) move((k.fast ? 2500 : 80) * mv * dt);
+  const sp = PACE[walk.pace][k.fast ? 1 : 0];
+  if (mv) move(sp * mv * dt);
+  walk.moving = !!mv; walk.speed = mv ? sp : 0;
   placeCamera();
   if (now - walk.sent > 100) { walk.sent = now; A.emit('walk', walk); }
 }
@@ -239,12 +250,32 @@ A.on('layers', applyLayers);
 A.on('route', () => { lastEm = null; drawRoute(); drawNow(); });
 A.on('tick', drawNow);
 A.on('cam', drawNow);
+A.on('uplink', () => { if (viewer && buildImagery) { buildImagery(); applyLayers(A.layerState()); } });
 let teleSig = '';
 A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || []); if (sig !== teleSig) { teleSig = sig; drawTargets(); } });
 A.globe = {
   get viewer() { return viewer; }, flyJezero, walk, enterWalk, exitWalk,
   teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },
   look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-60, Math.min(35, walk.pitch + dEl)); },
-  stepBy(m) { move(m); }
+  stepBy(m) { move(m); },
+  setPace(p) { if (PACE[p]) walk.pace = p; },
+  /* usados pela busca e pelos controles do mapa */
+  flyTo(lat, lon, rangeKm) {
+    if (!viewer) return;
+    viewer.camera.flyToBoundingSphere(new C.BoundingSphere(groundPos(lat, lon), 500 * K),
+      { offset: new C.HeadingPitchRange(0, C.Math.toRadians(rangeKm > 800 ? -89 : -55), rangeKm * 1000 * K), duration: 2.6 });
+  },
+  zoom(f) { // f < 1 aproxima, f > 1 afasta
+    if (!viewer) return;
+    const cam = viewer.camera, ground = A.heightAt(C.Math.toDegrees(cam.positionCartographic.latitude), C.Math.toDegrees(cam.positionCartographic.longitude)) * VS;
+    const above = Math.max(300 * K, cam.positionCartographic.height - ground);
+    if (f < 1) cam.zoomIn(above * (1 - f)); else cam.zoomOut(Math.min(above * (f - 1), 2.5e7 * K - above));
+  },
+  north() { if (viewer) viewer.camera.flyTo({ destination: viewer.camera.position.clone(), orientation: { heading: 0, pitch: viewer.camera.pitch, roll: 0 }, duration: 0.6 }); },
+  cam() {
+    if (!viewer) return null;
+    const c = viewer.camera.positionCartographic;
+    return { km: c.height / 1000 / K, heading: C.Math.toDegrees(viewer.camera.heading) };
+  }
 };
 })();
