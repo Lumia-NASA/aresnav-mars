@@ -10,9 +10,11 @@
 //   (níveis 8 a 14) em volta da rota;
 // - panoramas 360°: os da demo (Three Forks, lago antigo, pouso, Lookout Hill), em cor natural quando existe;
 // - fotos da Navcam do modo Capacete a até 2,5 km da rota.
+// - relevo HiRISE de 1 m numa faixa de 400 m para cada lado da linha base -> Three Forks (corredor da rota e o chão do capacete).
 const path = require('path');
 const fs = require('fs');
 const P = require('../frontend/pano-tiles.js');
+const HiRise = require('../frontend/hirise-core.js');
 
 const BASE = (process.env.ARESNAV_URL || 'http://localhost:3000').replace(/\/$/, '') + '/api/v1';
 const CHECK = process.argv.includes('--check');
@@ -20,6 +22,7 @@ const root = path.resolve(__dirname, '..');
 const BOX = { w: 77.36, e: 77.49, s: 18.40, n: 18.48 };          // base (77.45 E, 18.44 N) até Three Forks (77.40 E, 18.45 N), com folga
 const DEMO_PANOS = ['23', '24', '-8', '1', '41'];
 const NAVCAM_KM = 2.5;
+const DEPOT = [18.45133, 77.40126];   // Depósito de amostras Three Forks (destino da demo)
 
 function tilesIn(layer, z, box) {
   const size = 180 / 2 ** z, out = [];
@@ -44,6 +47,8 @@ function plan() {
     const parts = cube.sphere ? P.sphereTiles(cube).map(t => t.path) : P.cubeTiles(cube).tiles.map(t => t.path);
     for (const rel of ['preview.jpg'].concat(parts)) items.push(`/fub/pano/${encodeURIComponent(cube.folder)}/${rel}`);
   }
+  // relevo HiRISE de 1 m em volta da rota da demo
+  HiRise.tilesAlong([[18.4405, 77.4625], DEPOT], 400).forEach(t => items.push(`/dem/hirise/${t.tx}/${t.ty}`));
   // fotos da Navcam perto da rota
   const idx = JSON.parse(fs.readFileSync(path.join(root, 'frontend/data/pano/index.json'), 'utf8'));
   const mid = [(BOX.s + BOX.n) / 2, (BOX.w + BOX.e) / 2];

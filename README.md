@@ -13,6 +13,7 @@ O **AresNav** é um protótipo de planejamento de caminhadas (EVA) em Marte. Jun
 
 ## 🛰️ As 3 Camadas Científicas da NASA Unificadas
 1. **Topografia & Altimetria (MGS MOLA + Mars Express HRSC):** relevo de 200 m por ponto e declive calculado dele. Mostra o caminho geral e as encostas fortes; não enxerga pedras nem degraus menores que isso.
+1. **Relevo HiRISE de 1 m (MRO HiRISE, USGS Astrogeology):** o modelo de terreno usado no pouso do Perseverance. Depois de traçar a rota, o app lê o relevo de 1 m ao longo dela e mede o declive real a cada 5 m; trechos curtos acima do limite aparecem no mapa. No capacete, o chão em volta de quem anda usa esse relevo. O backend lê só os blocos de 256 x 256 m necessários (de um arquivo de 1,8 GB) e guarda em cache.
 2. **Meteorologia Marciana (Perseverance MEDA):** mínima, máxima e pressão do último sol que a NASA publicou (`/api/v1/weather`), com a data e a idade do dado.
    - O feed público do MEDA não traz vento, poeira nem radiação. Esses valores vêm do contrato e aparecem com o selo **SAMPLE**.
    - O nascer e o pôr do Sol de hoje são calculados com o algoritmo do Mars24 e conferidos contra os horários do próprio MEDA (menos de 1 min de diferença).
@@ -37,7 +38,7 @@ Rota científica → risco explicado → comparação → panorama real do local
 ---
 
 ## ⚠️ Limites (dizemos isso na apresentação)
-- **Relevo de 200 m:** escolhe o caminho geral, mas esconde pedras e degraus. Confira os trechos marcados na imagem HiRISE.
+- **Relevo de 200 m:** escolhe o caminho geral, mas esconde pedras e degraus. O relevo de 1 m confere o corredor da rota depois, mas não muda o caminho escolhido, e só existe na área do mosaico (cerca de 37 x 39 km em volta do pouso). Pedras menores que ~2 m continuam invisíveis.
 - **Calibração:** o relevo fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m). O app mostra isso no "Por quê?".
 - **Física simulada:** consumo de O₂, batimentos e ritmo × carga vêm de um modelo, não de um traje real. As hipóteses e o peso de cada uma estão em [`docs/HIPOTESES.md`](docs/HIPOTESES.md).
 - **Clima em dois conjuntos:** temperatura e pressão são medições reais do MEDA, mas datadas (último sol público: abril de 2024). Vento, radiação e poeira são valores de exemplo, com o selo SAMPLE. Esses valores não entram no cálculo do veredito; só a idade da medição aparece como ressalva no checklist.

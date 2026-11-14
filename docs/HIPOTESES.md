@@ -16,6 +16,7 @@ Os parâmetros estão em `frontend/physics.js` (`SLOPE_RULE` e `ALGORITHM`, vers
 | Ritmo de caminhada (Tobler) | 2,7 km/h no plano, pico em descida suave | função de Tobler com v₀ de astronauta de traje (referência SEXTANT/Apollo) | forma clássica; o valor de v₀ é hipótese |
 | Antena do habitat e capacete | 2 m e 1,7 m | escolha de projeto | hipótese (uma antena mais alta muda muito o resultado do rádio) |
 | Relevo | HRSC + MOLA, 200 m por ponto | NASA Mars Trek | **dado real**. Não enxerga pedras nem degraus; fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m) |
+| Relevo do corredor | HiRISE DTM controlado, 1 m (JEZ_hirise_soc_006) | USGS Astrogeology / MRO HiRISE | **dado real**. Declive medido em 5 m; limite do trecho íngreme = limite da rota. Difere do de 200 m em 3 a 6 m na base |
 | Clima: temperatura e pressão (MEDA) | mínima, máxima e pressão do último sol publicado | feed público do MEDA, via `/api/v1/weather` | **medição real e datada**, não leitura ao vivo. O app mostra a data e a idade do dado; o último sol público é de abril de 2024 |
 | Clima: vento, radiação e poeira | valores do contrato | `CONTRATO_API.json` | **valores de exemplo** (selo SAMPLE). O feed público do MEDA não traz essas grandezas |
 | Nascer e pôr do Sol | calculados para a data de hoje | algoritmo do Mars24, em `frontend/mars-sun.js` | **calculado**, conferido contra os horários do MEDA (menos de 1 min de diferença) |
@@ -64,5 +65,5 @@ Para uma rota com pico de 11°, a carga a partir da qual ela vira NO-GO cai de 2
 
 ## O que mudaria isso em um projeto real
 - Limites de declive e consumo medidos com o traje em ensaio (por exemplo, dados de caminhadas análogas da NASA).
-- Relevo HiRISE de 1 m em Jezero no lugar do de 200 m.
+- Relevo HiRISE de 1 m também na escolha do caminho (hoje ele só confere o corredor da rota de 200 m e dá o chão do capacete).
 - Clima do dia da caminhada, com vento, radiação e poeira medidos. Hoje só temperatura e pressão são medições, e de um sol antigo (o GeoJSON exportado registra a idade do dado).
