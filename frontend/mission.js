@@ -52,7 +52,7 @@ const modal = document.createElement('div');
 modal.className = 'modal'; modal.id = 'whyModal'; modal.hidden = true; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
 modal.innerHTML = '<div class="modal-card why-card"><header><div><small>Explicação do veredito</small><h3 id="whyTitle"></h3></div><button id="whyClose" aria-label="Fechar">✕</button></header><div id="whyBody"></div></div>';
 document.body.appendChild(modal);
-$('#whyBtn').onclick = () => { renderWhy(); modal.hidden = false; };
+$('#whyBtn').onclick = async () => { renderWhy(); modal.hidden = false; if (!calib) { await calibrate(); if (!modal.hidden) renderWhy(); } };   // calibração só quando alguém pede
 $('#whyClose').onclick = () => { modal.hidden = true; };
 modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
 window.addEventListener('keydown', e => { if (e.key === 'Escape') modal.hidden = true; });
@@ -114,6 +114,7 @@ async function sha256(text) {
 }
 $('#exportBtn').onclick = async () => {
   const st = A.state; if (!st.path) { alert(tr('Sem rota para exportar.')); return; }
+  if (!calib) await calibrate();
   const P = plan(), coords = st.path.map(c => { const p = A.cellLL(c); return [+p[1].toFixed(6), +p[0].toFixed(6), Math.round(A.HGT[c] * 10) / 10]; });
   const feats = [
     { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { kind: 'route', mode: st.mode, distance_m: Math.round(st.info.dist), climb_m: Math.round(st.info.climb), max_slope_deg: +st.info.maxS.toFixed(1), walk_out_min: +P.wt.outMin.toFixed(1), walk_back_min: +P.wt.backMin.toFixed(1), total_min: +st.plan.total.toFixed(1), o2_at_return_pct: +st.plan.o2.toFixed(1) } },
@@ -407,6 +408,6 @@ setInterval(renderComm, 1000);   // a telemetria refaz o painel a cada leitura: 
 A.on('layers', () => { drawPlan(); drawGlobal(); drawFub(); });
 A.on('view', () => setTimeout(() => { drawPlan(); drawGlobal(); drawFub(); }, 50));
 A.on('uplink', () => setTimeout(drawGlobal, 300));
-A.on('ready', () => { computePlanOverlays(); computeReach(); drawPlan(); drawGlobal(); loadZones(); calibrate(); loadFub(); });
+A.on('ready', () => { computePlanOverlays(); computeReach(); drawPlan(); drawGlobal(); loadZones(); loadFub(); });
 A.marsTime = marsTime; A.mission = { plan, commInfo, get reach() { return reach; }, get calib() { return calib; }, LANDINGS, get zones() { return zones; }, FUB };
 })();
