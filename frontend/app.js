@@ -106,6 +106,9 @@ const DEFAULT_GOAL = POIS.find(p => p.sol === 606);
 
 /* ---------- Relevo ---------- */
 let HGT = null, SL = null, GDEM = null, RDEM = null;
+/* Relevo sob demanda: blocos de 2° x 2° (HRSC + MOLA, ~230 m) pedidos ao backend para qualquer lugar de Marte */
+const PATCH = new Map(), PATCH_LOADING = new Set(), PS = 2, PN = 513;
+const patchKey = (lat, lon) => (Math.floor(lat / PS) * PS) + '_' + (Math.floor((((lon + 540) % 360) - 180) / PS) * PS);
 const GW = 1024, GH = 512;
 const REG = { x0: 73.9, x1: 80.9, y0: 14.9, y1: 21.9, n: 560 }; // relevo regional em volta de Jezero (HRSC + MOLA, ~740 m)
 const idx = (c, r) => r * W + c;
@@ -132,11 +135,42 @@ function heightAt(lat, lon) {
     const r = bilinear(RDEM, REG.n, REG.n, (lon - REG.x0) / (REG.x1 - REG.x0) * REG.n - 0.5, (REG.y1 - lat) / (REG.y1 - REG.y0) * REG.n - 0.5);
     g += (r - g) * ramp(REG.x0, REG.x1, REG.y0, REG.y1, 0.2);
   }
+  if (PATCH.size) {
+    const pt = PATCH.get(patchKey(lat, lon));
+    if (pt) { const py = Math.floor(lat / PS) * PS, px = Math.floor(lon / PS) * PS; g = bilinear(pt, PN, PN, (lon - px) / PS * PN - 0.5, (py + PS - lat) / PS * PN - 0.5); }
+  }
   if (!HGT || lon < XMIN || lon > XMAX || lat < YMIN || lat > YMAX) return g;
   const j = bilinear(HGT, W, H, (lon - XMIN) / DX - 0.5, (YMAX - lat) / DY - 0.5);
   return g + (j - g) * ramp(XMIN, XMAX, YMIN, YMAX, 0.1);
 }
 const slopeAt = (lat, lon) => { const i = cellOf(lat, lon); return i < 0 || !SL ? -1 : SL[i]; };
+/* Declive em qualquer ponto de Marte, pela diferença de altitude a 300 m em cada direção */
+function slopeAny(lat, lon) {
+  const d = 300, dLat = d / (R_MARS * Math.PI / 180), dLon = dLat / Math.max(0.05, Math.cos(lat * Math.PI / 180));
+  const gx = (heightAt(lat, lon + dLon) - heightAt(lat, lon - dLon)) / (2 * d), gy = (heightAt(lat + dLat, lon) - heightAt(lat - dLat, lon)) / (2 * d);
+  return Math.atan(Math.hypot(gx, gy)) * 180 / Math.PI;
+}
+/* Garante o relevo real em volta de um ponto (bloco do ponto e vizinhos). Avisa o globo quando chega dado novo. */
+let terrainTimer = null;
+function ensurePatch(lat, lon, ring) {
+  if (!link.online || state.forceOffline) return Promise.resolve(false);
+  const jobs = [], r = ring == null ? 1 : ring;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const py = Math.floor(lat / PS) * PS + dy * PS, px = Math.floor((((lon + dx * PS + 540) % 360) - 180) / PS) * PS;
+    if (py < -90 || py > 88) continue;
+    const key = py + '_' + px;
+    if (PATCH.has(key) || PATCH_LOADING.has(key)) continue;
+    PATCH_LOADING.add(key);
+    jobs.push(fetchT(`${API}/dem/patch/${py}/${px}`, 20000).then(res => res.ok ? res.arrayBuffer() : null).then(buf => {
+      if (!buf || buf.byteLength < PN * PN * 2) return false;
+      PATCH.set(key, new Int16Array(buf.slice(0, PN * PN * 2)));
+      if (PATCH.size > 30) PATCH.delete(PATCH.keys().next().value); // guarda só os 30 blocos mais recentes
+      clearTimeout(terrainTimer); terrainTimer = setTimeout(() => emit('terrain', state), 350);
+      return dy === 0 && dx === 0;
+    }).catch(() => false).finally(() => PATCH_LOADING.delete(key)));
+  }
+  return Promise.all(jobs).then(list => list.some(Boolean));
+}
 
 async function loadDem() {
   let buf = null, live = false;
@@ -230,19 +264,46 @@ function setPayload(kg, silent) {
   $('#payloadFx').textContent = `Limite de declive ${num(LIM.safe, 1)}° (${NO_LOAD_SLOPE}° sem carga) · consumo de O₂ ×${num(Physics.metabolicFactor(kg), 2)}`;
   if (!silent && state.ready) { if (state.goalLL) setGoalLL(state.goalLL[0], state.goalLL[1], state.goalPoi); else renderPanel(); }
 }
-/* Aviso por voz quando o veredito vira NO-GO */
-function announce(v) {
-  const kg = num(state.payloadKg, 1), lim = num(LIM.safe, 1);
-  const msg = v.code === 'SLOPE'
-    ? `Atenção. Com ${kg} quilos de carga, o limite de declive cai para ${lim} graus e a rota fica bloqueada. Reduza a carga ou desvie por terreno mais plano.`
-    : `Atenção. Com ${kg} quilos de carga, o oxigênio previsto na volta cai para ${Math.max(0, Math.round(state.plan ? state.plan.o2 : 0))} por cento. Reduza a carga ou encurte a rota.`;
+/* ---------- Voz do copiloto ---------- */
+/* Escolhe a melhor voz instalada para o idioma: as "Natural"/"Neural"/"Google" soam muito menos robóticas */
+let voices = [];
+function loadVoices() { try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { voices = []; } }
+if ('speechSynthesis' in window) { loadVoices(); try { window.speechSynthesis.addEventListener('voiceschanged', loadVoices); } catch (e) { /* navegador antigo */ } }
+function bestVoice(lang) {
+  const pre = lang.slice(0, 2).toLowerCase();
+  const score = v => (v.lang.toLowerCase() === lang.toLowerCase() ? 4 : 0) + (/natural|neural/i.test(v.name) ? 6 : 0) + (/google/i.test(v.name) ? 4 : 0) + (/online/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
+  return voices.filter(v => v.lang.toLowerCase().startsWith(pre)).sort((x, y) => score(y) - score(x))[0] || null;
+}
+/* Bipe curto de rádio antes da fala */
+function radioBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+    const ctx = radioBeep.ctx || (radioBeep.ctx = new Ctx()), t = ctx.currentTime;
+    [[880, 0], [1320, 0.11]].forEach(([f, d]) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.12, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.09); o.start(t + d); o.stop(t + d + 0.1); });
+  } catch (e) { /* sem áudio */ }
+}
+function speak(msg) {
   state.lastVoice = msg;
   try {
     if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(msg); u.lang = 'pt-BR'; u.rate = 1.05;
-    window.speechSynthesis.speak(u);
+    const lang = window.LANG === 'en' ? 'en-US' : 'pt-BR';
+    window.speechSynthesis.cancel(); radioBeep();
+    const u = new SpeechSynthesisUtterance(msg), v = bestVoice(lang);
+    u.lang = lang; if (v) u.voice = v;
+    u.rate = 1.02; u.pitch = 0.92; u.volume = 1;
+    setTimeout(() => window.speechSynthesis.speak(u), 240);
   } catch (e) { /* navegador sem voz: o alerta visual continua valendo */ }
+}
+/* Aviso por voz quando o veredito vira NO-GO. Frases curtas e imperativas, estilo controle de missão. */
+function announce(v) {
+  const say = v => num(Math.round(v * 10) / 10, v % 1 ? 1 : 0);   // "25" em vez de "25,0" na fala
+  const kg = say(state.payloadKg), lim = say(LIM.safe), o2 = Math.max(0, Math.round(state.plan ? state.plan.o2 : 0));
+  const en = window.LANG === 'en';
+  speak(v.code === 'SLOPE'
+    ? (en ? `Helena, no go. Payload ${kg} kilograms. Safe slope limit is now ${lim} degrees. Route blocked. Drop payload or divert to flatter ground.`
+      : `Helena, no go. Carga de ${kg} quilos. Limite de declive agora em ${lim} graus. Rota bloqueada. Reduza a carga ou desvie por terreno plano.`)
+    : (en ? `Helena, no go. Payload ${kg} kilograms. Oxygen at return forecast at ${o2} percent, below the 30 percent reserve. Drop payload or shorten the route.`
+      : `Helena, no go. Carga de ${kg} quilos. Oxigênio previsto na volta em ${o2} por cento, abaixo da reserva de 30. Reduza a carga ou encurte a rota.`));
 }
 
 /* ---------- Mapa 2D (Leaflet) ---------- */
@@ -261,7 +322,7 @@ function buildTiles() {
     });
     return lyr;
   };
-  T = { detail: tiles('detail'), tint: link.mapsOnline ? tiles('viking', { className: 'colorize' }) : L.layerGroup(), viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }) };
+  T = { detail: tiles('detail'), tint: link.mapsOnline ? tiles('viking', { className: 'colorize' }) : L.layerGroup(), wash: tiles('viking', { className: 'colorize' }), viking: tiles('viking'), ctx: tiles('ctx'), hirise: tiles('hirise'), mosaic: tiles('mosaic'), relief: tiles('relief'), themis: tiles('themis', { opacity: 0.6 }) };
 }
 /* Troca a origem dos blocos (backend <-> cópia local) sem recarregar a página */
 function rebuildTiles() {
@@ -290,7 +351,7 @@ function initMap() {
   $('#m-jezero').onclick = () => map.flyTo([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
 }
 /* ordem de baixo para cima: cor Viking, detalhe THEMIS, cor Viking de novo (tingindo o detalhe), mosaico regional, CTX, HiRISE */
-const BASES = { hirise: ['viking', 'detail', 'tint', 'mosaic', 'ctx', 'hirise'], mosaic: ['viking', 'detail', 'tint', 'mosaic'], relief: ['relief'] };
+const BASES = { hirise: ['viking', 'detail', 'tint', 'mosaic', 'ctx', 'hirise', 'wash'], mosaic: ['viking', 'detail', 'tint', 'mosaic', 'wash'], relief: ['relief'] };
 function layerState() {
   return { base: document.querySelector('input[name="base"]:checked').value, slope: $('#ov-slope').checked, themis: $('#ov-themis').checked, crism: $('#ov-crism').checked, rover: $('#ov-rover').checked, poi: $('#ov-poi').checked };
 }
@@ -335,8 +396,8 @@ function openTruth(t) {
   $('#truthTitle').textContent = t.title; $('#truthSub').textContent = t.sub || '';
   const s = slopeAt(t.lat, t.lon);
   $('#truthFacts').innerHTML = [
-    ['Posição', `${t.lat.toFixed(4)}° N  ${t.lon.toFixed(4)}° L`], ['Altitude', Math.round(heightAt(t.lat, t.lon)).toLocaleString('pt-BR') + ' m'],
-    ['Declive local', s < 0 ? 'fora da área detalhada' : s.toFixed(1).replace('.', ',') + '°'],
+    ['Posição', `${t.lat.toFixed(4)}° N  ${t.lon.toFixed(4)}° L`], ['Altitude', Math.round(heightAt(t.lat, t.lon)).toLocaleString(LOC) + ' m'],
+    ['Declive local', s < 0 ? 'fora da área detalhada' : num(s, 1) + '°'],
     t.mineral ? ['Mineral', t.mineral] : null, t.safe != null ? ['Rota segura', t.safe ? 'sim' : 'não'] : null
   ].filter(Boolean).map(([a, b]) => `<div><span>${a}</span><b>${b}</b></div>`).join('');
   $('#truthCtx').textContent = t.context || '';
@@ -485,7 +546,7 @@ function simAt(t) {
 }
 
 /* ---------- Estado ---------- */
-const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [], payloadKg: null, forceOffline: false, verdict: null, speed: 1.5 };
+const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', dropMode: false, op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [], payloadKg: null, forceOffline: false, verdict: null, speed: 1.5 };
 
 function recompute(keepTime) {
   if (!HGT) return;
@@ -528,6 +589,7 @@ const setGoalPoi = p => setGoalLL(p.lat, p.lon, p);
 function nearPoi(lat, lon, maxM) { let best = null, bd = maxM; for (const p of POIS) { const d = metersBetween(lat, lon, p.lat, p.lon); if (d < bd) { bd = d; best = p; } } return best; }
 /* Clique no mapa ou no globo: em cima de um ponto abre a foto de solo; em terreno livre define o destino */
 function pick(lat, lon) {
+  if (state.dropMode) return dropAt(lat, lon);
   const targets = (state.tele && state.tele.layers && state.tele.layers.science_targets) || [];
   const t = targets.find(q => metersBetween(lat, lon, q.lat, q.lng) < 250);
   if (t) return openTruth(targetTruth(t));
@@ -535,11 +597,18 @@ function pick(lat, lon) {
   if (p && p.k !== 'base') return openTruth(poiTruth(p));
   setGoalLL(lat, lon, null);
 }
+/* Soltar o astronauta em qualquer ponto de Marte: carrega o relevo real do lugar e entra no capacete (Terreno 3D) */
+function setDropMode(on) { state.dropMode = !!on; document.body.classList.toggle('drop-mode', state.dropMode); emit('drop', state.dropMode); }
+function dropAt(lat, lon) {
+  setDropMode(false);
+  ensurePatch(lat, lon, 1);
+  if (api.helmet) api.helmet.dropAt(lat, lon);
+}
 function readout(lat, lon) {
   const i = HGT ? cellOf(lat, lon) : -1, p = nearPoi(lat, lon, 250), pos = `${lat.toFixed(4)}° N  ${lon.toFixed(4)}° L`;
   $('#readout').textContent = i < 0
-    ? `${pos} · altitude ${Math.round(heightAt(lat, lon)).toLocaleString('pt-BR')} m (MOLA global)`
-    : `${pos} · altitude ${Math.round(HGT[i]).toLocaleString('pt-BR')} m · declive ${SL[i].toFixed(1).replace('.', ',')}°${p ? ' · ' + p.n : ''}`;
+    ? `${pos} · altitude ${Math.round(heightAt(lat, lon)).toLocaleString(LOC)} m (MOLA global)`
+    : `${pos} · altitude ${Math.round(HGT[i]).toLocaleString(LOC)} m · declive ${num(SL[i], 1)}°${p ? ' · ' + p.n : ''}`;
 }
 
 /* ---------- Desenho da rota no mapa 2D ---------- */
@@ -579,26 +648,26 @@ function drawProfile() {
   c.width = w * d; c.height = h * d;
   const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h);
   const muted = cssv('--muted'), line = cssv('--line'), col = SLOPE_COL(); x.font = `11px ${cssv('--mono')}`;
-  if (!state.info) { x.fillStyle = muted; x.fillText(HGT ? 'Sem rota possível até esse ponto.' : 'Carregando relevo…', 8, 24); return; }
+  if (!state.info) { x.fillStyle = muted; x.fillText(window.T(HGT ? 'Sem rota possível até esse ponto.' : 'Carregando relevo…'), 8, 24); return; }
   const pr = state.info.prof, L0 = 56, R0 = 10, T1 = 10, B0 = 22, tot = pr[pr.length - 1].d || 1;
   let mn = Infinity, mx = -Infinity; pr.forEach(p => { mn = Math.min(mn, p.h); mx = Math.max(mx, p.h); });
   mn = Math.floor(mn / 10) * 10 - 10; mx = Math.ceil(mx / 10) * 10 + 10;
   const X = v => L0 + (w - L0 - R0) * v / tot, Y = v => T1 + (h - T1 - B0) * (1 - (v - mn) / (mx - mn));
   x.strokeStyle = line; x.lineWidth = 1;
-  [mn, (mn + mx) / 2, mx].forEach(v => { x.beginPath(); x.moveTo(L0, Y(v)); x.lineTo(w - R0, Y(v)); x.stroke(); x.fillStyle = muted; x.fillText(Math.round(v).toLocaleString('pt-BR'), 4, Y(v) + 4); });
+  [mn, (mn + mx) / 2, mx].forEach(v => { x.beginPath(); x.moveTo(L0, Y(v)); x.lineTo(w - R0, Y(v)); x.stroke(); x.fillStyle = muted; x.fillText(Math.round(v).toLocaleString(LOC), 4, Y(v) + 4); });
   x.beginPath(); x.moveTo(X(0), Y(mn)); pr.forEach(p => x.lineTo(X(p.d), Y(p.h))); x.lineTo(X(tot), Y(mn)); x.closePath();
   x.fillStyle = 'rgba(0,255,170,.08)'; x.fill();
   x.lineWidth = 2.2;
   for (let k = 1; k < pr.length; k++) { x.strokeStyle = col[slopeClass(pr[k].s)]; x.beginPath(); x.moveTo(X(pr[k - 1].d), Y(pr[k - 1].h)); x.lineTo(X(pr[k].d), Y(pr[k].h)); x.stroke(); }
   x.fillStyle = muted; const kmT = tot / 1000, step = (kmT > 8 ? 2 : kmT > 4 ? 1 : kmT > 2 ? 0.5 : 0.25) * (w < 380 ? 2 : 1); // menos marcas quando o gráfico é estreito
-  for (let k = 0; k <= kmT + 1e-6; k += step) { const px = X(k * 1000); x.fillText(k.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' km', Math.min(Math.max(px - 10, L0 - 10), w - R0 - 50), h - 6); }
+  for (let k = 0; k <= kmT + 1e-6; k += step) { const px = X(k * 1000); x.fillText(k.toLocaleString(LOC, { maximumFractionDigits: 2 }) + ' km', Math.min(Math.max(px - 10, L0 - 10), w - R0 - 50), h - 6); }
 }
 
 /* ---------- Painel do plano e checklist ---------- */
-const fmtKm = m => (m / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
+const fmtKm = m => (m / 1000).toLocaleString(LOC, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
 const fmtMin = m => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h} h ${String(r).padStart(2, '0')}` : `${r} min`; };
 const clock = m => { m = Math.round(m); return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
-const num = (v, d) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const num = (v, d) => Number(v).toLocaleString(LOC, { minimumFractionDigits: d, maximumFractionDigits: d });
 function renderChecklist() {
   const I = state.info, P = state.plan, t = state.tele, ls = state.linkState;
   const meda = t && t.layers && t.layers.atmosphere_meda, payload = state.payloadKg;
@@ -648,10 +717,34 @@ function renderPanel() {
     if (o2 < 30) alerts.push(['var(--crit)', `Reserva de oxigênio prevista de ${Math.max(0, Math.round(o2))}% na chegada, abaixo dos 30% exigidos.`]);
     if (state.mode === 'short' && I.maxS > LIM.safe) alerts.push(['var(--crit)', `A rota curta passa por declive de ${Math.round(I.maxS)}°. A rota segura é recomendada.`]);
     alerts.push(['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']);
-    sp.innerHTML = stops.length ? stops.map(s => `<div class="stop"><span class="dot" style="--c:${KIND[s.p.k]}"></span><b>${s.p.n}${s.isGoal ? ' · destino' : ''}</b><span class="km">km ${num(s.km, 1)}</span><small>${s.p.why} <span class="mono">${s.p.src}</span></small></div>`).join('') : '<p class="note">Nenhum alvo científico a menos de 300 m da rota.</p>';
+    sp.innerHTML = renderItinerary();
   }
   state.alerts = alerts;
   al.innerHTML = alerts.map(([c, t]) => `<li class="alert" style="--c:${c}">${t}</li>`).join('');
+}
+/* Roteiro passo a passo: cada trecho com rumo, distância, tempo, hora de chegada, oxigênio e declive máximo */
+const CARD8 = window.LANG === 'en' ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] : ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+const cardinal = b => CARD8[Math.round(b / 45) % 8];
+function renderItinerary() {
+  const path = state.path, sim = state.sim; if (!path || !sim) return '';
+  const cum = [0]; for (let k = 1; k < path.length; k++) cum.push(cum[k - 1] + cellDist(path[k - 1], path[k]));
+  const arriveT = k => { const e = sim.S.find(x => x.k === k && x.phase === 'Ida'); return e ? e.t : 0; };
+  const legs = [], last = path.length - 1;
+  const pts = state.stops.filter(x => x.k > 0).map(x => ({ k: x.k, name: x.p.n, why: x.p.why, color: KIND[x.p.k], wait: x.isGoal ? 40 : 15 }));
+  if (!pts.length || pts[pts.length - 1].k !== last) pts.push({ k: last, name: 'Destino escolhido no mapa', why: '', color: cssv('--route'), wait: 30 });
+  let prev = 0, tPrevLeave = 0;
+  pts.forEach((p, i) => {
+    if (p.k === prev && i > 0) { legs[legs.length - 1].also.push(p.name); return; }
+    const a = cellLL(path[prev]), b = cellLL(path[p.k]), t = arriveT(p.k);
+    let maxS = 0; for (let k = prev; k <= p.k; k++) maxS = Math.max(maxS, SL[path[k]]);
+    legs.push({ name: p.name, why: p.why, color: p.color, dist: cum[p.k] - cum[prev], walk: t - tPrevLeave, at: t, o2: Physics.o2AtReturn(t, state.payloadKg, EVA_MAX), maxS, brg: bearing(a[0], a[1], b[0], b[1]), wait: p.wait, also: [] });
+    prev = p.k; tPrevLeave = t + p.wait;
+  });
+  const I = state.info, backBrg = bearing(...cellLL(path[last]), ...cellLL(path[0]));
+  const row = (n, l) => `<div class="leg"><span class="n" style="--c:${l.color}">${n}</span><b>${l.name}</b><span class="km">${fmtKm(l.dist)} · ${fmtMin(l.walk)}</span>
+    <small><span class="mono">rumo ${String(Math.round(l.brg)).padStart(3, '0')}° (${cardinal(l.brg)}) · chegada ${clock(T0 + l.at)} · O₂ ${Math.round(l.o2)}% · declive máx. ${num(l.maxS, 1)}°</span>${l.wait ? ` · parada de ${l.wait} min` : ''}${l.also.length ? ' · também: ' + l.also.join(', ') : ''}${l.why ? '<br>' + l.why : ''}</small></div>`;
+  return legs.map((l, i) => row(i + 1, l)).join('') +
+    row('↩', { name: 'Volta para a base', why: '', color: '#E8ECF8', dist: I.dist, walk: I.tBack, at: sim.total, o2: state.plan.o2, maxS: I.maxS, brg: backBrg, wait: 0, also: [] });
 }
 function renderEmergency() {
   const em = $('#emcard');
@@ -751,7 +844,7 @@ async function start() {
 }
 
 const api = {
-  $, cssv, on, emit, throttle, start, state, setPayload, API_BASE, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
+  $, cssv, on, emit, throttle, start, state, setPayload, API_BASE, ensurePatch, slopeAny, setDropMode, dropAt, speak, helmet: null, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
   heightAt, slopeAt, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,

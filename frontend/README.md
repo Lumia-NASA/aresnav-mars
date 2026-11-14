@@ -14,10 +14,26 @@ O navegador **nunca chama a NASA direto** (skill `01-frontend-hud-skill`). Image
 | Trajeto do Perseverance | `/api/v1/traverse` |
 | Blocos de imagem do Mars Trek | `/api/v1/tiles/:camada/:z/:y/:x` |
 | Relevo de Jezero (200 m) | `/api/v1/dem/jezero` |
+| Relevo de qualquer lugar de Marte | `/api/v1/dem/patch/:lat/:lon` |
 | Minerais hidratados (CRISM) | `/api/v1/crism` |
 | Fotos da Navcam | `/api/v1/navcam/...` |
 
 Se o backend cair ou responder `degraded: true`, o app entra em **redundância local** e mostra `OFFLINE TELEMETRY (CACHED)`: usa a última telemetria guardada, o relevo e o trajeto da pasta `data/` e um conjunto pequeno de imagens em `data/tiles/`. As fotos do rover e o zoom de alta resolução só funcionam com o backend.
+
+## Idiomas
+
+A interface abre em **inglês** (idioma da submissão) e tem **português** pelo botão no canto superior direito. A escolha fica guardada no navegador; também dá para forçar com `?lang=en` ou `?lang=pt` no endereço. Números, datas, pontos cardeais e o aviso por voz acompanham o idioma. O código escreve os textos em português e `i18n.js` traduz o que entra na tela.
+
+## Descer em qualquer lugar de Marte
+
+1. Clique no bonequinho (canto inferior direito) e depois em qualquer ponto do globo ou do mapa. Ou use a busca e desça lá.
+2. O app pede ao backend o relevo real do lugar (`/api/v1/dem/patch/:lat/:lon`: blocos de 2° × 2°, HRSC + MOLA, cerca de 230 m por ponto) e põe a câmera a 1,7 m do chão, em **escala real**.
+3. No Capacete, modo Terreno 3D:
+   - **Passo real:** 2,9 km/h a 1,7 m do chão (Shift = 5,8 km/h).
+   - **Visualização:** `E` sobe, `Q` desce (ou a roda do mouse, ou o controle "Altura", de 1,7 m a 20 km); a velocidade cresce com a altura.
+   - O rodapé do visor mostra latitude, longitude, altitude do chão, sua altura e o declive local, tudo calculado do relevo da NASA.
+
+No globo, o relevo também está em escala real; o botão `1×` / `2,5×` exagera a altura só para leitura na vista de cima. No chão a escala é sempre 1×. Como HiRISE e CTX são imagens em tons de cinza, o modo de caminhada aplica um filtro que pinta os cinzas com a paleta do solo marciano.
 
 ## Interface
 
@@ -46,6 +62,8 @@ Outros componentes:
 - **Rotas com gradiente de perigo**: a rota a pé e o trajeto do rover são coloridos pelo declive (verde até 4°, âmbar de 4° a 8°, vermelho acima de 8°).
 - **Carga do traje**: o limite de declive seguro vem do contrato (`max_safe_slope_deg`, 12° com 18,5 kg; 15° sem carga) e é o limite usado no cálculo da rota.
 - **HUD a 1 Hz**: os textos do HUD e da telemetria atualizam uma vez por segundo.
+- **Roteiro passo a passo**: cada trecho da caminhada com rumo, distância, tempo, hora de chegada, oxigênio previsto e declive máximo.
+- **Voz do copiloto**: o aviso de NO-GO usa a melhor voz instalada no navegador para o idioma (as "Natural"/"Neural" soam bem melhor), com um bipe de rádio antes.
 
 ## Como rodar
 
@@ -127,7 +145,8 @@ Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` o
 ## Limitações conhecidas
 
 - O relevo da rota tem 200 m de resolução. Serve pra escolher o caminho geral, mas esconde pedras e degraus. Próximo passo: DTM HiRISE de 1 m de Jezero (`JEZ_hirise_soc_006_DTM...` no catálogo do Mars Trek).
-- No globo 3D a altura do relevo está exagerada 2,5× para dar leitura.
+- Fora de Jezero o relevo sob demanda tem cerca de 230 m por ponto e a imagem é THEMIS de 100 m com cor do Viking: de perto, no chão, fica borrado. A geometria (montanhas, crateras, cânions) é real.
+- A qualidade da voz depende das vozes instaladas no navegador de quem apresenta.
 - A skill cita a camada `Mars_MGS_MOLA_ClrShade_blend_mola_128ppd`, mas esse endereço responde 404 no Mars Trek. O app usa a equivalente `Mars_MOLA_blend200ppx_HRSC_ClrShade` (MOLA + HRSC).
 - A bússola do Capacete é aproximada: usa a orientação do rover informada nos metadados da foto, sem corrigir a inclinação do terreno.
 - As faixas de panorama da Navcam vêm em preto e branco e recebem um tom de cor no app. Elas cobrem 26° de altura, então acima e abaixo aparece um fundo liso.
@@ -143,6 +162,7 @@ Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` o
 - `globe.js`: globo 3D (CesiumJS)
 - `helmet.js`: modo Capacete (fotos do rover e terreno 3D)
 - `ui.js`: casca da interface (painéis, busca, controles do mapa, barra de estado)
+- `i18n.js`: idiomas (inglês e português)
 - `telemetry.js`: modo Telemetria
 - `data/`: redundância local (relevo, trajeto, telemetria e `tiles/`) e o índice de panoramas
 - `../tools/build-pano-cache.py`: gera o índice de panoramas

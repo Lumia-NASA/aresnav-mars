@@ -100,11 +100,13 @@ function follow() {
 }
 
 /* ---------- Terreno 3D ---------- */
-function setMode(m) {
-  if (m === mode) return;
+function setMode(m, at) {
+  if (m === mode && !at) return;
   if (m === 'terrain') {
-    const p = position() || { lat: A.BASE.lat, lon: A.BASE.lon };
-    if (!A.globe.enterWalk($('#view-helmet'), p.lat, p.lon, viewAz)) return;
+    const p = at || position() || { lat: A.BASE.lat, lon: A.BASE.lon };
+    if (mode === 'terrain') A.globe.teleport(p.lat, p.lon);
+    else if (!A.globe.enterWalk($('#view-helmet'), p.lat, p.lon, viewAz)) return;
+    A.ensurePatch(p.lat, p.lon, 1);   // pede à NASA (pelo backend) o relevo real deste lugar
   } else A.globe.exitWalk();
   mode = m;
   $('#pano').classList.toggle('terrain', m === 'terrain');
@@ -113,13 +115,13 @@ function setMode(m) {
 }
 
 /* ---------- HUD ---------- */
-const CARD = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+const CARD = window.LANG === 'en' ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] : ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
 const dist = m => m >= 1000 ? A.fmtKm(m) : Math.round(m) + ' m';
 function target() {
   const st = A.state, n = st.now, me = position(); if (!me) return null;
   const back = !manual && mode === 'photo' && n && (n.phase === 'Volta' || n.phase === 'De volta à base');
   const toBase = back || !st.goalLL, to = toBase ? [A.BASE.lat, A.BASE.lon] : st.goalLL;
-  return { name: toBase ? 'BASE' : (st.goalPoi ? st.goalPoi.n : 'Destino').toUpperCase(), d: A.metersBetween(me.lat, me.lon, to[0], to[1]), b: A.bearing(me.lat, me.lon, to[0], to[1]) };
+  return { name: toBase ? 'BASE' : T(st.goalPoi ? st.goalPoi.n : 'Destino escolhido no mapa').toUpperCase(), d: A.metersBetween(me.lat, me.lon, to[0], to[1]), b: A.bearing(me.lat, me.lon, to[0], to[1]) };
 }
 function renderCompass() {
   const tape = $('#hudTape'), w = tape.getBoundingClientRect().width || 420, pp = w / 110;
@@ -145,7 +147,18 @@ function renderTarget() {
 }
 const bar = (pct, color) => `<span class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${color}"></i></span>`;
 const tone = (v, warn, crit) => v <= crit ? 'var(--crit)' : v <= warn ? 'var(--warn)' : 'var(--ok)';
-const num = (v, d) => v.toFixed(d).replace('.', ',');
+const num = (v, d) => A.num(v, d);
+/* Altura do observador: de 1,7 m (em pé) até 20 km. O controle é logarítmico para dar precisão perto do chão. */
+const altSpan = () => Math.log(A.globe.ALT_MAX / A.globe.EYE);
+const altToSlider = m => Math.round(Math.log(m / A.globe.EYE) / altSpan() * 1000);
+const sliderToAlt = v => A.globe.EYE * Math.exp(v / 1000 * altSpan());
+const altText = m => m < 10 ? num(m, 1) + ' m' : m < 1000 ? Math.round(m) + ' m' : num(m / 1000, 1) + ' km';
+function syncAlt() {
+  const sl = $('#hudAlt'), w = A.globe.walk; if (!sl) return;
+  if (document.activeElement !== sl) sl.value = altToSlider(w.alt);
+  $('#hudAltVal').textContent = altText(w.alt);
+  document.querySelectorAll('#hudSols [data-pace]').forEach(b => b.setAttribute('aria-pressed', b.dataset.pace === w.pace));
+}
 const STATUS_PT = { FOLLOWING_SAFE_CONTOUR: 'seguindo contorno seguro', HAZARD_STEEP: 'declive perigoso', NOMINAL: 'nominal', SAFE: 'seguro' };
 const statusPt = v => STATUS_PT[v] || String(v || '—').toLowerCase().replace(/_/g, ' ');
 function renderHud() {
@@ -181,7 +194,7 @@ function renderHud() {
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
-    src.textContent = `Vista gerada por dados orbitais (relevo MOLA/HRSC + imagem HiRISE, CTX e Viking) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(w.lon, 4)}° L · altitude ${Math.round(A.heightAt(w.lat, w.lon)).toLocaleString('pt-BR')} m`;
+    src.textContent = `Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(w.lon, 4)}° L · chão a ${A.num(A.heightAt(w.lat, w.lon), 0)} m · você a ${altText(w.alt)} do chão · declive local ${num(A.slopeAny(w.lat, w.lon), 1)}° · ${num(w.speed * 3.6, 1)} km/h`;
   } else {
     const p = cur();
     if (!p) src.textContent = panos.length ? '' : 'Carregando panoramas do rover…';
@@ -197,15 +210,17 @@ function renderBar() {
   const photo = mode === 'photo';
   const jumps = photo
     ? A.POIS.filter(p => p.sol).map((p, i) => `<option value="p${i}">${p.n}</option>`).join('')
-    : `<option value="me">Onde você está (Jezero)</option>` + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
+    : `<option value="me">Onde o astronauta está (Jezero)</option>` + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
+  const w = A.globe.walk;
   $('#hudSols').innerHTML =
     `<span class="seg2"><button data-mode="photo" aria-pressed="${photo}">Fotos do rover</button><button data-mode="terrain" aria-pressed="${!photo}">Terreno 3D</button></span>` +
     `<button data-turn="-1" aria-label="Virar à esquerda">◀</button><button data-walk="-1">▼ voltar</button><button data-walk="1" class="go">▲ avançar</button><button data-turn="1" aria-label="Virar à direita">▶</button>` +
     `<select id="hudJump" aria-label="Ir para"><option value="">Ir para…</option>${jumps}</select>` +
     (photo ? `<button data-follow="1" aria-pressed="${!manual}">Seguir caminhada</button>`
-      : `<span class="seg2"><button data-pace="real" aria-pressed="${A.globe.walk.pace === 'real'}">Passo real</button><button data-pace="fast" aria-pressed="${A.globe.walk.pace === 'fast'}">Visualização</button></span>`);
-  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram' : A.globe.walk.pace === 'real' ? 'Passo real: 2,9 km/h, como um astronauta de traje (Shift = 5,8 km/h) · W/S ou ↑ ↓ andam · A/D ou ← → viram · arraste para olhar'
-      : 'Visualização: sobrevoo rápido (Shift = muito rápido) · W/S ou ↑ ↓ andam · A/D ou ← → viram · arraste para olhar';
+      : `<span class="seg2"><button data-pace="real" aria-pressed="${w.pace === 'real'}">Passo real</button><button data-pace="fast" aria-pressed="${w.pace === 'fast'}">Visualização</button></span>` +
+        `<label class="alt">Altura <input type="range" id="hudAlt" min="0" max="1000" value="${altToSlider(w.alt)}" aria-label="Altura acima do chão"><b class="mono" id="hudAltVal">${altText(w.alt)}</b></label>`);
+  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram' : A.globe.walk.pace === 'real' ? 'Passo real: 2,9 km/h a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar · E sobe e muda para visualização'
+      : 'Visualização: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar';
 }
 
 /* ---------- Interação ---------- */
@@ -215,7 +230,7 @@ panoEl.addEventListener('pointerdown', e => { cancelAnimationFrame(anim); spin =
 panoEl.addEventListener('pointermove', e => {
   if (!drag) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y, now = performance.now();
-  if (mode === 'terrain') A.globe.look(-dx * 0.16, dy * 0.16);
+  if (mode === 'terrain') A.globe.look(-dx * 0.14, -dy * 0.14);   // arrastar para cima olha para cima
   else { viewAz -= dx / ppd; viewEl += dy / ppd; spin = -dx / ppd / Math.max(1, now - drag.t) * 16; place(); renderTarget(); }
   drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
 });
@@ -229,17 +244,23 @@ $('#hudSols').addEventListener('click', e => {
   if (b.dataset.mode) setMode(b.dataset.mode);
   else if (b.dataset.walk) walkStep(+b.dataset.walk);
   else if (b.dataset.turn) turnTo((mode === 'terrain' ? A.globe.walk.heading : viewAz) + 30 * b.dataset.turn);
-  else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); renderBar(); }
+  else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); renderBar(); renderHud(); }
   else if (b.dataset.follow) { manual = false; follow(); setCam(); renderHud(); renderBar(); }
 });
 $('#hudSols').addEventListener('change', e => {
+  if (e.target.id !== 'hudJump') return;
   const v = e.target.value; if (!v) return;
   if (v[0] === 'p') { const p = A.POIS.filter(q => q.sol)[+v.slice(1)]; manual = true; setIdx(nearest(p.lat, p.lon)); }
-  else if (v === 'me') { const n = A.state.now || A.BASE; A.globe.teleport(n.lat, n.lon); }
-  else { const p = PLACES[+v.slice(1)]; A.globe.teleport(p[1], p[2]); }
+  else if (v === 'me') { const n = A.state.now || A.BASE; setMode('terrain', { lat: n.lat, lon: n.lon }); }
+  else { const p = PLACES[+v.slice(1)]; setMode('terrain', { lat: p[1], lon: p[2] }); }
   e.target.value = '';
 });
-const KEYS = { ArrowUp: 'fwd', w: 'fwd', W: 'fwd', ArrowDown: 'back', s: 'back', S: 'back', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', Shift: 'fast' };
+$('#hudSols').addEventListener('input', e => { if (e.target.id !== 'hudAlt') return; A.globe.setAlt(sliderToAlt(+e.target.value)); syncAlt(); });
+panoEl.addEventListener('wheel', e => { // roda do mouse sobe e desce no Terreno 3D
+  if (mode !== 'terrain') return;
+  e.preventDefault(); A.globe.setAlt(A.globe.walk.alt * Math.exp(-e.deltaY * 0.0015)); syncAlt();
+}, { passive: false });
+const KEYS = { ArrowUp: 'fwd', w: 'fwd', W: 'fwd', ArrowDown: 'back', s: 'back', S: 'back', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', Shift: 'fast', e: 'up', E: 'up', PageUp: 'up', q: 'down', Q: 'down', PageDown: 'down' };
 window.addEventListener('keydown', e => {
   const k = KEYS[e.key]; if (!k || !visible() || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if (k !== 'fast') e.preventDefault();
@@ -251,12 +272,26 @@ window.addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) A.globe.wa
 window.addEventListener('blur', () => { A.globe.walk.keys = {}; });
 
 const cam1Hz = A.throttle(setCam, 1000);
-A.on('walk', w => { viewAz = w.heading; if (!visible()) return; renderCompass(); renderTarget(); hud1Hz(); cam1Hz(); });
+let lastPatch = 0;
+A.on('walk', w => {
+  viewAz = w.heading; if (!visible()) return;
+  renderCompass(); renderTarget(); syncAlt(); hud1Hz(); cam1Hz();
+  if (Date.now() - lastPatch > 2000) { lastPatch = Date.now(); A.ensurePatch(w.lat, w.lon, 1); } // relevo real acompanhando a caminhada
+});
 A.on('view', async v => {
   if (v !== 'helmet') { if (mode === 'terrain') { A.globe.exitWalk(); mode = 'photo'; $('#pano').classList.remove('terrain'); } A.state.cam = null; A.drawRoute(); A.emit('cam'); return; }
   renderBar(); await loaded; follow(); if (idx < 0) setIdx(0);
   build(); setCam(); renderHud(); renderBar();
+  if (pendingDrop) { const d = pendingDrop; pendingDrop = null; setMode('terrain', d); }
 });
+/* Soltar o astronauta em qualquer lugar de Marte (bonequinho do canto do mapa) */
+let pendingDrop = null;
+A.helmet = {
+  dropAt(lat, lon) {
+    manual = true;
+    if (visible()) setMode('terrain', { lat, lon }); else { pendingDrop = { lat, lon }; A.setView('helmet'); }
+  }
+};
 A.on('route', () => { if (visible()) { follow(); place(); renderHud(); } });
 A.on('tick', () => { if (visible()) { follow(); hud1Hz(); } });
 A.on('telemetry', () => { if (visible()) hud1Hz(); });

@@ -359,6 +359,43 @@ fastify.get('/api/v1/dem/jezero', async (request, reply) => {
   return reply.code(200).header('Content-Type', 'application/octet-stream').header('X-AresNav-Degraded', String(degraded)).send(body);
 });
 
+// Relevo de qualquer lugar de Marte em blocos de 2° x 2° (HRSC + MOLA, ~230 m; cai para MOLA 463 m).
+// O cliente só escolhe o bloco: latitude e longitude precisam ser inteiros pares dentro de Marte.
+const PATCH_DEG = 2, PATCH_N = 513;
+const DEM_SERVICES = ['Mars_MOLA_blend200ppx_HRSC_DEM_clon0dd_200mpp_lzw', 'mola128_mola64_merge_90Nto90S_SimpleC_clon0'];
+fastify.get('/api/v1/dem/patch/:lat/:lon', { config: PROXY_RATE }, async (request, reply) => {
+  const lat = Number(request.params.lat), lon = Number(request.params.lon);
+  if (!Number.isInteger(lat) || !Number.isInteger(lon) || lat % PATCH_DEG || lon % PATCH_DEG || lat < -90 || lat > 88 || lon < -180 || lon > 178) {
+    return reply.code(400).send({ error: 'Bloco de relevo inválido' });
+  }
+  const file = path.join(CACHE_DIR, 'dem', `patch_${lat}_${lon}.i16`);
+  let body = readCache(file), source = 'CACHE';
+  if (!body && !cacheOnly(request)) {
+    for (const svc of DEM_SERVICES) {
+      const url = `${TREK_AGS}/${svc}/ImageServer/exportImage?bbox=${lon},${lat},${lon + PATCH_DEG},${lat + PATCH_DEG}&bboxSR=104905&imageSR=104905&size=${PATCH_N},${PATCH_N}&format=bsq&pixelType=F32&interpolation=RSP_BilinearInterpolation&f=image`;
+      try {
+        const r = await fetchBinary(url, 1);
+        if (r.status !== 200 || r.body.length < PATCH_N * PATCH_N * 4) throw new Error('resposta inesperada');
+        const out = Buffer.alloc(PATCH_N * PATCH_N * 2);
+        let prev = 0;
+        for (let i = 0; i < PATCH_N * PATCH_N; i++) { // float32 -> int16 (metros); valores sem dado repetem o vizinho
+          const v = r.body.readFloatLE(i * 4);
+          if (v > -9000 && v < 30000) prev = Math.round(v);
+          out.writeInt16LE(prev, i * 2);
+        }
+        body = out; source = svc.startsWith('Mars_MOLA_blend') ? 'HRSC+MOLA' : 'MOLA';
+        writeCache(file, body);
+        break;
+      } catch (e) {
+        fastify.log.warn({ err: e.message, svc }, 'Relevo sob demanda indisponível neste serviço');
+      }
+    }
+  }
+  if (!body) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'NASA inacessível e bloco fora do cache' });
+  reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
+  return reply.code(200).header('Content-Type', 'application/octet-stream').header('Cache-Control', 'public, max-age=86400').header('X-AresNav-Cache', source).send(body);
+});
+
 // Detecções de minerais hidratados (CRISM) em Jezero
 fastify.get('/api/v1/crism', async (request, reply) => {
   const [x0, y0, x1, y1] = JEZERO_BBOX;

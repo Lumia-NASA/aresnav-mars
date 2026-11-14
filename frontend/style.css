@@ -427,3 +427,16 @@ body[data-view="telemetry"] #view-telemetry{background:linear-gradient(180deg,#0
   #btnData{display:none}
 }
 .sidebody>*{flex:none}
+
+/* soltar o astronauta, altura e roteiro */
+body.drop-mode #globe canvas,body.drop-mode #map{cursor:crosshair}
+.mapctl #ctlHelmet[aria-pressed="true"]{background:var(--warn);color:#201400;border-color:var(--warn)}
+.mapctl #ctlEx{font-size:12px;font-family:var(--mono)} .mapctl #ctlEx[aria-pressed="true"]{color:var(--warn);border-color:var(--warn)}
+.drophint{position:fixed;z-index:870;left:50%;top:calc(var(--bar) + 60px);transform:translateX(-50%);max-width:min(560px,calc(100vw - 28px));background:var(--warn);color:#201400;font-weight:500;padding:8px 16px;border-radius:99px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.hud-sols .alt{display:inline-flex;align-items:center;gap:6px;background:rgba(8,12,24,.85);border:1px solid var(--line);border-radius:99px;padding:3px 11px;font-family:var(--mono);font-size:11px}
+.hud-sols .alt input{width:120px;accent-color:var(--warn)} .hud-sols .alt b{min-width:52px;text-align:right;color:var(--warn);font-weight:500}
+.leg{display:grid;grid-template-columns:22px 1fr auto;gap:2px 8px;align-items:baseline;font-size:13px;padding:8px 0;border-top:1px solid rgba(255,255,255,.07)}
+.leg:first-child{border-top:0}
+.leg .n{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--c);color:#0b0c10;font-family:var(--mono)}
+.leg b{font-weight:500} .leg .km{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.leg small{grid-column:2 / 4;color:var(--muted);font-size:12px} .leg small .mono{color:var(--fg);font-size:11px}

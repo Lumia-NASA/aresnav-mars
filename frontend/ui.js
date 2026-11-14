@@ -27,7 +27,17 @@ A.on('view', v => {
 let mapView = 'globe';
 $('#ctl3d').onclick = () => { mapView = A.state.view === 'globe' ? 'map' : 'globe'; A.setView(mapView); };
 $('#btnTele').onclick = () => A.setView(A.state.view === 'telemetry' ? mapView : 'telemetry');
-$('#ctlHelmet').onclick = () => A.setView('helmet');
+/* Bonequinho: 1º clique arma o "soltar"; aí é só clicar em qualquer ponto de Marte.
+   Clicar de novo no bonequinho entra no capacete onde o astronauta da missão está. */
+$('#ctlHelmet').onclick = () => {
+  if (A.state.dropMode) { A.setDropMode(false); A.setView('helmet'); return; }
+  if (A.state.view !== 'globe' && A.state.view !== 'map') A.setView(mapView);
+  A.setDropMode(true);
+};
+A.on('drop', on => { $('#dropHint').hidden = !on; $('#ctlHelmet').setAttribute('aria-pressed', on); });
+A.on('view', v => { if (v !== 'globe' && v !== 'map' && A.state.dropMode) A.setDropMode(false); });
+/* Exagero vertical do relevo: 1× é a escala real */
+$('#ctlEx').onclick = () => { const v = A.globe.setExaggeration(A.globe.exaggeration === 1 ? 2.5 : 1); $('#ctlEx').textContent = v === 1 ? '1×' : A.num(v, 1) + '×'; $('#ctlEx').setAttribute('aria-pressed', v !== 1); };
 A.on('view', v => { if (v === 'globe' || v === 'map') mapView = v; });
 
 /* ---------- zoom e norte ---------- */
@@ -47,6 +57,11 @@ $('#basePick').onclick = () => {
   const next = radios[(i + 1) % radios.length]; next.checked = true; next.dispatchEvent(new Event('change', { bubbles: true }));
 };
 A.on('layers', syncBase);
+
+/* ---------- idioma ---------- */
+$('#langBtn').textContent = window.LANG === 'en' ? 'Português' : 'English';
+$('#langBtn').onclick = () => window.setLang(window.LANG === 'en' ? 'pt' : 'en');
+document.title = 'AresNav · ' + T('Trilha Jezero');
 
 /* ---------- gaveta de dados ---------- */
 const drawer = $('#dataDrawer');
@@ -79,8 +94,8 @@ function runSearch() {
   const q = norm(input.value.trim());
   hits = [];
   if (q) {
-    A.POIS.forEach(p => { if (norm(p.n).includes(q)) hits.push({ n: p.n, sub: p.src, lat: p.lat, lon: p.lon, range: 4, poi: p }); });
-    PLACES.forEach(([n, lat, lon, range, sub]) => { if (norm(n).includes(q)) hits.push({ n, sub, lat, lon, range }); });
+    A.POIS.forEach(p => { if (norm(T(p.n)).includes(q) || norm(p.n).includes(q)) hits.push({ n: T(p.n), sub: p.src, lat: p.lat, lon: p.lon, range: 4, poi: p }); });
+    PLACES.forEach(([n, lat, lon, range, sub]) => { if (norm(T(n)).includes(q) || norm(n).includes(q)) hits.push({ n: T(n), sub, lat, lon, range }); });
     const m = /^\s*(-?\d+(?:[.,]\d+)?)[\s,;]+(-?\d+(?:[.,]\d+)?)\s*$/.exec(input.value);   // "lat, lon"
     if (m) { const lat = parseFloat(m[1].replace(',', '.')), lon = parseFloat(m[2].replace(',', '.')); if (Math.abs(lat) <= 90 && Math.abs(lon) <= 360) hits.unshift({ n: `${lat}° N, ${lon}° L`, sub: 'Coordenadas', lat, lon: lon > 180 ? lon - 360 : lon, range: 40 }); }
   }
@@ -101,16 +116,16 @@ input.addEventListener('keydown', e => { if (e.key === 'Enter' && hits[0]) go(hi
 list.addEventListener('mousedown', e => { const b = e.target.closest('button'); if (b) { e.preventDefault(); go(hits[+b.dataset.i]); } });
 document.addEventListener('mousedown', e => { if (!e.target.closest('.search')) list.hidden = true; });
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape') setDrawer(false);
+  if (e.key === 'Escape') { setDrawer(false); if (A.state.dropMode) A.setDropMode(false); }
   if (e.key === '/' && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); input.focus(); }
 });
 
 /* ---------- barra de estado: altitude da câmera e agulha do norte ---------- */
-const fmtAlt = km => km >= 100 ? Math.round(km).toLocaleString('pt-BR') + ' km' : km >= 1 ? km.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km' : Math.round(km * 1000) + ' m';
+const fmtAlt = km => km >= 100 ? Math.round(km).toLocaleString(LOC) + ' km' : km >= 1 ? km.toLocaleString(LOC, { maximumFractionDigits: 1 }) + ' km' : Math.round(km * 1000) + ' m';
 setInterval(() => {
   const el = $('#camInfo');
   if (A.state.view === 'globe') { const c = A.globe.cam(); if (c) { el.textContent = 'Câmera: ' + fmtAlt(c.km); $('#ctlNeedle').style.transform = `rotate(${-c.heading}deg)`; } }
-  else if (A.state.view === 'map' && A.map) { el.textContent = 'Zoom ' + A.map.getZoom().toLocaleString('pt-BR'); $('#ctlNeedle').style.transform = ''; }
+  else if (A.state.view === 'map' && A.map) { el.textContent = 'Zoom ' + A.map.getZoom().toLocaleString(LOC); $('#ctlNeedle').style.transform = ''; }
   else el.textContent = '';
 }, 500);
 })();

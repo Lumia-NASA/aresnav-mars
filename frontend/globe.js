@@ -1,19 +1,21 @@
 /* Globo 3D de Marte (CesiumJS) com imagens do Mars Trek (via backend) e relevo real.
-   Usa o elipsoide marciano (raio equatorial 3396,2 km, polar 3376,2 km). A altura do relevo
-   é exagerada 2,5× para dar leitura. Se o navegador não aceitar trocar o elipsoide, cai para
-   o da Terra com as alturas reescaladas (1,88×).
+   Usa o elipsoide marciano (raio equatorial 3396,2 km, polar 3376,2 km) e relevo em ESCALA REAL.
+   O exagero vertical (2,5×) é opcional, só para leitura na vista de cima; no chão é sempre 1×.
+   Se o navegador não aceitar trocar o elipsoide, cai para o da Terra com as alturas reescaladas (1,88×).
    O mesmo globo serve ao modo "Terreno 3D" do Capacete: a câmera desce ao nível do chão
    e a pessoa anda por qualquer lugar de Marte. */
 (function () {
 'use strict';
 const A = App, $ = A.$;
-const EX = 2.5;
-let K = 1.88, VS = 1.88 * EX, EYE = 14; // K = tamanho do globo em relação a Marte (1 com o elipsoide marciano)
-let viewer = null, failed = false, C = null, buildImagery = null;
+let K = 1.88, VS = 1.88;   // K = tamanho do globo em relação a Marte (1 com o elipsoide marciano); VS = escala das alturas
+let EX = 1, userEx = 1;    // exagero vertical em uso e o escolhido pela pessoa (1 = escala real)
+const EYE = 1.7;           // altura dos olhos de um astronauta em pé, em metros
+let viewer = null, failed = false, C = null, buildImagery = null, makeTerrain = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
-const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0 };
-/* Passo real: astronauta de traje, 0,8 m/s (2,9 km/h) e 1,6 m/s com Shift. Visualização: sobrevoo rápido. */
-const PACE = { real: [0.8, 1.6], fast: [80, 2500] };
+const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: 0, alt: EYE, vel: 0, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0 };
+/* Passo real: astronauta de traje, 0,8 m/s (2,9 km/h) e 1,6 m/s com Shift, sempre a 1,7 m do chão.
+   Visualização: a pessoa escolhe a altura (1,7 m a 20 km) e a velocidade cresce com ela. */
+const ALT_MAX = 20000;
 
 function fail(e) {
   failed = true; console.error('Globo 3D', e);
@@ -31,11 +33,11 @@ function init() {
     C = Cesium;
     try { // elipsoide de Marte (skill 01)
       C.Ellipsoid.default = new C.Ellipsoid(3396200, 3396200, 3376200);
-      if (Math.abs(C.Cartesian3.fromDegrees(0, 0, 0).x - 3396200) < 1) { K = 1; VS = EX; EYE = 7.5; }
+      if (Math.abs(C.Cartesian3.fromDegrees(0, 0, 0).x - 3396200) < 1) { K = 1; VS = 1; }
       else C.Ellipsoid.default = C.Ellipsoid.WGS84;
     } catch (e) { K = 1.88; }
     const geo = new C.GeographicTilingScheme();
-    const terrain = new C.CustomHeightmapTerrainProvider({
+    makeTerrain = () => new C.CustomHeightmapTerrainProvider({
       width: 33, height: 33, tilingScheme: geo,
       callback: (x, y, level) => {
         const r = geo.tileXYToRectangle(x, y, level), out = new Float32Array(33 * 33), D = 180 / Math.PI;
@@ -45,7 +47,7 @@ function init() {
       }
     });
     viewer = new C.Viewer('globe', {
-      baseLayer: false, terrainProvider: terrain, baseLayerPicker: false, geocoder: false, homeButton: false,
+      baseLayer: false, terrainProvider: makeTerrain(), baseLayerPicker: false, geocoder: false, homeButton: false,
       sceneModePicker: false, navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
       infoBox: false, selectionIndicator: false, scene3DOnly: true
     });
@@ -64,8 +66,8 @@ function init() {
 
     buildImagery = () => { // refeito quando o enlace cai ou volta (backend <-> cópia local)
     viewer.imageryLayers.removeAll(); Object.keys(layers).forEach(k => delete layers[k]);
-    const add = (k, alpha, name) => {
-      const d = A.LAYERS[k], range = A.tileRange(k);
+    const add = (k, alpha, name, box) => {
+      const d = Object.assign({}, A.LAYERS[k], box ? { box } : null), range = A.tileRange(k);
       if (!range) return; // sem backend, só existem as camadas guardadas localmente
       const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
@@ -76,6 +78,9 @@ function init() {
     add('viking'); add('detail');
     if (layers.detail) { add('viking', 0.5, 'tint'); layers.tint.saturation = 1.8; } // cor do Viking por cima do detalhe THEMIS
     ['relief', 'mosaic', 'ctx', 'hirise'].forEach(k => add(k));
+    // as imagens de alta resolução são em tons de cinza: a cor real do Viking entra por cima, só na região delas
+    add('viking', 0.42, 'wash', A.LAYERS.mosaic.box); if (layers.wash) layers.wash.saturation = 2.0;
+    ['mosaic', 'ctx', 'hirise'].forEach(k => { if (layers[k]) layers[k].contrast = 1.12; });
     add('themis', 0.6);
     if (A.slopeURL) C.SingleTileImageryProvider.fromUrl(A.slopeURL, { rectangle: C.Rectangle.fromDegrees(A.BOX.XMIN, A.BOX.YMIN, A.BOX.XMAX, A.BOX.YMAX) })
       .then(p => { layers.slope = viewer.imageryLayers.addImageryProvider(p); layers.slope.alpha = 0.6; applyLayers(A.layerState()); })
@@ -93,11 +98,13 @@ function init() {
     h.setInputAction(e => {
       if (walk.on) return;
       const p = ll(e.position); if (!p) return;
+      if (A.state.dropMode) return A.dropAt(p[0], p[1]);   // soltar o astronauta em qualquer lugar de Marte
       const B = A.BOX; (p[1] >= B.XMIN && p[1] <= B.XMAX && p[0] >= B.YMIN && p[0] <= B.YMAX) ? A.pick(p[0], p[1]) : flyJezero();
     }, C.ScreenSpaceEventType.LEFT_CLICK);
     let last = 0;
     h.setInputAction(e => { if (walk.on) return; const t = Date.now(); if (t - last < 80) return; last = t; const p = ll(e.endPosition); if (p) A.readout(p[0], p[1]); }, C.ScreenSpaceEventType.MOUSE_MOVE);
 
+    setEx(userEx);
     viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(60, 12, 8e6 * K) });
     setTimeout(() => { if (!walk.on) flyJezero(); }, 1200);
     $('#g-mars').onclick = () => viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(77.4, 10, 8e6 * K), duration: 2.5 });
@@ -105,7 +112,9 @@ function init() {
   } catch (e) { fail(e); }
 }
 
-const groundPos = (lat, lon, lift) => C.Cartesian3.fromDegrees(lon, lat, A.heightAt(lat, lon) * VS + (lift || 0));
+const groundPos = (lat, lon, lift) => C.Cartesian3.fromDegrees(lon, lat, A.heightAt(lat, lon) * VS * EX + (lift || 0));
+/* Exagero vertical do relevo: 1 = escala real */
+function setEx(v) { EX = v; if (viewer && 'verticalExaggeration' in viewer.scene) viewer.scene.verticalExaggeration = v; else EX = 1; }
 function flyJezero() {
   if (!viewer) return;
   viewer.camera.flyToBoundingSphere(new C.BoundingSphere(groundPos(18.462, 77.415), 4800 * K),
@@ -113,7 +122,7 @@ function flyJezero() {
 }
 
 function label(text, far, near) {
-  return { text, font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#e8ecf8'), showBackground: true,
+  return { text: T(text), font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#e8ecf8'), showBackground: true,
     backgroundColor: C.Color.fromCssColorString('rgba(10,13,20,.88)'), backgroundPadding: new C.Cartesian2(6, 4), pixelOffset: new C.Cartesian2(0, -20),
     heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 400000 * K,
     distanceDisplayCondition: new C.DistanceDisplayCondition((near || 0) * K / 1.88, far * K / 1.88) };
@@ -157,7 +166,7 @@ function buildStatic() {
 
 function applyLayers(s) {
   if (!viewer) return;
-  const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base !== 'relief', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
+  const show = { viking: s.base !== 'relief', detail: s.base !== 'relief', tint: s.base !== 'relief', wash: s.base !== 'relief', relief: s.base === 'relief', mosaic: s.base !== 'relief', ctx: s.base === 'hirise', hirise: s.base === 'hirise', themis: s.themis, slope: s.slope && !walk.on };
   Object.keys(show).forEach(k => { if (layers[k]) layers[k].show = show[k]; });
   ents.rover.forEach(e => { e.show = s.rover; }); ents.pois.forEach(e => { e.show = s.poi; }); (ents.targets || []).forEach(e => { e.show = s.poi; }); ents.crism.forEach(e => { e.show = s.crism; });
 }
@@ -180,7 +189,7 @@ function drawTargets() {
   (ents.targets || []).forEach(e => viewer.entities.remove(e)); ents.targets = [];
   const list = (A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || [], show = A.layerState().poi;
   list.forEach(t => { if (typeof t.lat === 'number' && typeof t.lng === 'number')
-    ents.targets.push(viewer.entities.add({ show, position: C.Cartesian3.fromDegrees(t.lng, t.lat), point: point('#0A0D14', 12, A.KIND.target), label: label(`${t.id || 'Alvo'} · ${t.name || ''}`, 26000) })); });
+    ents.targets.push(viewer.entities.add({ show, position: C.Cartesian3.fromDegrees(t.lng, t.lat), point: point('#0A0D14', 12, A.KIND.target), label: label(`${t.id || 'WP'} · ${t.name || ''}`, 26000) })); });
 }
 let lastEm = null;
 function drawNow() {
@@ -197,9 +206,9 @@ function drawNow() {
 /* ---------- Andar pelo terreno (usado pelo modo Capacete) ---------- */
 function placeCamera() {
   const c = C.Cartographic.fromDegrees(walk.lon, walk.lat), mesh = viewer.scene.globe.getHeight(c);
-  const bob = walk.moving && walk.pace === 'real' ? Math.sin(performance.now() / 1000 * Math.PI * 2 * 1.7) * 0.02 * EYE : 0; // balanço do passo
-  const h = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh) + EYE + bob;
-  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(walk.lon, walk.lat, h), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(walk.pitch), roll: 0 } });
+  const ground = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh);
+  const bob = walk.moving && walk.alt < 3 ? Math.sin(performance.now() / 1000 * Math.PI * 2 * 1.7) * 0.035 : 0; // balanço do passo
+  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(walk.lon, walk.lat, ground + (walk.alt + bob) * K), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(walk.pitch), roll: 0 } });
 }
 function move(m) {
   const r = Math.PI / 180;
@@ -207,20 +216,60 @@ function move(m) {
   walk.lon += m * Math.sin(walk.heading * r) / (A.R_MARS * r * Math.cos(walk.lat * r));
   walk.lon = ((walk.lon + 540) % 360) - 180;
 }
+let SKY = null;
+/* No chão as imagens de alta resolução (em tons de cinza) dominam a tela. Um filtro pinta só os tons de cinza
+   com a paleta do solo marciano (do marrom escuro ao areia claro); o que já tem cor (céu, rota, mosaico Viking) fica como está. */
+let tintStage = null;
+function groundLook(on) {
+  if (!tintStage) {
+    try {
+      tintStage = viewer.scene.postProcessStages.add(new C.PostProcessStage({ fragmentShader: `
+        uniform sampler2D colorTexture; in vec2 v_textureCoordinates;
+        void main() {
+          vec4 c = texture(colorTexture, v_textureCoordinates);
+          float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));
+          float gray = 1.0 - smoothstep(0.05, 0.22, mx - mn);
+          float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+          vec3 mars = mix(vec3(0.22, 0.11, 0.07), vec3(1.0, 0.80, 0.60), smoothstep(0.0, 0.9, lum));
+          out_FragColor = vec4(mix(c.rgb, mars, gray * 0.92), c.a);
+        }` }));
+    } catch (e) { tintStage = null; console.warn('filtro de cor do solo indisponível', e); }
+  }
+  if (tintStage) tintStage.enabled = on;
+  // com o filtro ligado, a cor do Viking por cima das imagens cinza sai de cena (em regiões escuras ela puxava para o roxo)
+  if (layers.wash) layers.wash.alpha = on && tintStage ? 0 : 0.42;
+  if (layers.tint) layers.tint.alpha = on && tintStage ? 0 : 0.5;
+}
+function setAlt(m) {
+  walk.alt = Math.max(EYE, Math.min(ALT_MAX, m));
+  if (walk.alt > 3 && walk.pace === 'real') walk.pace = 'fast'; // acima do chão já não é caminhada
+}
 function step() {
   const now = performance.now(), dt = Math.min(0.1, (now - walk.last) / 1000), k = walk.keys; walk.last = now;
-  const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0), mv = (k.fwd ? 1 : 0) - (k.back ? 1 : 0);
-  if (turn) walk.heading = (walk.heading + turn * 70 * dt + 360) % 360;
-  const sp = PACE[walk.pace][k.fast ? 1 : 0];
-  if (mv) move(sp * mv * dt);
-  walk.moving = !!mv; walk.speed = mv ? sp : 0;
+  const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0), mv = (k.fwd ? 1 : 0) - (k.back ? 1 : 0), lift = (k.up ? 1 : 0) - (k.down ? 1 : 0);
+  if (turn) walk.heading = (walk.heading + turn * 60 * dt + 360) % 360;
+  if (lift) setAlt(walk.alt * Math.exp(lift * 1.3 * dt) + lift * 0.8 * dt);
+  // passo real: 0,8 m/s; visualização: a velocidade acompanha a altura (voo baixo é lento, voo alto é rápido)
+  const cruise = walk.pace === 'real' ? 0.8 : Math.max(25, walk.alt * 1.5);
+  const want = mv * cruise * (k.fast ? (walk.pace === 'real' ? 2 : 10) : 1);
+  walk.vel += (want - walk.vel) * Math.min(1, dt * 5);   // acelera e freia aos poucos, sem tranco
+  if (Math.abs(walk.vel) > 0.005) move(walk.vel * dt);
+  walk.moving = Math.abs(walk.vel) > 0.05; walk.speed = Math.abs(walk.vel);
   placeCamera();
+  // céu: caramelo perto do chão, escurecendo até o preto do espaço conforme a pessoa sobe
+  viewer.scene.backgroundColor = C.Color.lerp(C.Color.BLACK, SKY || (SKY = C.Color.fromCssColorString('#cfa67f')), Math.max(0, 1 - walk.alt / 30000), new C.Color());
   if (now - walk.sent > 100) { walk.sent = now; A.emit('walk', walk); }
 }
 function enterWalk(host, lat, lon, heading) {
   init(); if (!viewer) return false;
   viewer.camera.cancelFlight();
-  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, keys: {}, last: performance.now() });
+  Object.assign(walk, { on: true, lat, lon, heading, pitch: 0, vel: 0, keys: {}, last: performance.now() });
+  setEx(1);                                   // no chão a escala é sempre real
+  viewer.camera.frustum.near = 0.2 * K;       // deixa ver o chão a 1,7 m sem cortar
+  if (viewer.scene.skyBox) viewer.scene.skyBox.show = false;   // de dia, do chão, o céu de Marte é cor de caramelo e sem estrelas
+  if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
+  if ('renderable' in viewer.scene.fog) viewer.scene.fog.renderable = false;   // a névoa do Cesium escurece o horizonte; fica só o corte de distância
+  groundLook(true);
   host.insertBefore($('#globe'), host.firstChild);
   viewer.scene.screenSpaceCameraController.enableInputs = false;
   viewer.scene.fog.enabled = true;
@@ -235,6 +284,10 @@ function exitWalk() {
   const home = $('#view-globe'); home.insertBefore($('#globe'), home.firstChild);
   viewer.scene.screenSpaceCameraController.enableInputs = true;
   viewer.scene.fog.enabled = false;
+  viewer.camera.frustum.near = 1.0; setEx(userEx);
+  if (viewer.scene.skyBox) viewer.scene.skyBox.show = true;
+  if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+  viewer.scene.backgroundColor = C.Color.BLACK; groundLook(false);
   viewer.useDefaultRenderLoop = A.state.view === 'globe'; viewer.resize();
   applyLayers(A.layerState()); drawNow();
   viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(77.4, 14, 320000 * K) });
@@ -250,15 +303,20 @@ A.on('layers', applyLayers);
 A.on('route', () => { lastEm = null; drawRoute(); drawNow(); });
 A.on('tick', drawNow);
 A.on('cam', drawNow);
+/* chegou relevo novo da NASA: recria o terreno para o globo usar as alturas reais do lugar */
+A.on('terrain', () => { if (viewer && makeTerrain) viewer.terrainProvider = makeTerrain(); });
 A.on('uplink', () => { if (viewer && buildImagery) { buildImagery(); applyLayers(A.layerState()); } });
 let teleSig = '';
 A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || []); if (sig !== teleSig) { teleSig = sig; drawTargets(); } });
 A.globe = {
   get viewer() { return viewer; }, flyJezero, walk, enterWalk, exitWalk,
   teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },
-  look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-60, Math.min(35, walk.pitch + dEl)); },
+  look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-85, Math.min(60, walk.pitch + dEl)); },
+  setAlt, EYE, ALT_MAX,
+  setExaggeration(v) { userEx = v; if (!walk.on) setEx(v); return EX; },
+  get exaggeration() { return userEx; },
   stepBy(m) { move(m); },
-  setPace(p) { if (PACE[p]) walk.pace = p; },
+  setPace(p) { if (p === 'real') { walk.pace = 'real'; walk.alt = EYE; } else if (p === 'fast') walk.pace = 'fast'; },
   /* usados pela busca e pelos controles do mapa */
   flyTo(lat, lon, rangeKm) {
     if (!viewer) return;
@@ -267,7 +325,7 @@ A.globe = {
   },
   zoom(f) { // f < 1 aproxima, f > 1 afasta
     if (!viewer) return;
-    const cam = viewer.camera, ground = A.heightAt(C.Math.toDegrees(cam.positionCartographic.latitude), C.Math.toDegrees(cam.positionCartographic.longitude)) * VS;
+    const cam = viewer.camera, ground = A.heightAt(C.Math.toDegrees(cam.positionCartographic.latitude), C.Math.toDegrees(cam.positionCartographic.longitude)) * VS * EX;
     const above = Math.max(300 * K, cam.positionCartographic.height - ground);
     if (f < 1) cam.zoomIn(above * (1 - f)); else cam.zoomOut(Math.min(above * (f - 1), 2.5e7 * K - above));
   },

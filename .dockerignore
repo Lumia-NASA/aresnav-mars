@@ -22,3 +22,4 @@ tools
 # Cache gerado em uso (blocos de mapa e fotos): recriado sob demanda
 backend/data/cache/tiles
 backend/data/cache/navcam
+backend/data/cache/dem

@@ -21,6 +21,7 @@ npm-debug.log*
 data/cache/*.tmp
 backend/data/cache/tiles/
 backend/data/cache/navcam/
+backend/data/cache/dem/
 
 # Arquivos de Sistema e IDE
 .DS_Store

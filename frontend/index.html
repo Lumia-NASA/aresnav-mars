@@ -77,6 +77,7 @@
   <div class="topactions">
     <button class="pillbtn" id="btnTele" aria-pressed="false">Telemetria</button>
     <button class="pillbtn" id="btnData" aria-pressed="false">Dados</button>
+    <button class="pillbtn" id="langBtn" title="Language / Idioma">Português</button>
     <span class="chip live" id="dataChip">Conectando ao backend…</span>
   </div>
 </header>
@@ -136,7 +137,7 @@
     <div><h3>Perfil de altitude da ida</h3><canvas id="profile"></canvas></div>
     <div><h3>Horários</h3><div class="timeline" id="timeline"></div></div>
     <div><h3>Alertas</h3><ul class="list" id="alerts"></ul></div>
-    <div><h3>Paradas científicas na rota</h3><div id="stops"></div></div>
+    <div><h3>Roteiro passo a passo</h3><div id="stops"></div></div>
   </div>
 </aside>
 <button class="sidetoggle right" id="rightToggle" aria-label="Recolher o plano da caminhada" aria-expanded="true">›</button>
@@ -160,16 +161,18 @@
 
 <!-- Controles do mapa (canto inferior direito) -->
 <div class="mapctl" role="group" aria-label="Controles do mapa">
-  <button id="ctlHelmet" title="Entrar no capacete (vista do chão)" aria-label="Entrar no capacete">
+  <button id="ctlHelmet" title="Descer ao chão: clique aqui e depois em qualquer lugar de Marte" aria-label="Descer ao chão em qualquer lugar de Marte" aria-pressed="false">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>
   </button>
   <button id="ctl3d" title="Alternar entre globo 3D e mapa 2D" aria-pressed="true">3D</button>
+  <button id="ctlEx" title="Exagero vertical do relevo (1× é a escala real)" aria-pressed="false">1×</button>
   <button id="ctlNorth" title="Apontar para o norte" aria-label="Apontar para o norte">
     <svg viewBox="0 0 24 24" id="ctlNeedle"><path d="M12 3l4 9h-8z" fill="#FF3344" stroke="none"/><path d="M12 21l-4-9h8z" fill="currentColor" stroke="none"/></svg>
   </button>
   <button id="ctlOut" aria-label="Afastar">−</button>
   <button id="ctlIn" aria-label="Aproximar">+</button>
 </div>
+<div class="drophint" id="dropHint" hidden>Clique em qualquer lugar de Marte para descer até o chão. Clique de novo no bonequinho para ir até o astronauta. Esc cancela.</div>
 <button class="basepick" id="basePick" title="Trocar a imagem de fundo"><span class="thumb" aria-hidden="true"></span><span id="basePickLabel">HiRISE</span></button>
 
 <!-- Barra de estado -->
@@ -190,8 +193,8 @@
   </div>
   <p class="prov mono"><b>DATA PROVENANCE:</b> MOLA DEM (463 m/px) | HRSC + MOLA (200 m/px) | HiRISE/CTX (0,25–6 m/px) | THEMIS (100 m/px) | MEDA Sol Baseline | Navcam M20
     <span class="seal">🔒 EvidenceGate SHA-256: <span id="provHash">aguardando o backend</span> <span id="provState"></span></span></p>
-  <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores. O relevo do globo tem a altura exagerada 2,5× para dar leitura.</p>
-  <p>A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje. As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance. No "Terreno 3D" a vista é montada só com dados orbitais.</p>
+  <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores. O relevo do globo está em escala real; o botão 1× / 2,5× exagera a altura só para facilitar a leitura na vista de cima. As imagens de alta resolução (HiRISE e CTX) são em tons de cinza e recebem por cima a cor real do mosaico Viking.</p>
+  <p>A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje. As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance. No "Terreno 3D" a vista é montada só com dados orbitais: ao descer em qualquer ponto de Marte, o app pede ao backend o relevo real do lugar (HRSC + MOLA, cerca de 230 m por ponto).</p>
 </section>
 
 <div class="modal" id="truth" hidden role="dialog" aria-modal="true" aria-labelledby="truthTitle">
@@ -204,6 +207,7 @@
   </div>
 </div>
 
+<script src="i18n.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="config.js"></script>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>

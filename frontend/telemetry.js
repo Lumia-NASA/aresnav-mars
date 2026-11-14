@@ -34,7 +34,7 @@ function buildGauges() {
   $('#gauges').innerHTML = GAUGES.map(g => `<div class="gauge" id="g-${g.k}"><svg viewBox="0 0 100 86"><path class="track" d="${arc(1)}"/><path class="val" d="${arc(0.5)}"/></svg><b class="mono">–</b><small>${g.unit}</small><span>${g.label}</span></div>`).join('');
   $('#charts').innerHTML = CHARTS.map(c => `<div class="chart"><div class="chead"><span>${c.label}${c.real ? ' <em>dado real</em>' : ' <em class="sim">simulado</em>'}</span><b class="mono" id="cv-${c.k}">–</b></div><canvas id="c-${c.k}"></canvas></div>`).join('');
 }
-const fmt = (v, dec) => v.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const fmt = (v, dec) => v.toLocaleString(LOC, { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
 function buildSeries() {
   const sim = A.state.sim; series = null;

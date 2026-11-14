@@ -1,0 +1,180 @@
+/* Idiomas da interface: inglês (padrão, para a submissão) e português.
+   O código escreve os textos em português; em inglês, este módulo traduz tudo o que entra na tela
+   (textos, títulos, dicas e campos) com um dicionário de frases. Os números já saem no formato do idioma.
+   window.T(texto) traduz um texto avulso (usado em desenhos de canvas, rótulos do globo e voz). */
+(function () {
+'use strict';
+let lang = 'en';
+try {
+  const q = new URLSearchParams(location.search).get('lang'), saved = localStorage.getItem('aresnav.lang');
+  if (q === 'pt' || q === 'en') { lang = q; localStorage.setItem('aresnav.lang', q); } else if (saved === 'pt' || saved === 'en') lang = saved;
+} catch (e) { /* sem armazenamento: fica no padrão */ }
+window.LANG = lang;
+window.LOC = lang === 'en' ? 'en-US' : 'pt-BR';
+document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
+window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (e) { /* ignora */ } const u = new URL(location.href); u.searchParams.delete('lang'); location.href = u.toString(); };
+
+/* Textos curtos: só traduz quando o texto inteiro é este */
+const EXACT = {
+  'Trilha Jezero': 'Jezero Trail', 'Telemetria': 'Telemetry', 'Dados': 'Data', 'Conteúdo da missão': 'Mission content', 'Plano da caminhada': 'Walk plan',
+  'Segura': 'Safe', 'Mais curta': 'Shortest', 'Emergência': 'Emergency', 'Checklist de saída': 'Pre-walk checklist', 'Imagem': 'Imagery', 'Camadas': 'Layers', 'Destinos': 'Destinations',
+  'Declive': 'Slope', 'Infravermelho diurno': 'Daytime infrared', 'Minerais hidratados': 'Hydrated minerals', 'Trajeto do Perseverance': 'Perseverance traverse', 'Pontos de interesse': 'Points of interest',
+  'Relevo colorido': 'Colour relief', 'Mosaico de pouso Mars 2020': 'Mars 2020 landing mosaic', 'Horários': 'Schedule', 'Alertas': 'Alerts', 'Roteiro passo a passo': 'Step-by-step itinerary',
+  'Perfil de altitude da ida': 'Outbound elevation profile', 'Na base': 'At base', 'Ida': 'Outbound', 'Volta': 'Return', 'De volta à base': 'Back at base', 'Sem rota': 'No route',
+  'Trabalho no destino': 'Work at destination', 'Parada científica': 'Science stop', 'Marte inteiro': 'Whole Mars', 'Ir para Jezero': 'Go to Jezero',
+  'Camada': 'Layer', 'Missão': 'Mission', 'Instrumento': 'Instrument', 'Rota do backend': 'Backend route', 'Status': 'Status',
+  'Telemetria do contrato': 'Contract telemetry', 'Registro de eventos': 'Event log', 'Definir como destino': 'Set as destination', 'Ver no capacete': 'View in helmet',
+  'Posição': 'Position', 'Altitude': 'Elevation', 'Declive local': 'Local slope', 'Mineral': 'Mineral', 'Rota segura': 'Safe route', 'sim': 'yes', 'não': 'no', 'fora da área detalhada': 'outside the detailed area',
+  'Backend · NASA ao vivo': 'Backend · NASA live', 'Cache / cópia local': 'Cache / local copy', 'Desligada': 'Off', 'Aguardando': 'Waiting',
+  'Telemetria unificada (contrato)': 'Unified telemetry (contract)', 'Mosaico global colorido': 'Global colour mosaic', 'Imagem HiRISE 25 cm': 'HiRISE imagery, 25 cm', 'Imagem CTX 6 m': 'CTX imagery, 6 m',
+  'Mosaico de pouso': 'Landing mosaic', 'Relevo global (globo 3D)': 'Global elevation (3D globe)', 'Altitude e declive (rota)': 'Elevation and slope (route)', 'Fotos de solo (Capacete e pop-up)': 'Ground photos (Helmet and pop-up)',
+  'Navegação do rover': 'Rover navigation', 'Navcam (imagens brutas)': 'Navcam (raw images)', 'camada local': 'local layer',
+  'Enlace com o backend': 'Backend link', 'Telemetria ao vivo': 'Live telemetry', 'Conectando…': 'Connecting…', 'Rota traçada': 'Route plotted', 'Sem caminho possível': 'No possible path', 'Aguardando relevo': 'Waiting for terrain',
+  'Declive dentro do limite': 'Slope within limit', 'Reserva de oxigênio': 'Oxygen reserve', 'Tempo em Jezero (MEDA)': 'Weather at Jezero (MEDA)', 'Volta com luz do dia': 'Back before dark',
+  'Comunicação com a Terra': 'Earth comms', 'Atraso de 11 min. Ciente': '11 min delay. Acknowledged', 'Aguardando dados': 'Waiting for data', '[ GO ] com ressalvas': '[ GO ] with caveats',
+  'Ponto escolhido no mapa': 'Point picked on the map', 'Destino escolhido no mapa': 'Destination picked on the map', 'Dentro da margem': 'Within margin', 'Margem apertada': 'Tight margin', 'Não recomendado': 'Not recommended',
+  'Distância (ida)': 'Distance (outbound)', 'Tempo de ida': 'Outbound time', 'Duração total': 'Total duration', 'Oxigênio na volta': 'Oxygen at return', 'mín. 30%': 'min. 30%', 'Subida acumulada': 'Total climb', 'Declive máximo': 'Max slope',
+  'Saída da base': 'Leave base', 'Chegada ao destino': 'Arrive at destination', 'Início do retorno': 'Start return', 'Pôr do sol': 'Sunset', 'Volta para a base': 'Return to base',
+  'Retorno de emergência': 'Emergency return', 'Você já está na base ou não há rota rápida.': 'You are already at base or there is no fast route.',
+  'Helena · você': 'Helena · you', 'Parceiro': 'Buddy', 'Rover M20 de apoio': 'M20 support rover', 'Terreno': 'Terrain', 'Vento': 'Wind', 'Radiação': 'Radiation', 'Ritmo': 'Pace', 'Bateria': 'Battery',
+  'seguindo contorno seguro': 'following safe contour', 'declive perigoso': 'hazardous slope', 'seguro': 'safe', 'visor do capacete': 'helmet visor', 'planejamento no habitat': 'habitat planning',
+  'você chegou': 'you have arrived', '▲ em frente': '▲ straight ahead', '◀ vire à esquerda': '◀ turn left', 'vire à direita ▶': 'turn right ▶',
+  'Fotos do rover': 'Rover photos', 'Terreno 3D': '3D terrain', '▼ voltar': '▼ back', '▲ avançar': '▲ forward', 'Ir para…': 'Go to…', 'Seguir caminhada': 'Follow the walk', 'Passo real': 'Real pace', 'Visualização': 'Free view',
+  'Onde o astronauta está (Jezero)': 'Where the astronaut is (Jezero)', 'Olympus Mons (maior vulcão)': 'Olympus Mons (largest volcano)', 'Valles Marineris (cânion)': 'Valles Marineris (canyon)',
+  'Cratera Gale (Curiosity)': 'Gale Crater (Curiosity)', 'Calota polar norte': 'North polar cap', 'Calota polar sul': 'South polar cap', 'Carregando panoramas do rover…': 'Loading rover panoramas…',
+  'Oxigênio (previsto)': 'Oxygen (forecast)', 'Freq. cardíaca': 'Heart rate', 'CO₂ no capacete': 'Helmet CO₂', 'Pressão do traje': 'Suit pressure', 'Temp. interna': 'Internal temp.',
+  'Declive do terreno': 'Terrain slope', 'Oxigênio': 'Oxygen', 'Frequência cardíaca': 'Heart rate', 'dado real': 'real data', 'simulado': 'simulated', 'Sem rota traçada.': 'No route plotted.',
+  'Ambiente · MEDA': 'Environment · MEDA', 'Mobilidade': 'Mobility', 'Topografia': 'Topography', 'Temperatura': 'Temperature', 'Poeira': 'Dust', 'Alerta ativo': 'Alert active',
+  'O₂ restante': 'O₂ remaining', 'Carga do traje': 'Suit payload', 'Dupla': 'Buddy', 'Rover de apoio': 'Support rover', 'Limite seguro': 'Safe limit', 'Modo': 'Mode', 'Local': 'Site',
+  'Cratera Jezero': 'Jezero Crater', 'Cratera Gale': 'Gale Crater', 'Cratera Gusev': 'Gusev Crater', 'Local de pouso do Perseverance': 'Perseverance landing site', 'Maior vulcão do Sistema Solar': 'Largest volcano in the Solar System',
+  'Sistema de cânions': 'Canyon system', 'Local de pouso do Curiosity': 'Curiosity landing site', 'Local de pouso do Spirit': 'Spirit landing site', 'Local de pouso do Opportunity': 'Opportunity landing site',
+  'Local de pouso do InSight': 'InSight landing site', 'Local de pouso da Viking 1': 'Viking 1 landing site', 'Local de pouso da Viking 2': 'Viking 2 landing site', 'Maior bacia de impacto visível': 'Largest visible impact basin',
+  'Cadeia de vulcões': 'Volcano chain', 'Vulcão': 'Volcano', 'Planalto escuro ao lado de Jezero': 'Dark plateau next to Jezero', 'Coordenadas': 'Coordinates', 'Mosaico': 'Mosaic', 'Relevo': 'Relief',
+  'Base Ares-1 (hipotética)': 'Ares-1 Base (hypothetical)', 'Ponto de partida': 'Starting point', 'Local de pouso Octavia E. Butler': 'Octavia E. Butler landing site', 'Região da 1ª amostra (Rochette)': 'First sample area (Rochette)',
+  'Frente do delta': 'Delta front', 'Wildcat Ridge (aprox.)': 'Wildcat Ridge (approx.)', 'Depósito de amostras Three Forks': 'Three Forks sample depot', 'Topo do delta': 'Delta top', 'Rumo a Neretva Vallis': 'Towards Neretva Vallis',
+  'Minerais hidratados (CRISM)': 'Hydrated minerals (CRISM)', 'BASE': 'BASE', 'VOCÊ': 'YOU', 'DESTINO': 'DESTINATION', 'VISTA DO CAPACETE': 'HELMET VIEW', 'Altura': 'Height',
+  'Sem rota possível até esse ponto.': 'No possible route to that point.', 'Carregando relevo…': 'Loading terrain…', 'Carregando foto…': 'Loading photo…', 'Conectando ao backend…': 'Connecting to backend…',
+  'Backend AresNav · NASA ao vivo': 'AresNav backend · NASA live', 'aguardando o backend': 'waiting for the backend', 'Normal': 'Normal', 'HiRISE': 'HiRISE', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
+  'Controle de missão para caminhadas em Marte · Cratera Jezero': 'Mission control for walks on Mars · Jezero Crater', 'Modo de operação': 'Operation mode',
+  'Recolher o painel da missão': 'Collapse the mission panel', 'Recolher o plano da caminhada': 'Collapse the walk plan', 'Velocidade da simulação': 'Simulation speed',
+  'Descer ao chão: clique aqui e depois em qualquer lugar de Marte': 'Drop to the ground: click here, then anywhere on Mars', 'Descer ao chão em qualquer lugar de Marte': 'Drop to the ground anywhere on Mars',
+  'Exagero vertical do relevo (1× é a escala real)': 'Vertical exaggeration of the terrain (1× is true scale)', 'Dados e procedência': 'Data and provenance', 'Conteúdo da missão ': 'Mission content',
+  'Pesquisar um lugar em Marte': 'Search for a place on Mars', 'Tipo de rota': 'Route type', 'Simular a caminhada': 'Simulate the walk', 'Momento da caminhada': 'Moment of the walk',
+  'Clique para simular a queda do enlace Terra–Marte': 'Click to simulate losing the Earth–Mars link', 'Controles do mapa': 'Map controls', 'Alternar entre globo 3D e mapa 2D': 'Switch between 3D globe and 2D map',
+  'Apontar para o norte': 'Point north', 'Afastar': 'Zoom out', 'Aproximar': 'Zoom in', 'Trocar a imagem de fundo': 'Change the background imagery', 'Fechar': 'Close', 'Mapa de Marte': 'Map of Mars',
+  'Foto de solo tirada pelo Perseverance': 'Ground photo taken by Perseverance', 'Virar à esquerda': 'Turn left', 'Virar à direita': 'Turn right', 'Ir para': 'Go to', 'Altura acima do chão': 'Height above ground',
+  'Procedência dos dados': 'Data provenance', 'Destino': 'Destination',
+  'Pesquisar em Marte': 'Search Mars', 'Caminhada 07 · Sol 412': 'Walk 07 · Sol 412', 'Câmera: —': 'Camera: —', '1× tempo real': '1× real time'
+};
+
+/* Frases e pedaços de frase (o maior primeiro). Os números ficam onde estão. */
+const PHRASES = [
+  ['Habitat da tripulação em terreno plano, perto do local de pouso do Perseverance.', 'Crew habitat on flat ground, close to the Perseverance landing site.'],
+  ['Onde o Perseverance começou a rodar. Referência histórica da missão.', 'Where Perseverance started driving. A historic landmark of the mission.'],
+  ['Rocha vulcânica do fundo da cratera. A primeira amostra guardada pelo rover saiu desta área.', 'Volcanic rock from the crater floor. The first sample cached by the rover came from this area.'],
+  ['Camadas de sedimento deixadas pelo rio antigo. Contam a história do lago.', 'Sediment layers left by the ancient river. They record the history of the lake.'],
+  ['Rocha sedimentar onde o rover detectou moléculas orgânicas.', 'Sedimentary rock where the rover detected organic molecules.'],
+  ['Tubos de amostras deixados no chão para uma missão futura recolher.', 'Sample tubes left on the ground for a future mission to collect.'],
+  ['Sedimentos da parte alta do delta, trazidos de fora da cratera pelo rio.', 'Sediments from the upper delta, carried in from outside the crater by the river.'],
+  ['Antigo canal do rio. Nessa região o rover achou a rocha Cheyava Falls, com possíveis sinais de vida antiga.', 'Ancient river channel. In this region the rover found the Cheyava Falls rock, with possible signs of ancient life.'],
+  ['Detecção orbital de minerais que só se formam na presença de água.', 'Orbital detection of minerals that only form in the presence of water.'],
+  ['Afloramento sedimentar lacustre; alta probabilidade de bioassinaturas preservadas.', 'Lacustrine sedimentary outcrop; high probability of preserved biosignatures.'],
+  ['Esse ponto está fora da área com relevo detalhado (o retângulo pontilhado em Jezero). Escolha um local dentro dele.', 'That point is outside the area with detailed terrain (the dashed rectangle at Jezero). Pick a spot inside it.'],
+  ['Nenhum caminho dentro do limite de declive. Tente outro ponto ou a opção "Mais curta".', 'No path within the slope limit. Try another point or the "Shortest" option.'],
+  ['Esse ponto tem declive de ', 'That point has a slope of '], ['°, acima do limite de ', '°, above the limit of '], ['°. Reduza a carga ou escolha um local mais plano.', '°. Reduce the payload or pick a flatter spot.'],
+  ['Rota segura: evita declives acima de ', 'Safe route: avoids slopes above '], ['° e prefere terreno plano.', '° and prefers flat ground.'], ['Rota mais curta: aceita declives até ', 'Shortest route: accepts slopes up to '],
+  ['OFFLINE TELEMETRY (CACHED): sem enlace com o backend, usando a última telemetria guardada.', 'OFFLINE TELEMETRY (CACHED): no link to the backend, using the last stored telemetry.'],
+  [' m de trecho com declive acima de 8°. Use bastões e passos curtos.', ' m of the route has slopes above 8°. Use poles and short steps.'],
+  ['O retorno passa das 14:30, quando o vento costuma subir. Antecipe a volta.', 'The return runs past 14:30, when the wind usually picks up. Head back earlier.'],
+  ['A volta termina perto do pôr do sol. Encurte a caminhada ou divida em dois dias.', 'The return ends close to sunset. Shorten the walk or split it over two days.'],
+  ['Reserva de oxigênio prevista de ', 'Forecast oxygen reserve of '], ['% na chegada, abaixo dos 30% exigidos.', '% on arrival, below the required 30%.'],
+  ['A rota curta passa por declive de ', 'The shortest route crosses a slope of '], ['°. A rota segura é recomendada.', '°. The safe route is recommended.'],
+  ['Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.', 'Terrain at 200 m resolution: confirm the flagged stretches on the HiRISE image before leaving.'],
+  ['Da sua posição atual até a base pela rota mais rápida:', 'From your current position to base by the fastest route:'], ['. Declive máximo ', '. Max slope '],
+  ['Limite de declive e consumo mudam com a carga.', 'Slope limit and consumption change with the payload.'], ['Limite de declive ', 'Slope limit '], ['° sem carga) · consumo de O₂ ×', '° unloaded) · O₂ use ×'],
+  ['° sem a carga de ', '° without the '], ['% previstos na volta (mín. 30%)', '% forecast at return (min. 30%)'], ['Alerta de poeira', 'Dust alert'], ['Sem alerta', 'No alert'], [' · vento ', ' · wind '],
+  [' · pôr do sol 17:52', ' · sunset 17:52'], [' de ida', ' outbound'], ['Foto indisponível agora (backend ou NASA fora do ar).', 'Photo unavailable right now (backend or NASA down).'],
+  ['Foto real da Navcam do Perseverance · sol ', 'Real Perseverance Navcam photo · sol '], [' · tirada a ', ' · taken '], [' deste ponto', ' from this point'],
+  ['Nenhuma foto de solo perto deste ponto.', 'No ground photo near this point.'], ['OFFLINE: fotos de solo precisam do backend AresNav.', 'OFFLINE: ground photos need the AresNav backend.'],
+  ['Foto de solo indicada pelo contrato (optical_first_person_url) · Perseverance', 'Ground photo named by the contract (optical_first_person_url) · Perseverance'],
+  [' · declive máx. ', ' · max slope '], [' · contrato da API', ' · API contract'], ['Alvo científico', 'Science target'], [' (MOLA global)', ' (global MOLA)'], [' · altitude ', ' · elevation '], [' · declive ', ' · slope '],
+  ['Passe o mouse sobre o mapa para ver altitude e declive reais.', 'Hover over the map to see real elevation and slope.'],
+  [' · declive até 4°', ' · slope up to 4°'], [' · declive 4° a 8°', ' · slope 4° to 8°'], [' · declive acima de 8°', ' · slope above 8°'], ['CRISM · minerais hidratados', 'CRISM · hydrated minerals'],
+  ['(último selo guardado, enlace offline)', '(last stored seal, link offline)'], ['(lido de /api/v1/telemetry)', '(read from /api/v1/telemetry)'],
+  ['Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend AresNav', 'Data: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via AresNav backend'],
+  ['NO-GO · SLOPE OVERLOAD · com ', 'NO-GO · SLOPE OVERLOAD · with '], [' kg o limite cai para ', ' kg the limit drops to '], ['°. Desvie por terreno plano ou reduza a carga.', '°. Divert over flat ground or reduce the payload.'],
+  ['NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ', 'NO-GO · METABOLIC OVERLOAD · O₂ at return forecast below 30% with '], [' kg. Reduza a carga ou encurte a rota.', ' kg. Reduce the payload or shorten the route.'],
+  ['EMERGÊNCIA · siga a rota tracejada até a base', 'EMERGENCY · follow the dashed route to base'], ['TEMPESTADE DE POEIRA · alerta ativo (MEDA)', 'DUST STORM · alert active (MEDA)'], ['OXIGÊNIO ABAIXO DE 30% · volte agora', 'OXYGEN BELOW 30% · head back now'],
+  ['Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital)', 'Real NASA terrain (MOLA/HRSC elevation at 1:1 scale + orbital imagery)'], [' · chão a ', ' · ground at '], [' · você a ', ' · you are '], [' do chão · declive local ', ' above ground · local slope '],
+  ['OFFLINE: as fotos do rover precisam do backend AresNav', 'OFFLINE: rover photos need the AresNav backend'], ['Foto real · Perseverance Navcam', 'Real photo · Perseverance Navcam'],
+  [' do trajeto do rover', ' along the rover traverse'], [' · panorama mais próximo, a ', ' · nearest panorama, '], [' de você', ' from you'], ['ponto de recarga e extração a ', 'recharge and extraction point at '],
+  ['Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram', 'Drag to look around · ↑ ↓ arrows walk along the rover path · ← → turn'],
+  ['Passo real: 2,9 km/h a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar · E sobe e muda para visualização', 'Real pace: 2.9 km/h at 1.7 m above ground, like a suited astronaut (Shift = 5.8 km/h) · W/S walk · A/D turn · drag to look · E climbs and switches to free view'],
+  ['Visualização: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar', 'Free view: W/S move · A/D turn · E climbs and Q descends (or the mouse wheel) · speed grows with height · Shift = 10× · drag to look'],
+  ['Lido do backend AresNav (/api/v1/telemetry) a cada 5 s.', 'Read from the AresNav backend (/api/v1/telemetry) every 5 s.'], ['Sem enlace com o backend: mostrando a última telemetria guardada.', 'No link to the backend: showing the last stored telemetry.'],
+  [' Evidência SHA-256 ', ' Evidence SHA-256 '], ['Nada encontrado. Tente "Olympus", "Gale" ou "18.45, 77.40".', 'Nothing found. Try "Olympus", "Gale" or "18.45, 77.40".'],
+  ['O globo 3D não pôde ser aberto neste navegador (precisa de WebGL e internet). Use o modo Mapa.', 'The 3D globe could not open in this browser (it needs WebGL and internet). Use Map mode.'],
+  ['ENLACE TERRA–MARTE FORA DO AR.', 'EARTH–MARS LINK DOWN.'],
+  ['O AresNav segue operando 100% sobre dados locais: matrizes binárias de relevo (.i16), cache', 'AresNav keeps running 100% on local data: binary elevation grids (.i16), the'],
+  [', mapa de reserva e panoramas já guardados. A navegação continua viva sem internet.', ' cache, the backup map and stored panoramas. Navigation stays alive with no internet.'],
+  ['Carga de amostras e equipamento', 'Samples and equipment payload'], ['HiRISE 25 cm + CTX 6 m', 'HiRISE 25 cm + CTX 6 m'],
+  ['Calculado do relevo HRSC/MOLA (200 m)', 'Computed from HRSC/MOLA elevation (200 m)'], ['CRISM · MRO. Sinal de água no passado', 'CRISM · MRO. Sign of past water'], ['Mars 2020 · cor pelo declive', 'Mars 2020 · coloured by slope'],
+  ['Locais visitados pelo rover e alvos científicos', 'Places visited by the rover and science targets'],
+  ['Clique em qualquer lugar de Marte para descer até o chão. Clique de novo no bonequinho para ir até o astronauta. Esc cancela.', 'Click anywhere on Mars to drop to the ground. Click the figure again to go to the astronaut. Esc cancels.'],
+  ['NASA / JPL / USGS · Mars Trek via backend AresNav', 'NASA / JPL / USGS · Mars Trek via AresNav backend'],
+  ['Dados usados (todos oficiais da NASA, sempre pelo backend AresNav)', 'Data used (all official NASA data, always through the AresNav backend)'],
+  ['O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores.', 'The terrain used to compute the route has 200 m resolution. It is good for choosing the general path but hides smaller rocks and steps.'],
+  ['O relevo do globo está em escala real; o botão 1× / 2,5× exagera a altura só para facilitar a leitura na vista de cima.', 'The globe terrain is at true scale; the 1× / 2.5× button exaggerates height only to make it easier to read from above.'],
+  ['As imagens de alta resolução (HiRISE e CTX) são em tons de cinza e recebem por cima a cor real do mosaico Viking.', 'The high-resolution images (HiRISE and CTX) are greyscale and are tinted with the real colour of the Viking mosaic.'],
+  ['A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje.', 'Ares-1 Base is hypothetical. Heart rate, pace and the oxygen forecast are simulated from the route, the real terrain and the suit payload.'],
+  ['As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance.', 'The Helmet mode photos are real raw images from the Perseverance Navcam.'],
+  ['No "Terreno 3D" a vista é montada só com dados orbitais: ao descer em qualquer ponto de Marte, o app pede ao backend o relevo real do lugar (HRSC + MOLA, cerca de 230 m por ponto).', 'In "3D terrain" the view is built from orbital data only: when you drop anywhere on Mars, the app asks the backend for the real terrain of that place (HRSC + MOLA, about 230 m per sample).'],
+  ['1st Person Ground Truth · 4ª camada óptica', '1st Person Ground Truth · 4th optical layer'], ['Câmera: ', 'Camera: ']
+];
+
+/* Padrões em que a ordem das palavras muda */
+const RULES = [
+  [/Desviar (\d+) ?m a Leste: inclinação de ([\d.,]+)° excede limite seguro do traje \(([\d.,]+)° com carga de ([\d.,]+) ?kg\)\./g, 'Divert $1 m east: the $2° slope exceeds the suit safe limit ($3° with an $4 kg payload).'],
+  [/^Máximo ([\d.,]+)° de ([\d.,]+)°/, 'Max $1° of $2°'], [/without the ([\d.,]+) kg\)/, 'without the $1 kg payload)'],
+  [/^Limite ([\d.,]+)° com ([\d.,]+) kg$/, 'Limit $1° with $2 kg'], [/^Retorno (\d\d:\d\d)/, 'Back at $1'],
+  [/^volta (.+)$/, 'return $1'], [/^descida (.+)$/, 'descent $1'], [/^limite (.+)$/, 'limit $1'], [/^(\d+) paradas?$/, (m, n) => n + (n === '1' ? ' stop' : ' stops')],
+  [/^a ([\d.,]+ k?m)$/, '$1 away'], [/^Parada: (.*)$/, 'Stop: $1'], [/^Chegada: (.*)$/, 'Arrival: $1'],
+  [/rumo (\d+°)/, 'heading $1'], [/· chegada (\d\d:\d\d)/, '· arrive $1'], [/declive máx\. /, 'max slope '], [/ · parada de (\d+) min/, ' · $1 min stop'], [/ · também: /, ' · also: '],
+  [/ · parada (\d+) de (\d+)/, ' · stop $1 of $2'], [/° L\b/g, '° E'], [/(\d) do chão/, '$1 above ground'],
+  [/^O₂ (.+) · carga (.+) · limite (.+)° \((\d+)° sem carga\)$/, 'O₂ $1 · payload $2 · limit $3° ($4° unloaded)']
+];
+
+PHRASES.sort((a, b) => b[0].length - a[0].length);
+function translate(str) {
+  if (lang !== 'en' || !str) return str;
+  const trimmed = str.trim(); if (!trimmed) return str;
+  if (Object.prototype.hasOwnProperty.call(EXACT, trimmed)) return str.replace(trimmed, EXACT[trimmed]);
+  let out = str;
+  for (const [pt, en] of PHRASES) if (out.includes(pt)) out = out.split(pt).join(en);
+  for (const [re, en] of RULES) out = out.replace(re, en);
+  // nomes de lugares e de fases dentro de frases maiores
+  if (out !== str || /[À-ú]/.test(out)) for (const pt in EXACT) { if (pt.length > 11 && out.includes(pt)) out = out.split(pt).join(EXACT[pt]); }
+  return out;
+}
+window.T = translate;
+
+if (lang === 'en') {
+  const ATTRS = ['title', 'placeholder', 'aria-label'];
+  const skip = n => { const p = n.parentElement; return !p || p.closest('script,style,.cesium-widget,.leaflet-tile-pane'); };
+  function walk(node) {
+    if (node.nodeType === 3) { if (!skip(node)) { const t = translate(node.nodeValue); if (t !== node.nodeValue) node.nodeValue = t; } return; }
+    if (node.nodeType !== 1 || /^(SCRIPT|STYLE|CANVAS)$/.test(node.tagName)) return;
+    ATTRS.forEach(a => { const v = node.getAttribute(a); if (v) { const t = translate(v); if (t !== v) node.setAttribute(a, t); } });
+    for (let c = node.firstChild; c; c = c.nextSibling) walk(c);
+  }
+  const start = () => {
+    walk(document.body);
+    new MutationObserver(list => list.forEach(m => {
+      if (m.type === 'characterData') walk(m.target);
+      else if (m.type === 'attributes') { const v = m.target.getAttribute(m.attributeName); if (v) { const t = translate(v); if (t !== v) m.target.setAttribute(m.attributeName, t); } }
+      else m.addedNodes.forEach(walk);
+    })).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+}
+})();
