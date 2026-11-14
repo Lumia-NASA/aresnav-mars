@@ -68,7 +68,7 @@ function plan() {
   const segs = segments(st.path), wt = Physics.walkTimes(segs, st.payloadKg);
   const work = st.sim ? st.sim.total - st.info.tOut - st.info.tBack : 0;
   // ponto de retorno descontando o tempo de trabalho já planejado: o O₂ das paradas também sai do tanque
-  const tb = Physics.turnBackPoint(segs, st.payloadKg, A.EVA_MAX - work * Physics.metabolicFactor(st.payloadKg), 30);
+  const tb = Physics.turnBackPoint(segs, st.payloadKg, A.EVA_MAX, 30, work);   // o tempo parado entra inteiro no consumo (conservador)
   const tbLL = tb.index >= 0 ? A.cellLL(st.path[tb.index]) : A.cellLL(st.path[0]);
   return { segs, wt, tb, tbLL, work };
 }
