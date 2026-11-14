@@ -16,6 +16,20 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  'Valor de exemplo do contrato, não é leitura de instrumento': 'Contract sample value, not an instrument reading',
+  'Mínima': 'Minimum',
+  'Máxima': 'Maximum',
+  'Pressão': 'Pressure',
+  'Agora (estimada)': 'Now (estimated)',
+  'Exemplo do contrato (o MEDA público não traz)': 'Contract sample (not in the public MEDA feed)',
+  'Alerta (exemplo)': 'Alert (sample)',
+  'Luz do Sol': 'Sunlight',
+  'Vento (ex.)': 'Wind (sample)',
+  'Radiação (ex.)': 'Radiation (sample)',
+  'ALERTA DE POEIRA · valor de exemplo do contrato': 'DUST ALERT · contract sample value',
+  'Tempo medido (mínima, máxima, pressão)': 'Measured weather (min, max, pressure)',
+  'Sem dado medido': 'No measured data',
+  'NASA/JPL-Caltech/CAB (mars.nasa.gov weather feed)': 'NASA/JPL-Caltech/CAB (mars.nasa.gov weather feed)',
   'Mostrar no mapa o trecho que causou o veredito': 'Show on the map the segment that caused the verdict',
   'O₂ abaixo da reserva na volta': 'O₂ below reserve on return',
   'Daqui para a frente não dá para voltar com 30% de O₂': 'Past this point you cannot get back with 30% O₂',
@@ -290,6 +304,12 @@ const PHRASES = [
 
 /* Padrões em que a ordem das palavras muda */
 const RULES = [
+  [/^(.+) a (.+) °C · (.+) Pa · sol (\d+) \((.+)\), dado de (\d+) dias atrás$/, '$1 to $2 °C · $3 Pa · sol $4 ($5), data from $6 days ago'],
+  [/^Retorno (\d\d:\d\d) · Sol a (\d+)° · pôr do sol (\d\d:\d\d) \(sol (\d+)\)$/, 'Back at $1 · Sun at $2° · sunset $3 (sol $4)'],
+  [/^Pôr do sol \(sol (\d+)\)$/, 'Sunset (sol $1)'],
+  [/^A volta termina a menos de 1 h do pôr do sol \((\d\d:\d\d)\)\. Encurte a caminhada ou divida em dois dias\.$/, 'The return ends less than 1 h before sunset ($1). Shorten the walk or split it over two sols.'],
+  [/^Ambiente · MEDA sol (\d+) \((.+), há (\d+) dias\)$/, 'Environment · MEDA sol $1 ($2, $3 days ago)'],
+  [/^nasce (\d\d:\d\d) · põe (\d\d:\d\d)$/, 'rises $1 · sets $2'],
   [/\(15° sem carga, regra simulada\)/, '(15° unloaded, simulated rule)'], [/ · consumo de O₂ ×/, ' · O₂ use ×'],
   [/^\+?(.+) na ida \(mais subida\)$/, '+$1 on the way out (more climbing)'],
   [/^\+?(.+) na volta \(mais subida\)$/, '$1 on the way back (more climbing)'],

@@ -536,6 +536,35 @@ fastify.get('/api/v1/fub/pano/:folder/*', { config: PROXY_RATE }, async (request
   return reply.code(200).header('Content-Type', 'image/jpeg').header('Cache-Control', 'public, max-age=604800').header('X-AresNav-Cache', r.cache).send(r.body);
 });
 
+// Tempo real medido pelo MEDA do Perseverance (feed público da NASA). A NASA publica só os últimos sols
+// liberados: temperatura mínima e máxima, pressão e nascer e pôr do sol. Não traz vento nem radiação.
+// O backend devolve o último sol com medida, a data dele e a idade em dias, para a tela não fingir que é "agora".
+const MEDA_URL = 'https://mars.nasa.gov/rss/api/?feed=weather&category=mars2020&feedtype=json&ver=1.0';
+const CACHE_MEDA = path.join(CACHE_DIR, 'meda_weather.cached.json');
+const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : (v !== '--' && v !== '' && v != null && Number.isFinite(Number(v)) ? Number(v) : null));
+fastify.get('/api/v1/weather', async (request, reply) => {
+  let raw = null, degraded = false;
+  if (!cacheOnly(request)) {
+    try {
+      assertAuthorizedScope(MEDA_URL);
+      const r = await axios.get(MEDA_URL, { timeout: REQUEST_TIMEOUT_MS, headers: { 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: s => s === 200 });
+      if (!Array.isArray(r.data && r.data.sols)) throw new Error('feed sem sols');
+      raw = r.data;
+      try { fs.writeFileSync(CACHE_MEDA, JSON.stringify(raw), 'utf8'); } catch (e) { /* cache é opcional */ }
+    } catch (err) { fastify.log.warn({ err: err.message }, 'MEDA: usando cache'); }
+  }
+  if (!raw) { raw = loadOfflineCache(CACHE_MEDA); degraded = true; }
+  if (!raw) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ success: false, error: 'NASA inacessível e MEDA fora do cache' });
+  const sols = raw.sols.map(s => ({ sol: Number(s.sol), date: s.terrestrial_date, ls: num(s.ls), season: s.season, minC: num(s.min_temp), maxC: num(s.max_temp), pressurePa: num(s.pressure), sunrise: s.sunrise, sunset: s.sunset }))
+    .sort((a, b) => a.sol - b.sol);
+  const latest = [...sols].reverse().find(s => s.minC != null && s.maxC != null) || null;
+  const ageDays = latest ? Math.floor((Date.now() - Date.parse(latest.date + 'T12:00:00Z')) / 86400000) : null;
+  const data = { source: 'NASA Mars 2020 MEDA (mars.nasa.gov weather feed)', latest, ageDays, sols, missing: ['wind', 'radiation', 'dust'] };
+  const hash = computeEvidenceHash(data);
+  if (latest) reply.header('X-AresNav-Data-Date', latest.date);
+  return reply.code(200).header('X-AresNav-Evidence-SHA256', hash).send({ success: true, degraded, evidenceSha256: hash, data });
+});
+
 // Zonas de exploração para missões humanas (NASA Human Landing Site / Exploration Zone Workshop, 2015)
 const ZONES_URL = `${TREK_AGS}/EZMars/MapServer/0/query?where=1%3D1&outFields=name,lat,lon,elev,abstract_l&returnGeometry=false&f=json`;
 const CACHE_ZONES = path.join(CACHE_DIR, 'exploration_zones.cached.json');

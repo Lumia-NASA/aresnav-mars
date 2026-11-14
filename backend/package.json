@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node ../tests/smoke-test.js && node ../tests/physics-test.js && node ../tests/fub-test.js && node ../tests/demo-flow-test.js",
+    "test": "node ../tests/smoke-test.js && node ../tests/physics-test.js && node ../tests/sun-test.js && node ../tests/fub-test.js && node ../tests/demo-flow-test.js",
     "prewarm": "node ../tools/prewarm-demo.js",
     "check-offline": "node ../tools/prewarm-demo.js --check"
   },

@@ -24,7 +24,7 @@ const CHARTS = [
 ];
 
 /* Selo de procedência de cada número: medido por instrumento, derivado do relevo, ou simulado pelo modelo */
-const SRC = { m: ['MEASURED', 'Medido por instrumento (MEDA, waypoints do Perseverance)'], d: ['DEM-DERIVED', 'Calculado do relevo orbital MOLA/HRSC'], s: ['SIMULATED', 'Estimado pelo modelo do traje e da caminhada'] };
+const SRC = { m: ['MEASURED', 'Medido por instrumento (MEDA, waypoints do Perseverance)'], d: ['DEM-DERIVED', 'Calculado do relevo orbital MOLA/HRSC'], s: ['SIMULATED', 'Estimado pelo modelo do traje e da caminhada'], e: ['SAMPLE', 'Valor de exemplo do contrato, não é leitura de instrumento'] };
 const badge = k => `<i class="prov-badge ${k}" title="${SRC[k][1]}">${SRC[k][0]}</i>`;
 const GAUGE_SRC = { o2: 's', hr: 's', co2: 's', suitKpa: 's', suitTemp: 's', batt: 's' };
 const CHART_SRC = { h: 'd', slope: 'd', speed: 's', o2: 's', hr: 's' };
@@ -105,7 +105,8 @@ function renderMeda() {
   $('#meda').innerHTML =
     (A.state.linkState === 'online' ? '' : '<p class="offline-note">OFFLINE TELEMETRY (CACHED)</p>') +
     '<p class="comm-line mono" id="teleComm">📡 COMM: —</p>' +
-    block('Ambiente · MEDA', [['Temperatura', val(m.temp_c, 1, ' °C'), 'm'], ['Vento', val(m.wind_speed_ms, 1, ' m/s'), 'm'], ['Radiação', val(m.radiation_msv_day, 2, ' mSv/sol'), 'm'], ['Poeira', m.dust_storm_alert == null ? '—' : m.dust_storm_alert ? 'Alerta ativo' : 'Normal', 'm']]) +
+    (w => block(w ? `Ambiente · MEDA sol ${w.sol} (${w.date}, há ${w.ageDays} dias)` : 'Ambiente · MEDA', [['Mínima', w ? val(w.minC, 1, ' °C') : '—', 'm'], ['Máxima', w ? val(w.maxC, 1, ' °C') : '—', 'm'], ['Pressão', w ? val(w.pressurePa, 0, ' Pa') : '—', 'm'], ['Agora (estimada)', (tc => tc == null ? '—' : '≈ ' + val(tc, 0, ' °C'))(A.tempAt(A.T0 + (A.state.now ? A.state.now.t : 0))), 's']]))(A.state.wx) +
+    block('Exemplo do contrato (o MEDA público não traz)', [['Vento', val(m.wind_speed_ms, 1, ' m/s'), 'e'], ['Radiação', val(m.radiation_msv_day, 2, ' mSv/sol'), 'e'], ['Poeira', m.dust_storm_alert == null ? '—' : m.dust_storm_alert ? 'Alerta (exemplo)' : 'Normal', 'e'], ['Luz do Sol', `nasce ${A.clock(A.SUN.sunrise)} · põe ${A.clock(A.SUN.sunset)}`, 'd']]) +
     block('Mobilidade', [['O₂ restante', val(mob.o2_remaining_pct, 0, '%'), 's'], ['Carga do traje', val(mob.suit_payload_kg, 1, ' kg'), 's'], ['Dupla', val(mob.buddy_eva2_distance_m, 1, ' m'), 's'], ['Rover de apoio', statusPt(mob.support_rover_status), 'm']]) +
     block('Topografia', [['Declive', val(topo.slope_deg, 1, '°'), 'd'], ['Limite seguro', val(topo.max_safe_slope_deg, 0, '°'), 's'], ['Terreno', statusPt(topo.terrain_status), 'd'], ['Modo', statusPt(mob.mode), 's']]) +
     block('Posição', [['Latitude', val(loc.lat, 4, '° N'), 'm'], ['Longitude', val(loc.lng, 4, '° L'), 'm'], ['Altitude', val(loc.elevation_m, 1, ' m'), 'd'], ['Local', loc.name || '—', 'm']]) +
@@ -117,6 +118,7 @@ A.on('route', () => { buildSeries(); render(); });
 const render1Hz = A.throttle(render, 1000);   // painel atualiza a 1 Hz
 A.on('tick', render1Hz);
 A.on('telemetry', () => { if (A.state.view === 'telemetry') renderMeda(); });
+A.on('weather', () => { if (A.state.view === 'telemetry') renderMeda(); });
 A.on('view', v => { if (v === 'telemetry') { renderMeda(); render(); } });
 window.addEventListener('resize', render1Hz);
 })();
