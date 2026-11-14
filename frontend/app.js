@@ -66,29 +66,37 @@ const MX = DX * Math.PI / 180 * R_MARS * Math.cos(LAT0 * Math.PI / 180);
 const MY = DY * Math.PI / 180 * R_MARS;
 
 /* ---------- Tabela de fontes ---------- */
+/* [chave, camada, missão, instrumento, rota do backend, fonte e crédito exigido] */
 const SOURCES = [
-  ['telemetry', 'Telemetria unificada (contrato)', 'MOLA + MEDA + Mars 2020', 'CONTRATO_API.json', '/api/v1/telemetry'],
-  ['viking', 'Mosaico global colorido', 'Viking Orbiter', 'VIS (232 m)', '/api/v1/tiles/viking'],
-  ['hirise', 'Imagem HiRISE 25 cm', 'Mars Reconnaissance Orbiter', 'HiRISE', '/api/v1/tiles/hirise'],
-  ['ctx', 'Imagem CTX 6 m', 'Mars Reconnaissance Orbiter', 'CTX', '/api/v1/tiles/ctx'],
-  ['mosaic', 'Mosaico de pouso', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/mosaic'],
-  ['relief', 'Relevo colorido', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC', '/api/v1/tiles/relief'],
-  ['gdem', 'Relevo global (globo 3D)', 'Mars Global Surveyor', 'MOLA', 'camada local'],
-  ['dem', 'Altitude e declive (rota)', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC (200 m)', '/api/v1/dem/jezero'],
-  ['themis', 'Infravermelho diurno', '2001 Mars Odyssey', 'THEMIS', '/api/v1/tiles/themis'],
-  ['fubcolor', 'Jezero em cor natural (FU Berlin)', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/fubcolor'],
-  ['crism', 'Minerais hidratados', 'Mars Reconnaissance Orbiter', 'CRISM', '/api/v1/crism'],
-  ['traverse', 'Trajeto do Perseverance', 'Mars 2020', 'Navegação do rover', '/api/v1/traverse'],
-  ['navcam', 'Fotos de solo (Capacete e pop-up)', 'Mars 2020', 'Navcam (imagens brutas)', '/api/v1/navcam']
+  ['telemetry', 'Telemetria unificada (contrato)', 'MOLA + MEDA + Mars 2020', 'CONTRATO_API.json', '/api/v1/telemetry', 'Contrato AresNav (valores de exemplo)'],
+  ['viking', 'Mosaico global colorido', 'Viking Orbiter', 'VIS (232 m)', '/api/v1/tiles/viking', 'NASA/JPL/USGS · Mars Trek'],
+  ['hirise', 'Imagem HiRISE 25 cm', 'Mars Reconnaissance Orbiter', 'HiRISE', '/api/v1/tiles/hirise', 'NASA/JPL/University of Arizona · Mars Trek'],
+  ['ctx', 'Imagem CTX 6 m', 'Mars Reconnaissance Orbiter', 'CTX', '/api/v1/tiles/ctx', 'NASA/JPL-Caltech/MSSS · Mars Trek'],
+  ['mosaic', 'Mosaico de pouso', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/mosaic', 'NASA/JPL/UA/MSSS · ESA/DLR/FU Berlin · Mars Trek'],
+  ['relief', 'Relevo colorido', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC', '/api/v1/tiles/relief', 'NASA/GSFC · ESA/DLR/FU Berlin · Mars Trek'],
+  ['gdem', 'Relevo global (globo 3D)', 'Mars Global Surveyor', 'MOLA', 'camada local', 'NASA/GSFC · Mars Trek'],
+  ['dem', 'Altitude e declive (rota)', 'Mars Global Surveyor + Mars Express', 'MOLA, HRSC (200 m)', '/api/v1/dem/jezero', 'NASA/GSFC · ESA/DLR/FU Berlin · Mars Trek'],
+  ['themis', 'Infravermelho diurno', '2001 Mars Odyssey', 'THEMIS', '/api/v1/tiles/themis', 'NASA/JPL-Caltech/ASU · Mars Trek'],
+  ['fubcolor', 'Jezero em cor natural', 'MRO + Mars Express', 'HiRISE, CTX, HRSC', '/api/v1/tiles/fubcolor', 'FU Berlin (WebGIS Jezero) · HRSC ESA/DLR/FU Berlin, CC BY-SA 3.0 IGO · HiRISE NASA/JPL/UA (Fergason et al. 2020) · CTX NASA/JPL-Caltech/MSSS'],
+  ['fubvec', 'Margem do lago, canais, elipse de pouso', 'Mapeamento geológico', 'sobre HRSC + HiRISE', '/api/v1/fub/:layer', 'Freie Universität Berlin, Planetologia (WebGIS Jezero)'],
+  ['pano360', 'Panoramas 360° — fotos reais', 'Mars 2020', 'Mastcam-Z', '/api/v1/fub/pano', 'NASA/JPL-Caltech/ASU/MSSS · montagem FU Berlin'],
+  ['panosyn', 'Panoramas 360° — vistas sintéticas', 'Modelo de relevo', 'HiRISE, CTX, HRSC', '/api/v1/fub/pano', 'Renderização da FU Berlin a partir do relevo: não é foto'],
+  ['tes', 'Poeira e firmeza do solo', 'Mars Global Surveyor', 'TES', '/api/v1/tiles/dust, inertia', 'NASA/JPL/ASU · Mars Trek'],
+  ['rough', 'Rugosidade da superfície', 'Mars Global Surveyor', 'MOLA', '/api/v1/tiles/rough', 'NASA/GSFC · Mars Trek'],
+  ['zones', 'Zonas de exploração humana', 'Workshop NASA 2015', '—', '/api/v1/zones', 'NASA · Mars Trek (EZMars)'],
+  ['crism', 'Minerais hidratados', 'Mars Reconnaissance Orbiter', 'CRISM', '/api/v1/crism', 'NASA/JPL/JHUAPL · Mars Trek'],
+  ['traverse', 'Trajeto do Perseverance', 'Mars 2020', 'Navegação do rover', '/api/v1/traverse', 'NASA/JPL-Caltech (MMGIS)'],
+  ['navcam', 'Fotos de solo (Capacete e pop-up)', 'Mars 2020', 'Navcam (imagens brutas)', '/api/v1/navcam', 'NASA/JPL-Caltech'],
+  ['copilot', 'Copiloto ARES', 'Claude (Anthropic) ou modo local', '—', '/api/v1/copilot', 'Responde só com os números calculados pelo app']
 ];
 const srcStatus = {};
-const ST_LABEL = { ok: 'Backend · NASA ao vivo', fb: 'Cache / cópia local', off: 'Desligada', wait: 'Aguardando' };
+const ST_LABEL = { ok: 'Backend · ao vivo', fb: 'Cache / cópia local', off: 'Desligada', wait: 'Aguardando' };
 function setStatus(id, s) {
   if (srcStatus[id] === s) return;
   srcStatus[id] = s;
-  $('#srcTable').innerHTML = SOURCES.map(([k, a, b, c, d]) => {
+  $('#srcTable').innerHTML = SOURCES.map(([k, a, b, c, d, e]) => {
     const st = srcStatus[k] || 'wait';
-    return `<tr><td>${a}</td><td>${b}</td><td>${c}</td><td class="mono">${d}</td><td class="${st === 'off' ? 'wait' : st}">${ST_LABEL[st]}</td></tr>`;
+    return `<tr><td>${a}</td><td>${b}</td><td>${c}</td><td class="mono">${d}</td><td class="credit">${e}</td><td class="${st === 'off' ? 'wait' : st}">${ST_LABEL[st]}</td></tr>`;
   }).join('');
 }
 

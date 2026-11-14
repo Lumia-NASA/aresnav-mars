@@ -146,7 +146,7 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-shore" checked><b>Margem do antigo lago</b><small>Contorno mapeado pela FU Berlin</small></label>
   <label class="layer"><input type="checkbox" id="ov-channels" checked><b>Canais dos rios</b><small>Neretva e Sava (entrada), Pliva (saída)</small></label>
   <label class="layer"><input type="checkbox" id="ov-ellipse" checked><b>Elipse de pouso do Perseverance</b><small>Área-alvo do pouso da Mars 2020</small></label>
-  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>64 pontos · clique para ver em 360° aqui no app</small></label>
+  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>Laranja: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°</small></label>
   <label class="layer"><input type="checkbox" id="ov-contour"><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
   <h3 class="gap">Marte inteiro</h3>
   <label class="layer"><input type="checkbox" id="ov-sites" checked><b>Locais de pouso</b><small>14 sondas e rovers, 1971–2021</small></label>
@@ -157,6 +157,11 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-grid"><b>Grade lat / lon</b><small>A cada 10°</small></label>
   <label class="layer"><input type="checkbox" id="ov-sun" checked><b>Sol de agora</b><small>Dia e noite reais no globo, pela hora de Marte</small></label>`;
 layersBlock.append(...extra.children);
+/* Enlace fora: camadas que dependem da internet (sem cópia local) ganham o aviso "indisponível offline" */
+const OFFLINE_NOTE = { 'ov-dust': 'Indisponível offline', 'ov-inertia': 'Indisponível offline', 'ov-rough': 'Indisponível offline', 'ov-contour': 'Indisponível offline', 'ov-pano360': 'Offline: só os panoramas já abertos' };
+function markOffline(input, text) { const lab = input && input.closest('label'); if (!lab || lab.querySelector('.offline-tag')) return; const t = document.createElement('em'); t.className = 'offline-tag'; t.textContent = text; lab.appendChild(t); }
+Object.keys(OFFLINE_NOTE).forEach(id => markOffline($('#' + id), OFFLINE_NOTE[id]));
+markOffline(document.querySelector('input[name="base"][value="fub"]'), 'Indisponível offline: usa o mosaico Viking');
 const sci = document.createElement('section'); sci.className = 'block';
 sci.innerHTML = '<h3>Ciência alcançável</h3><p class="hint">Com a carga atual, ida e volta pela rota segura, 20 min de trabalho e 30% de O₂ na chegada.</p><ul class="dest reach" id="reachList"></ul>';
 layersBlock.after(sci);
@@ -355,16 +360,19 @@ async function loadFub() {
     try { const r = await fetch(`${A.API}/fub/${k}`, { cache: 'no-cache' }); if (r.ok) FUB[k] = (await r.json()).data; } catch (e) { /* sem backend: camada fica vazia */ }
   }));
   buildFubLeaflet(); drawFub();
+  if (FUB.lake) A.setStatus('fubvec', A.state.linkState === 'online' ? 'ok' : 'fb');
 }
 /* abre o panorama no visor 360° do próprio app (pano360.js); o site da FU Berlin fica só como crédito */
 const openTour = p => { if (A.pano360) A.pano360.open(p); };
-const panoTxt = p => `${p.name || 'Panorama'} · ${(p.credits || '').replace(/,.*$/, '')} · ${tr('abrir 360°')}`;
+/* pano_id negativo = vista sintética renderizada do relevo pela FU Berlin; positivo = foto real da Mastcam-Z */
+const isSynthetic = p => Number(p.pano_id) < 0;
+const panoTxt = p => `${p.name || 'Panorama'} · ${tr(isSynthetic(p) ? 'vista sintética do relevo (não é foto)' : 'foto real · Mastcam-Z')} · ${tr('abrir 360°')}`;
 function buildFubLeaflet() {
   if (!window.L || !A.map) return;
   if (FUB.lake) fubL.shore = L.geoJSON(FUB.lake, { style: { color: '#4FA3FF', weight: 2, fillColor: '#4FA3FF', fillOpacity: 0.12, dashArray: '6 4' }, interactive: false });
   if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#7FD4FF', weight: 1.6, opacity: 0.9 }, interactive: false });
   if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
-  if (FUB.panoramas) fubL.pano360 = L.geoJSON(FUB.panoramas, { pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 5, color: '#0A0D14', weight: 1.5, fillColor: '#FF9F43', fillOpacity: 0.95 }),
+  if (FUB.panoramas) fubL.pano360 = L.geoJSON(FUB.panoramas, { pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 5, color: '#0A0D14', weight: 1.5, fillColor: isSynthetic(f.properties) ? '#B98CFF' : '#FF9F43', fillOpacity: 0.95 }),
     onEachFeature: (f, l) => { l.bindTooltip(panoTxt(f.properties), { className: 'tag' }); l.on('click', e => { L.DomEvent.stopPropagation(e); openTour(f.properties); }); } });
 }
 function ringsOf(g) { return g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []; }
@@ -381,7 +389,7 @@ function drawFub() {
   if (!fubG.channels.length && FUB['channel-lines']) FUB['channel-lines'].features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.channels.push(lineE(r, '#7FD4FF', 2))));
   if (!fubG.ellipse.length && FUB.landingellipse) FUB.landingellipse.features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.ellipse.push(lineE(r, '#FFFFFF', 1.6, true))));
   if (!fubG.pano360.length && FUB.panoramas) FUB.panoramas.features.forEach(f => {
-    const [lon, lat] = f.geometry.coordinates, e = gLabel(v, lat, lon, '360°', '#FF9F43', 60000);
+    const [lon, lat] = f.geometry.coordinates, syn = isSynthetic(f.properties), e = gLabel(v, lat, lon, syn ? tr('360° sintético') : '360°', syn ? '#B98CFF' : '#FF9F43', 60000);
     e._aresTour = f.properties; fubG.pano360.push(e);
   });
   Object.keys(fubG).forEach(k => fubG[k].forEach(e => { e.show = on('ov-' + k) && !walking; }));

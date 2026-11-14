@@ -19,8 +19,8 @@ O **AresNav** é um sistema tático de navegação e sobrevivência para astrona
 ---
 
 ## 🛡️ Arquitetura de Defesa e Resiliência
-* **Offline-First Cache:** Todos os dados científicos possuem cache local em `/backend/data/cache/` para operação 100% autônoma e à prova de oscilações de internet ou da API da NASA.
-* **ScopeGuard (KhaosForge):** Bloqueio estrito contra SSRF, limitando conexões aos domínios oficiais da NASA (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`).
+* **Offline-First Cache:** Os dados da rota (relevo, trajeto, telemetria) têm cache local em `/backend/data/cache/` e seguem funcionando sem internet. Camadas da FU Berlin, mapas globais e panoramas 360° só funcionam offline se já estiverem no cache. Oscilações da internet ou da API da NASA não derrubam o app.
+* **ScopeGuard (KhaosForge):** Bloqueio estrito contra SSRF, limitando conexões aos domínios da NASA (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`) e ao WebGIS de Jezero da FU Berlin (`maps.planet.fu-berlin.de`).
 * **EvidenceGate:** Selamento criptográfico SHA-256 de cada telemetria processada, garantindo integridade auditável ponta a ponta.
 * **CORS Restrito & Rate Limiting:** Proteção de backend Fastify contra abusos e negação de serviço.
 
