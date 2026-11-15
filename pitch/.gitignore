@@ -1,0 +1,20 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignore the output video from Git but not videos you import into src/.
+out
+
+# Skills do Remotion (copias de terceiros): quem precisar roda "npx remotion skills add" dentro de pitch/
+.agents/
+.claude/
+skills-lock.json
+
+# Imagens gravadas que o video final nao usa (o script capture.mjs gera de novo)
+public/footage/mars-globe.jpg
+public/footage/planner-nogo.jpg
+public/footage/helmet-photo.jpg
+public/footage/helmet-countdown.jpg
+public/footage/jezero-approach.jpg
+public/footage/fly-ui/
