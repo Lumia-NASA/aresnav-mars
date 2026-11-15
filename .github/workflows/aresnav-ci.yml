@@ -20,6 +20,14 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Backend Dependencies
+        run: |
+          npm ci --prefix backend
+
+      - name: Dependency Security Audit (SCA Gate)
+        run: |
+          npm audit --prefix backend --audit-level=high
+
       - name: DevSecOps Gate — Leak & Secrets Prevention
         run: |
           echo "Verificando se há arquivos .env ou chaves vazadas no repositório..."
@@ -45,10 +53,6 @@ jobs:
         run: |
           node tests/exec-test.js
           node tests/hirise-test.js
-
-      - name: Install Backend Dependencies
-        run: |
-          npm ci --prefix backend
 
       - name: FU Berlin Integration Tests (360° viewer logic, tiles & panorama routes, offline)
         run: |

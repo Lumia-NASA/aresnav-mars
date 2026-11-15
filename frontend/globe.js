@@ -333,8 +333,11 @@ function placeCamera(dt) {
 function tilt() {
   const r = Math.PI / 180, h = walk.heading * r, f = [Math.sin(h), Math.cos(h)], rt = [Math.cos(h), -Math.sin(h)], L = 1.8, W = 1.2;
   const at = (e, n) => A.heightAt(walk.lat + n / (A.R_MARS * r), walk.lon + e / (A.R_MARS * r * Math.cos(walk.lat * r)));
-  return { pitch: Math.atan2(at(f[0] * L, f[1] * L) - at(-f[0] * L, -f[1] * L), 2 * L) / r,
-    roll: Math.atan2(at(-rt[0] * W, -rt[1] * W) - at(rt[0] * W, rt[1] * W), 2 * W) / r };
+  const fwd = at(f[0] * L, f[1] * L), bwd = at(-f[0] * L, -f[1] * L);
+  const left = at(-rt[0] * W, -rt[1] * W), right = at(rt[0] * W, rt[1] * W);
+  const dp = (Number.isFinite(fwd) && Number.isFinite(bwd)) ? fwd - bwd : 0;
+  const dr = (Number.isFinite(left) && Number.isFinite(right)) ? left - right : 0;
+  return { pitch: Math.atan2(dp, 2 * L) / r, roll: Math.atan2(dr, 2 * W) / r };
 }
 /* Acabamento da vista do chão: céu marciano, poeira que cresce com a distância, cor de Marte sobre a
    imagem orbital (que vem em tons de cinza) e um granulado fino no solo perto dos pés. Roda na placa de vídeo. */

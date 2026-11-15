@@ -43,7 +43,7 @@ function freezePlan() {
 let run = null, timer = null;
 function start() {
   const f = freezePlan();
-  if (!f) { alert(tr('Trace uma rota antes de executar a caminhada.')); return; }
+  if (!f) { say(tr('Trace uma rota antes de executar a caminhada.')); return; }
   A.setPlaying(false);
   run = Object.assign(f, { E: 0, pace: Number($('#execPace').value) || 1, turned: null, paused: false, prev: null, prevRadio: null, prevOff: 0, log: [] });
   card.hidden = false; startBtn.textContent = tr('Encerrar execução'); startBtn.setAttribute('aria-pressed', 'true');

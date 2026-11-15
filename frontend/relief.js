@@ -41,7 +41,7 @@ function placeRimfax() {
 function tiers() {
   const B = A.BOX, G = A.GRID, k = Math.max(1, Math.min(4, Math.floor(1024 / Math.max(G.W, G.H))));
   return [
-    { id: 'global', west: -180, south: -90, east: 180, north: 90, w: 1440, h: 720, z: 9, blur: 5 },
+    { id: 'global', west: -180, south: -90, east: 180, north: 90, w: 720, h: 360, z: 9, blur: 5 },
     { id: 'region', west: 75.9, south: 16.9, east: 78.9, north: 19.9, w: 640, h: 640, z: 3.2, blur: 6 },
     { id: 'jezero', west: B.XMIN, south: B.YMIN, east: B.XMAX, north: B.YMAX, w: G.W * k, h: G.H * k, z: 1.8, blur: 7 }
   ];
