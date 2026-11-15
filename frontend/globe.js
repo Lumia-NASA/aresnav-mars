@@ -14,7 +14,7 @@ let viewer = null, failed = false, C = null, buildImagery = null, makeTerrain = 
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
 const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, alt: EYE, vel: 0, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0, gx: 0, gy: 0,
   odo: 0, phase: 0, gz: null, yaw: 0, vp: 0, vr: 0, warn: null };
-/* Três jeitos de andar no Terreno 3D (hipóteses em docs/HIPOTESES.md):
+/* Três jeitos de andar no Terreno 3D (hipóteses em docs/ASSUMPTIONS.md):
    a pé (pace 'real'): astronauta de traje, olhos a 1,7 m, 0,8 m/s (2,9 km/h), passos de 0,7 m;
    rover ('rover'): rover tripulado pressurizado, olhos a 2,4 m, 10 km/h de cruzeiro (Shift = 15 km/h), sobe até 20°;
    voo livre ('fast'): câmera solta, a velocidade cresce com a altura. */

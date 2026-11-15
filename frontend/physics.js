@@ -9,7 +9,7 @@
   /* Limite de declive da SIMULAÇÃO, em graus: 15° sem carga, menos 0,2° por kg, nunca abaixo de 8°.
      ATENÇÃO: é uma hipótese de projeto do AresNav para demonstrar o efeito da carga, não um limite validado
      de EVA real (não vem de norma da NASA nem de ensaio com traje). A sensibilidade a cada parâmetro está
-     em docs/HIPOTESES.md e em tests/physics-test.js. Os parâmetros ficam expostos em SLOPE_RULE. */
+     em docs/ASSUMPTIONS.md e em tests/physics-test.js. Os parâmetros ficam expostos em SLOPE_RULE. */
   const SLOPE_RULE = Object.freeze({ base: 15, perKg: 0.2, floor: 8, status: 'simulation hypothesis' });
   const maxSafeSlope = (payloadKg, rule) => { const r = rule || SLOPE_RULE; return Math.max(r.floor, r.base - kg(payloadKg) * r.perKg); };
   /* Multiplicador do consumo de oxigênio e do esforço: +1,8% por kg */
