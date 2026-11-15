@@ -84,6 +84,7 @@ aresnav-mars/
 ├── tools/prewarm-demo.js     # Pre-loads and checks offline everything the demo uses
 └── docs/
     ├── PITCH.md              # The 29-second video script and the live demo script
+    ├── SUBMISSION.md         # Space Apps submission kit: rules, checklist and form texts
     ├── PERFORMANCE.md        # Loading, 360° and memory measurements
     └── ASSUMPTIONS.md        # Model assumptions and verdict sensitivity
 ```
