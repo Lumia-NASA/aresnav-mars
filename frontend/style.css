@@ -831,3 +831,10 @@ body.ge .transport #simPlay{border-color:var(--accent);color:var(--accent);backg
 body.ge .transport input[type=range]{accent-color:var(--accent)}
 .ares-panel form button svg{display:block}
 .sidehead > div:first-child{flex:1 1 auto;min-width:0} .sidehead .seg{flex:none;align-self:flex-start}
+
+/* ---------- Base do veredito: medido, conferido no relevo de 1 m, simulado e offline ---------- */
+.basis{margin-top:8px;display:grid;gap:3px;font:11px/1.35 var(--mono);color:var(--muted)}
+.basis[hidden]{display:none}
+.basis p{margin:0;display:flex;gap:6px;align-items:baseline}
+.basis b{flex:0 0 auto;min-width:92px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+.basis .b-m{color:var(--ok)} .basis .b-c{color:var(--ok)} .basis .b-n{color:var(--warn)} .basis .b-s{color:var(--warn)} .basis .b-o{color:var(--muted)}

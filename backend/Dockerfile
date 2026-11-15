@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
-COPY server.js calc.js ./
+COPY server.js calc.js hirise-fetch.js ./
 # A chave da IA não entra na imagem: passe com "docker run -e NVIDIA_API_KEY ...".
 COPY data/ ./data/
 

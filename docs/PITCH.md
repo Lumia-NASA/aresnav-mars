@@ -12,7 +12,7 @@ About 70 words, read at a calm pace. Record it at 29 s so it never goes over the
 |---|---|---|
 | 0–5 s | Globe flies into Jezero crater | "Before every walk on Mars, an astronaut needs three answers: can I get there, can I get back, and will anyone hear me?" |
 | 5–12 s | Pick **Three Forks sample depot**; the verdict shows **NO-GO · not enough O₂** | "MarsView turns real NASA and ESA data — one-meter HiRISE terrain, MEDA weather and Perseverance's own route — into a go or no-go." |
-| 12–20 s | Click **Why?**, then **Carry 13.5 kg instead of 18.5**: the verdict changes | "When the answer is no, it says why, and what to change: carry less, or turn back at three kilometers." |
+| 12–20 s | Click **Why?**, then **Carry 13.0 kg instead of 18.5**: the verdict changes | "When the answer is no, it says why, and what to change: carry less, or turn back at three kilometers." |
 | 20–26 s | Helmet view, **Follow live**; ARES says "turn back now" | "Out there, ARES follows the walk and calls the turn-back point." |
 | 26–29 s | MarsView logo | "MarsView. Every step planned. Every breath counted." |
 
@@ -26,10 +26,10 @@ An astronaut leaving a habitat in Jezero crater needs to answer three questions 
 | # | What you do on screen | What you say | Data behind it |
 |---|---|---|---|
 | 1 | Open the app on the globe, fly to Jezero. The ground turns to natural color as you zoom in. | "Everything you see is real: NASA terrain and imagery, ESA's HRSC camera, FU Berlin's color mosaic of Jezero." | MOLA, HRSC, HiRISE, CTX via NASA Mars Trek; FU Berlin WebGIS |
-| 2 | Pick **Three Forks sample depot** — the real place where Perseverance left sample tubes. | "Our astronaut wants to visit the sample depot, 3.7 km away, carrying 18.5 kg of equipment." | Perseverance traverse and waypoints (MMGIS) |
-| 3 | The verdict reads **NO-GO · not enough O₂ — return O₂ 21% < 30%**. Click **Why?** | "The route is flat enough. The problem is oxygen: the walk out is 1 h 54 because it climbs, the walk back is 1 h 40. With 18.5 kg the suit burns oxygen faster." | Tobler walking model + suit mass; asymmetric out/back times |
-| 4 | Click the verdict. The map flies to the stretch past the **turn-back point** and marks it in red. | "MarsView doesn't just say no. It shows where the plan breaks: past 3.07 km she can't get home with a 30% reserve." | Turn-back point from the oxygen budget, stops included |
-| 5 | Click **Carry 13.5 kg instead of 18.5**. Verdict becomes **CAUTION**. | "Drop five kilos and the walk is feasible. The remaining caution is radio." | Max payload solved from the same model |
+| 2 | Pick **Three Forks sample depot** — the real place where Perseverance left sample tubes. The panel says the route was checked on the 1 m HiRISE terrain and walks around two short steep spots. | "Our astronaut wants to visit the sample depot, 3.8 km away, carrying 18.5 kg of equipment. The one-meter terrain found two spots too steep for that load, so the route goes around them." | Perseverance traverse and waypoints (MMGIS); 1 m HiRISE DTM (USGS) |
+| 3 | The verdict reads **NO-GO · not enough O₂ — return O₂ 20% < 30%**. Click **Why?** | "The route is flat enough. The problem is oxygen: the walk out is 1 h 57 because it climbs, the walk back is 1 h 42. With 18.5 kg the suit burns oxygen faster." | Tobler walking model + suit mass; asymmetric out/back times |
+| 4 | Click the verdict. The map flies to the stretch past the **turn-back point** and marks it in red. | "MarsView doesn't just say no. It shows where the plan breaks: past 3.13 km she can't get home with a 30% reserve." | Turn-back point from the oxygen budget, stops included |
+| 5 | Click **Carry 13.0 kg instead of 18.5**. Verdict becomes **CAUTION**. | "Drop five kilos and the walk is feasible. The remaining caution is radio." | Max payload solved from the same model |
 | 6 | Click **Show segments without radio**. | "From the habitat's 2 m antenna, the terrain hides her for most of the route, so comms relay through the Mars Reconnaissance Orbiter." | Line of sight over the real terrain, with Mars curvature |
 | 7 | Switch to **Shortest** route on a far point: the direct path is dashed red, the safe detour green. | "When the short way is too steep for the load, it offers the safe detour in one click." | Slope from the 200 m terrain model |
 | 8 | Click a **360°** point near the depot. | "Before going, she can stand there: this is a real Mastcam-Z panorama from Perseverance. Purple points are synthetic views rendered from the terrain — we label them so nobody mistakes them for photos." | Mastcam-Z panoramas stitched by FU Berlin |

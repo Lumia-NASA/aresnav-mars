@@ -14,6 +14,8 @@ window.setLang = () => {};
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  /* base do veredito (rótulos) */
+  'Medido': 'Measured', 'Conferindo': 'Checking', 'Conferido': 'Checked', 'Parcial': 'Partial', 'Não conferido': 'Not checked', 'Simulado': 'Simulated', 'Offline': 'Offline', 'Sem enlace': 'No link',
   'Preparar a caminhada': 'Prepare the walk',
   'Checklist, carga do traje, imagem do mapa e destino': 'Checklist, suit payload, map imagery and destination',
   'Veredito, números da rota e horários do destino escolhido': 'Verdict, route numbers and schedule for the chosen destination',
@@ -301,6 +303,15 @@ const EXACT = {
 
 /* Frases e pedaços de frase (o maior primeiro). Os números ficam onde estão. */
 const PHRASES = [
+  ['Rota fora do mosaico HiRISE de 1 m: depende só da grade de 200 m. Confirme os trechos marcados na imagem antes de sair.', 'Route outside the 1 m HiRISE mosaic: it relies only on the 200 m grid. Check the flagged stretches on the image before leaving.'],
+  ['Relevo HiRISE de 1 m não conferiu a rota: os blocos não chegaram. Ela depende só da grade de 200 m; confirme na imagem HiRISE antes de sair.', 'The 1 m HiRISE relief did not check the route: the tiles did not arrive. It relies only on the 200 m grid; check the HiRISE image before leaving.'],
+  ['O relevo de 1 m passou de 25 s para chegar: a análise usa o que chegou e é refeita quando o resto terminar.', 'The 1 m relief took more than 25 s to arrive: the analysis uses what arrived and runs again when the rest is in.'],
+  ['relevo de 200 m (HRSC + MOLA) · tempo do MEDA indisponível', '200 m terrain (HRSC + MOLA) · MEDA weather unavailable'],
+  ['relevo de 1 m (HiRISE) ao longo da rota…', '1 m terrain (HiRISE) along the route…'],
+  ['no relevo de 1 m: só a grade de 200 m', 'on the 1 m terrain: only the 200 m grid'],
+  ['consumo de O₂, ritmo e batimentos (modelo do traje)', 'O₂ use, pace and heart rate (suit model)'],
+  ['rota, veredito e física funcionam sem internet', 'route, verdict and physics work without internet'],
+  ['usando os dados guardados no habitat', 'using the data stored in the habitat'],
   ['Rota, veredito e física continuam funcionando sobre dados locais: relevo (.i16), cache', 'Route, verdict and physics keep working on local data: elevation (.i16), the'],
   [', mapa de reserva e fotos da Navcam já guardadas.', ' cache, the backup map and stored Navcam photos.'],
   [': a cor natural e as curvas de nível da FU Berlin, os mapas globais (poeira, firmeza, rugosidade) e os panoramas 360° que ainda não foram abertos.', ': FU Berlin natural color and contours, the global maps (dust, firmness, roughness) and 360° panoramas not opened yet.'],
@@ -417,7 +428,19 @@ const RULES = [
   [/^a ([\d.,]+ k?m)$/, '$1 away'], [/^Parada: (.*)$/, 'Stop: $1'], [/^Chegada: (.*)$/, 'Arrival: $1'],
   [/rumo (\d+°)/, 'heading $1'], [/· chegada (\d\d:\d\d)/, '· arrive $1'], [/declive máx\. /, 'max slope '], [/ · parada de (\d+) min/, ' · $1 min stop'], [/ · também: /, ' · also: '],
   [/ · parada (\d+) de (\d+)/, ' · stop $1 of $2'], [/° L\b/g, '° E'], [/^Rádio: o relevo bloqueia, relé pelo MRO \((.+) m\)$/, 'Radio: terrain blocks it, relay via MRO ($1 m)'], [/° O(?![₂\w])/g, '° W'], [/(\d) do chão/, '$1 above ground'],
-  [/^O₂ (.+) · carga (.+) · limite (.+)° \((\d+)° sem carga\)$/, 'O₂ $1 · payload $2 · limit $3° ($4° unloaded)']
+  [/^O₂ (.+) · carga (.+) · limite (.+)° \((\d+)° sem carga\)$/, 'O₂ $1 · payload $2 · limit $3° ($4° unloaded)'],
+  /* relevo de 1 m: cobertura, desvios e origem dos blocos */
+  [/^Relevo HiRISE de 1 m: rota verificada em (\d+)% \(declive máximo de ([\d.,]+)° medido a cada 5 m\)\.$/, '1 m HiRISE relief: route verified on $1% (maximum slope $2° measured every 5 m).'],
+  [/^Relevo HiRISE de 1 m: verificação parcial, (\d+)% da rota\. (.+) dependem só da grade de 200 m \(tracejado cinza no mapa\)\.$/, '1 m HiRISE relief: partial check, $1% of the route. $2 rely only on the 200 m grid (gray dashes on the map).'],
+  [/^Relevo HiRISE de 1 m no trecho conferido: declive máximo de ([\d.,]+)° medido a cada 5 m\.$/, '1 m HiRISE relief on the checked part: maximum slope $1° measured every 5 m.'],
+  [/^Desvio de 1 m aplicado em (\d+) trecho\(s\): contorna até ([\d.,]+)° e acrescenta (\d+) m\. A simulação ▶ segue o contorno\.$/, '1 m detour applied on $1 stretch(es): it avoids up to $2° and adds $3 m. The ▶ simulation follows it.'],
+  [/^(\d+) trecho\(s\) acima do limite sem desvio possível no relevo de 1 m: passe devagar\.$/, '$1 stretch(es) above the limit with no possible 1 m detour: go slowly.'],
+  [/^Relevo de 1 m: (\d+) blocos pedidos, (\d+) do cache, (\d+) baixados da USGS, (\d+) sem resposta, em ([\d.,]+) s\.$/, '1 m relief: $1 tiles requested, $2 from cache, $3 downloaded from USGS, $4 with no answer, in $5 s.'],
+  [/^Sem relevo de 1 m: (\d+) m conferidos só na grade de 200 m$/, 'No 1 m relief: $1 m checked only on the 200 m grid'],
+  [/^Desvio de 1 m: evita ([\d.,]+)°; o contorno fica em ([\d.,]+)° \(\+(\d+) m\)$/, '1 m detour: avoids $1°; the detour stays at $2° (+$3 m)'],
+  /* base do veredito */
+  [/^relevo de 200 m \(HRSC \+ MOLA\) · tempo do MEDA de (\d+) dias atrás$/, '200 m terrain (HRSC + MOLA) · MEDA weather from $1 days ago'],
+  [/^relevo de 1 m \(HiRISE\) em (\d+)% da rota$/, '1 m terrain (HiRISE) on $1% of the route']
 ];
 
 PHRASES.sort((a, b) => b[0].length - a[0].length);

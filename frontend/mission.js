@@ -54,7 +54,10 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape') modal.hidden =
 /* trechos da rota (para Tobler ida x volta e ponto de retorno) */
 function segments(path) {
   const H = A.HGT, out = [];
-  for (let k = 1; k < (path || []).length; k++) out.push({ d: A.cellDist(path[k - 1], path[k]), dh: H[path[k]] - H[path[k - 1]] });
+  for (let k = 1; k < (path || []).length; k++) {
+    const e = path === A.state.path ? A.edgeWalk(path, k, false) : null;   // com o desvio de 1 m, se houver
+    out.push(e ? { d: e.d, dh: e.dh } : { d: A.cellDist(path[k - 1], path[k]), dh: H[path[k]] - H[path[k - 1]] });
+  }
   return out;
 }
 function plan() {
@@ -109,9 +112,10 @@ async function sha256(text) {
 $('#exportBtn').onclick = async () => {
   const st = A.state; if (!st.path) { alert(tr('Sem rota para exportar.')); return; }
   if (!calib) await calibrate();
-  const P = plan(), coords = st.path.map(c => { const p = A.cellLL(c); return [+p[1].toFixed(6), +p[0].toFixed(6), Math.round(A.HGT[c] * 10) / 10]; });
+  const P = plan(), coords = A.routeLL().map(p => [+p[1].toFixed(6), +p[0].toFixed(6), Math.round(A.heightAt(p[0], p[1]) * 10) / 10]);   // com os desvios de 1 m
   const feats = [
-    { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { kind: 'route', mode: st.mode, distance_m: Math.round(st.info.dist), climb_m: Math.round(st.info.climb), max_slope_deg: +st.info.maxS.toFixed(1), walk_out_min: +P.wt.outMin.toFixed(1), walk_back_min: +P.wt.backMin.toFixed(1), total_min: +st.plan.total.toFixed(1), o2_at_return_pct: +st.plan.o2.toFixed(1) } },
+    { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { kind: 'route', mode: st.mode, distance_m: Math.round(st.info.dist), climb_m: Math.round(st.info.climb), max_slope_deg: +st.info.maxS.toFixed(1), walk_out_min: +P.wt.outMin.toFixed(1), walk_back_min: +P.wt.backMin.toFixed(1), total_min: +st.plan.total.toFixed(1), o2_at_return_pct: +st.plan.o2.toFixed(1),
+      hirise_1m_check: st.fine && st.fine.status ? { status: st.fine.status, coverage_pct: Math.floor((st.fine.coverage || 0) * 100), max_slope_deg: +(st.fine.maxDeg || 0).toFixed(1), detours_applied: (st.fine.detours || []).filter(d => d.ok).length, detours_failed: (st.fine.detours || []).filter(d => !d.ok).length } : { status: 'unverified' } } },
     { type: 'Feature', geometry: { type: 'Point', coordinates: [A.BASE.lon, A.BASE.lat] }, properties: { kind: 'habitat', name: A.BASE.n } },
     { type: 'Feature', geometry: { type: 'Point', coordinates: [P.tbLL[1], P.tbLL[0]] }, properties: { kind: 'turn_back_point', o2_at_base_pct: +P.tb.o2AtBase.toFixed(1), reaches_goal: P.tb.reachesEnd } }
   ].concat(st.stops.map(s => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.p.lon, s.p.lat] }, properties: { kind: s.isGoal ? 'goal' : 'science_stop', name: s.p.n, km_from_base: +s.km.toFixed(2) } })));
