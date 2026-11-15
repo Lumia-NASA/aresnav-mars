@@ -30,13 +30,14 @@ function freezePlan() {
   const st = A.state, path = st.path; if (!path || !st.sim) return null;
   const kg = st.payloadKg || 0, H = A.HGT, n = path.length - 1;
   const dist = [0], walkOut = [0], walkBack = [0], stop = new Array(n + 1).fill(0), names = new Array(n + 1).fill(null);
+  const via = st.via ? st.via.slice() : null;   // desvios de 1 m congelados junto com o plano
   for (let k = 1; k <= n; k++) {
-    const d = A.cellDist(path[k - 1], path[k]), dh = H[path[k]] - H[path[k - 1]], t = Physics.walkTimes([{ d, dh }], kg);
+    const e = A.edgeWalk(path, k, false, via), d = e.d, dh = e.dh, t = Physics.walkTimes([{ d, dh }], kg);
     dist.push(dist[k - 1] + d); walkOut.push(walkOut[k - 1] + t.outMin); walkBack.push(walkBack[k - 1] + t.backMin);
   }
   st.stops.forEach(s => { stop[s.k] += s.isGoal ? 40 : 15; names[s.k] = s.p.n; });   // mesmas paradas da simulação
   if (!st.goalPoi) { stop[n] += 30; names[n] = names[n] || tr('Destino escolhido no mapa'); }
-  return { P: X.makePlan({ dist, walkOut, walkBack, stop, names }, { kg, autonomyMin: A.EVA_MAX, reservePct: 30, departMin: A.T0, sunsetMin: A.SUN.sunset, darkMarginMin: A.DARK_MARGIN }), path: path.slice(), sim: st.sim };
+  return { P: X.makePlan({ dist, walkOut, walkBack, stop, names }, { kg, autonomyMin: A.EVA_MAX, reservePct: 30, departMin: A.T0, sunsetMin: A.SUN.sunset, darkMarginMin: A.DARK_MARGIN }), path: path.slice(), via, sim: st.sim };
 }
 
 /* ---------- laço da execução ---------- */
@@ -65,8 +66,9 @@ function step() {
   let s = X.status(run.P, run.E, run.pace, run.turned);
   if (s.phase === 'goal-done' && !run.turned) { run.turned = { atMin: run.E, k: run.P.n, f: 0 }; s = X.status(run.P, run.E, run.pace, run.turned); }
   // posição no mapa: ponto da rota (k, f)
-  const a = A.cellLL(run.path[s.k]), b = A.cellLL(run.path[Math.min(run.P.n, s.k + 1)]);
-  const lat = a[0] + (b[0] - a[0]) * s.f, lon = a[1] + (b[1] - a[1]) * s.f;
+  const k1 = Math.min(run.P.n, s.k + 1);
+  const ep = k1 > s.k ? A.edgePts(run.path, k1, run.via) : [A.cellLL(run.path[s.k]), A.cellLL(run.path[s.k])];   // pelo desvio de 1 m, se houver
+  const { lat, lon } = A.alongPts(ep, s.f);
   const radio = A.losTo(lat, lon).losClear;
   const w = A.globe && A.globe.walk, offM = w && w.on && w.moved ? offRoute(w.lat, w.lon) : 0;
   const evs = X.events(run.prev, s, { radio, prevRadio: run.prevRadio, offRouteM: offM, prevOffRouteM: run.prevOff });
@@ -173,6 +175,6 @@ $('#execTurnNow').onclick = () => {
   say(en() ? 'Turning back now.' : 'Virando agora. Voltando para a base.'); step();
 };
 $('#execPace').onchange = e => { if (run) run.pace = Number(e.target.value) || 1; };
-A.on('route', () => { if (run && !run.paused) { /* o plano da execução fica congelado; mudar a rota encerra */ stop(true); } });
+A.on('route', () => { if (A.state.routeRefine) return; if (run && !run.paused) { /* o plano da execução fica congelado; mudar a rota encerra */ stop(true); } });
 A.execution = { start, stop, get run() { return run; }, step };
 })();

@@ -457,39 +457,19 @@ HIRISE.tilesX = Math.ceil(HIRISE.width / HIRISE.tile); HIRISE.tilesY = Math.ceil
 const http = require('https');
 const hiriseAgent = new http.Agent({ keepAlive: true, maxSockets: 24 });
 const hiriseInflight = new Map();
-async function hiriseRange(start, end) {
-  assertAuthorizedScope(HIRISE.url);
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const r = await axios.get(HIRISE.url, { responseType: 'arraybuffer', timeout: 15000, httpsAgent: hiriseAgent,
-        headers: { Range: `bytes=${start}-${end}`, 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 206 });
-      const b = Buffer.from(r.data);
-      if (b.length !== end - start + 1) throw new Error('faixa incompleta');
-      return b;
-    } catch (e) {
-      if (attempt >= 2) throw e;
-      await jitter();
-    }
+/* Leitura agrupada e com prazo (backend/hirise-fetch.js): blocos vizinhos na mesma fileira compartilham as leituras
+   de linha; cada leitura tem 10 s e uma nova tentativa; o grupo inteiro tem HIRISE_DEADLINE_MS (padrão 30 s). */
+const HIRISE_DEADLINE_MS = Number(process.env.HIRISE_DEADLINE_MS) || 30000;
+const hiriseReader = require('./hirise-fetch').createReader({
+  width: HIRISE.width, height: HIRISE.height, dataStart: HIRISE.dataStart, rowBytes: HIRISE.rowBytes, tile: HIRISE.tile, deadlineMs: HIRISE_DEADLINE_MS,
+  fetchRange: async (start, end, signal) => {
+    assertAuthorizedScope(HIRISE.url);
+    const r = await axios.get(HIRISE.url, { responseType: 'arraybuffer', timeout: 10000, signal, httpsAgent: hiriseAgent,
+      headers: { Range: `bytes=${start}-${end}`, 'User-Agent': 'AresNav-Extractor/1.0' }, validateStatus: st => st === 206 });
+    return Buffer.from(r.data);
   }
-}
-async function hiriseTile(tx, ty) {
-  const T = HIRISE.tile, c0 = tx * T, r0 = ty * T, cols = Math.min(T, HIRISE.width - c0), rows = Math.min(T, HIRISE.height - r0);
-  const out = Buffer.alloc(T * T * 2);
-  out.fill(0); for (let i = 0; i < T * T; i++) out.writeInt16LE(-32768, i * 2);
-  let next = 0, valid = 0;
-  const worker = async () => {
-    while (next < rows) {
-      const j = next++, off = HIRISE.dataStart + (r0 + j) * HIRISE.rowBytes + c0 * 4;
-      const b = await hiriseRange(off, off + cols * 4 - 1);
-      for (let i = 0; i < cols; i++) {
-        const v = b.readFloatLE(i * 4);
-        if (v > -9000 && v < 30000) { out.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round((v + 2500) * 10))), (j * T + i) * 2); valid++; }
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: 16 }, worker));
-  return { body: out, valid };
-}
+});
+const hiriseTile = (tx, ty) => hiriseReader.tile(tx, ty);
 fastify.get('/api/v1/dem/hirise/info', async () => ({
   source: 'USGS Astrogeology / NASA MRO HiRISE (University of Arizona)', product: 'JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40',
   resolution_m: HIRISE.px, tile: HIRISE.tile, tilesX: HIRISE.tilesX, tilesY: HIRISE.tilesY, x0: HIRISE.x0, y0: HIRISE.y0, radius: HIRISE.radius,
@@ -501,19 +481,20 @@ fastify.get('/api/v1/dem/hirise/:tx/:ty', { config: PROXY_RATE }, async (request
     return reply.code(400).send({ error: 'Bloco HiRISE inválido' });
   }
   const file = path.join(CACHE_DIR, 'hirise', `t_${tx}_${ty}.i16`);
-  let body = readCache(file), source = 'CACHE';
+  let body = readCache(file), source = 'CACHE', ms = 0;
   if (!body && !cacheOnly(request)) {
-    const key = tx + '_' + ty;
+    const key = tx + '_' + ty, t0 = Date.now();
     if (!hiriseInflight.has(key)) hiriseInflight.set(key, hiriseTile(tx, ty).finally(() => hiriseInflight.delete(key)));
     try {
       const t = await hiriseInflight.get(key);
-      body = t.body; source = 'USGS';
+      body = t.body; source = 'USGS'; ms = Date.now() - t0;
       writeCache(file, body);   // blocos sem dado também ficam em cache (não adianta pedir de novo)
     } catch (e) {
       fastify.log.warn({ err: e.message, tx, ty }, 'Relevo HiRISE indisponível');
     }
   }
-  if (!body) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: 'USGS inacessível e bloco fora do cache' });
+  if (!body) return reply.code(504).header('X-AresNav-Degraded', 'true').send({ error: cacheOnly(request) ? 'Bloco fora do cache (modo offline)' : `USGS sem resposta em ${Math.round(HIRISE_DEADLINE_MS / 1000)} s e bloco fora do cache` });
+  if (ms) reply.header('X-AresNav-Fetch-Ms', String(ms));
   reply.header('X-AresNav-Evidence-SHA256', computeEvidenceHash(body.toString('base64')));
   return reply.code(200).header('Content-Type', 'application/octet-stream').header('Cache-Control', 'public, max-age=604800, immutable')
     .header('X-AresNav-Cache', source).header('X-AresNav-Data-Date', '2020-08-03').send(body);
@@ -739,14 +720,17 @@ fastify.get('/api/v1/copilot/status', async () => { const order = providerOrder(
 fastify.post('/api/v1/copilot/ask', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, bodyLimit: 32 * 1024 }, async (request, reply) => {
   const body = request.body || {};
   const clean = t => String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u2028\u2029\uFEFF]/g, ' ').replace(/\s{3,}/g, '  ').trim();   // controle e invisíveis
-  const question = typeof body.question === 'string' ? clean(body.question).slice(0, 600) : '';
+  /* isolamento: o texto de quem pergunta nunca abre nem fecha as tags do prompt (<mission_snapshot>, <astronaut_question>,
+     <calculator>). Na pergunta e no histórico, < e > viram ‹ ›; no contexto (JSON), viram < e >, que o JSON lê igual. */
+  const noTags = t => t.replace(/</g, '‹').replace(/>/g, '›');
+  const question = typeof body.question === 'string' ? noTags(clean(body.question)).slice(0, 600) : '';
   if (!question) return reply.code(400).send({ error: 'Pergunta vazia' });
   const order = providerOrder();
   if (!order.length) return reply.code(503).send({ offline: true, error: 'Copiloto sem credencial da API: usando o modo local do navegador' });
-  const context = JSON.stringify(body.context || {}).slice(0, 12000);
+  const context = JSON.stringify(body.context || {}).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').slice(0, 12000);
   const history = (Array.isArray(body.history) ? body.history : []).slice(-6)
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string')
-    .map(m => ({ role: m.role, content: clean(m.text).slice(0, 1200) }));
+    .map(m => ({ role: m.role, content: noTags(clean(m.text)).slice(0, 1200) }));
   while (history.length && history[0].role !== 'user') history.shift();
   const calcs = Calc.findCalculations(question), facts = Calc.marsFacts(question).concat(Calc.conversions(question));
   const calcLines = calcs.map(c => `${c.expr} = ${Calc.fmt(c.value)}`).concat(facts.map(f => `${f.expr} = ${Calc.fmt(Number(f.value.toPrecision(4)))} ${f.unit}`));

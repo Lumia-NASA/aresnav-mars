@@ -24,9 +24,9 @@
 ## The demo, start to finish
 Science route → risk explained → comparison → real panorama of the place → decision → link cut. The full script, including the 29-second video version, is in [`docs/PITCH.md`](docs/PITCH.md).
 
-1. **Science route:** pick the Three Forks sample depot, a real place where Perseverance left sample tubes, 3.7 km from base, carrying 18.5 kg.
-2. **Risk explained:** the verdict reads `NO-GO · not enough O₂` with the reason "return O₂ 21% < 30%". The **Why?** button shows that the walk out (1 h 54) is slower than the walk back (1 h 40) because the path climbs, plus the terrain calibration.
-3. **One-click decision:** clicking the verdict jumps to the stretch past the **turn-back point**. The **What to do** box offers: turn back there, carry at most 13.5 kg, or take the safe route.
+1. **Science route:** pick the Three Forks sample depot, a real place where Perseverance left sample tubes, 3.8 km from base, carrying 18.5 kg. The 1 m HiRISE check finds two short stretches above the slope limit and walks around them (+59 m); the numbers below include those detours (run `npm run prewarm` so the 1 m tiles are cached).
+2. **Risk explained:** the verdict reads `NO-GO · not enough O₂` with the reason "return O₂ 20% < 30%". The **Why?** button shows that the walk out (1 h 57) is slower than the walk back (1 h 42) because the path climbs, plus the terrain calibration.
+3. **One-click decision:** clicking the verdict jumps to the stretch past the **turn-back point**. The **What to do** box offers: turn back there, carry at most 13.0 kg, or take the safe route.
 4. **Comparison:** the dangerous short route is dashed red and the safe detour green. The map also shows the 15 and 30 min walking reach and what can be reached with the current payload.
 5. **Real panorama:** a 360° Mastcam-Z panorama of the place. Synthetic views are shown in purple and labeled "not a photo".
 6. **ARES copilot:** answers by voice ("Where do I turn back?") using only the app's numbers. It works with Claude or in local mode.
@@ -40,7 +40,11 @@ In the Helmet's 3D terrain you can move **on foot** (suited astronaut, eyes at 1
 ---
 
 ## Limits (we say this in the presentation)
-- **200 m terrain:** it chooses the general path but hides boulders and steps. The 1 m terrain checks the route corridor afterwards, but does not change the chosen path, and it only exists inside the mosaic area (about 37 × 39 km around the landing site). Rocks smaller than about 2 m remain invisible.
+- **200 m terrain:** it chooses the general path but hides boulders and steps. The 1 m HiRISE terrain then checks the route corridor:
+  - the panel says how much of the route it checked: **verified** (98% or more), **partial** (with the share, and gray dashes on the map where the route relies only on the 200 m grid) or **not verified**. It never says "confirmed" for a part it did not see;
+  - where a short stretch goes above the slope limit, the app searches a **1 m detour** on a 5 m grid around it and applies it to the route, the ▶ simulation, the live walk and the GeoJSON export. If no detour fits, the stretch stays flagged;
+  - it only exists inside the mosaic area (about 37 × 39 km around the landing site), and rocks smaller than about 2 m remain invisible.
+- **Cold 1 m download:** a tile not yet cached comes from the USGS file row by row. Neighbor tiles in the same row share those reads, each tile has a 30 s deadline, and the panel shows how many tiles came from cache. After 25 s the analysis uses what arrived (and says it is partial), then runs again when the rest is in. Run `npm run prewarm` before the demo.
 - **Calibration:** the terrain sits on average 19 m above the elevation Perseverance measured at 613 stops (σ 19 m). The app shows this under "Why?".
 - **Simulated physics:** oxygen use, heart rate and pace vs. payload come from a model, not from a real suit. The assumptions and how much each one weighs are in [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md).
 - **Weather in two sets:** temperature and pressure are real MEDA measurements, but dated (latest public sol: April 2024). Wind, radiation and dust are sample values, labeled SAMPLE. None of these values feed the verdict; only the age of the reading shows up as a caveat in the checklist.
@@ -77,6 +81,7 @@ aresnav-mars/
 │   ├── exec-test.js          # Walk execution engine: position, O₂, turn-back by O₂ and daylight, callouts
 │   ├── calc-test.js          # ARES exact calculator: math, unit conversions, weight on Mars
 │   ├── copilot-test.js       # ARES switches AI provider when one fails (fake local servers, no real key)
+│   ├── terrain-1m-test.js    # 1 m terrain: partial coverage, detour, grouped USGS reads with a deadline
 │   ├── hirise-test.js        # 1 m HiRISE terrain: tile math, decoding and the route corridor
 │   ├── fub-test.js           # FU Berlin layers, 360° viewer and offline mode (starts the backend on a test port)
 │   └── demo-flow-test.js     # The full presentation run in a headless Chrome
@@ -100,10 +105,11 @@ node tests/exec-test.js
 node tests/calc-test.js
 node tests/copilot-test.js
 node tests/hirise-test.js
+node tests/terrain-1m-test.js
 node tests/fub-test.js
 node tests/demo-flow-test.js   # the full demo run in a headless Chrome
 ```
-Or all at once: `cd backend && npm test`, which runs the nine in sequence.
+Or all at once: `cd backend && npm test`, which runs the ten in sequence. The demo run also injects a synthetic 1 m terrain with a steep mound on the route and checks that the detour is applied and that ▶ walks along it (no USGS download needed).
 
 The smoke test also fails if git tracks any `.env` file (other than `.env.example`) or any file containing an API key. AI keys go only in `backend/.env`, which git ignores.
 

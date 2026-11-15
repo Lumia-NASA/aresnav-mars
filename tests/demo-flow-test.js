@@ -141,6 +141,49 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(hdr, 'OFFLINE', 'o backend respondeu do disco, sem ir à FU Berlin');
       await page.keyboard.press('Escape');
     });
+    await step('relevo de 1 m com um morrinho íngreme na rota: o desvio é aplicado e o Play ▶ percorre o contorno', async () => {
+      // espera terminar o que o app já pedia de relevo de 1 m (blocos reais não podem chegar depois e sobrescrever os sintéticos)
+      await until(() => App.state.fine && !App.state.fine.loading && App.fineLoading === 0, 90000, 'relevo de 1 m em curso');
+      const r = await page.evaluate(async () => {
+        const st = App.state, H = HiRise, path = st.path;
+        let k = -1;
+        for (let i = Math.floor(path.length / 2); i < path.length; i++) { const a = App.cellLL(path[i - 1]), b = App.cellLL(path[i]); if (H.inside(a[0], a[1]) && H.inside(b[0], b[1])) { k = i; break; } }
+        if (k < 0) return { err: 'nenhum trecho da rota dentro do mosaico HiRISE' };
+        const a = App.cellLL(path[k - 1]), b = App.cellLL(path[k]), m = H.pixelOf((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        // relevo sintético: plano a -2550 m com um morrinho de 12 m (raio 20 m) no meio do trecho k, em todos os blocos ao longo da rota
+        H.tilesAlong(App.routeLL(), 130).forEach(t => {
+          const arr = new Int16Array(256 * 256).fill(-500);
+          for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+            const d = Math.hypot(t.tx * 256 + x + 0.5 - m.px, t.ty * 256 + y + 0.5 - m.py);
+            if (d < 20) arr[y * 256 + x] = -500 + Math.round(120 * (1 - d / 20));
+          }
+          App.FINE.put(t.tx, t.ty, arr); App.FINE.bias.delete(H.key(t.tx, t.ty));
+        });
+        await App.fineCorridor();
+        const F = st.fine, det = (F.detours || []).find(d => d.k === k);
+        if (!det || !det.ok || !st.via || !st.via[k]) return { err: 'desvio não aplicado no trecho ' + k, detours: F.detours, status: F.status };
+        // o Play avança simT e chama tick(): é a mesma posição que aparece no mapa e no capacete
+        const S = st.sim.S, i1 = S.findIndex(s => s.phase === 'Ida' && s.k === k), ta = S[i1 - 1].t, tb = S[i1].t;
+        const via = App.edgePts(path, k), toM = p => { const q = H.pixelOf(p[0], p[1]); return [q.px, q.py]; };
+        const segDist = (p, q, w) => { const [px, py] = toM(p), [qx, qy] = toM(q), [wx, wy] = toM(w), dx = wx - qx, dy = wy - qy, t = Math.max(0, Math.min(1, ((px - qx) * dx + (py - qy) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(px - qx - t * dx, py - qy - t * dy); };
+        let onVia = 0, offLine = 0, nearMound = Infinity;
+        for (let i = 1; i < 30; i++) {
+          st.simT = ta + (tb - ta) * i / 30; App.tick(true);
+          const p = [st.now.lat, st.now.lon];
+          let dv = Infinity; for (let j = 1; j < via.length; j++) dv = Math.min(dv, segDist(p, via[j - 1], via[j]));
+          onVia = Math.max(onVia, dv); offLine = Math.max(offLine, segDist(p, a, b));
+          const q = toM(p); nearMound = Math.min(nearMound, Math.hypot(q[0] - m.px, q[1] - m.py));
+        }
+        return { k, status: F.status, maxDeg: F.maxDeg, limit: F.limitDeg, before: det.beforeDeg, after: det.afterDeg, onVia, offLine, nearMound, exportVia: App.routeLL().length > path.length };
+      });
+      assert.ok(!r.err, r.err + ' ' + JSON.stringify(r));
+      assert.ok(r.before > 20, `o trecho reto passa pelo morrinho (${r.before}°)`);
+      assert.ok(r.after <= r.limit, `o contorno fica abaixo do limite (${r.after}° de ${r.limit}°)`);
+      assert.ok(r.onVia < 0.5, `a posição do Play fica no contorno (a ${r.onVia} m dele)`);
+      assert.ok(r.offLine > 10, `e sai da reta antiga (até ${r.offLine} m dela)`);
+      assert.ok(r.nearMound > 15, `sem passar por cima do morrinho (mais perto: ${r.nearMound} m do centro)`);
+      assert.ok(r.exportVia, 'a rota exportada inclui os pontos do desvio');
+    });
     await step('nenhum erro de JavaScript na página durante o percurso', async () => {
       assert.deepStrictEqual(pageErrors, []);
     });

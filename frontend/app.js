@@ -181,35 +181,96 @@ function heightAt(lat, lon) {
 const FINE = HiRise.Store(), FINE_LOADING = new Map();
 let fineToken = 0;
 const terrainChanged = throttle(() => emit('terrain'), 2500);
-/* Busca os blocos que faltam (no máximo `max`, 6 de cada vez). Devolve quantos chegaram. */
-async function loadFine(list, max) {
+/* Busca os blocos que faltam (no máximo `max`, 6 de cada vez).
+   budgetMs: tempo máximo de espera. Passado o prazo, devolve o que chegou; os downloads seguem em segundo plano
+   e `all` avisa quando terminam. Conta quantos blocos vieram do cache do backend e quantos da USGS. */
+const FINE_BUDGET_MS = 25000;
+async function loadFine(list, max, budgetMs) {
   const want = list.filter(t => !FINE.has(t.tx, t.ty)).slice(0, max || 200);
-  let got = 0, next = 0;
+  const st = { asked: want.length, got: 0, cache: 0, net: 0, failed: 0, ms: 0, timedOut: false, all: null };
+  let next = 0;
   const one = t => {
     const k = HiRise.key(t.tx, t.ty);
-    if (!FINE_LOADING.has(k)) FINE_LOADING.set(k, fetchT(`${API}/dem/hirise/${t.tx}/${t.ty}`, 60000)
-      .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => { if (b && b.byteLength === 256 * 256 * 2) { FINE.put(t.tx, t.ty, new Int16Array(b)); FINE.measureBias(t.tx, t.ty, coarseAt); return true; } return false; })
-      .catch(() => false).finally(() => FINE_LOADING.delete(k)));
+    if (!FINE_LOADING.has(k)) FINE_LOADING.set(k, fetchT(`${API}/dem/hirise/${t.tx}/${t.ty}${state.forceOffline ? '?offline=1' : ''}`, 60000)
+      .then(async r => { if (!r.ok) return null; const src = r.headers.get('X-AresNav-Cache') || ''; return { src, b: await r.arrayBuffer() }; })
+      .then(x => { if (x && x.b.byteLength === 256 * 256 * 2) { FINE.put(t.tx, t.ty, new Int16Array(x.b)); FINE.measureBias(t.tx, t.ty, coarseAt); return x.src; } return null; })
+      .catch(() => null).finally(() => FINE_LOADING.delete(k)));
     return FINE_LOADING.get(k);
   };
-  await Promise.all(Array.from({ length: 6 }, async () => { while (next < want.length) if (await one(want[next++])) got++; }));
-  if (got) terrainChanged();
-  return got;
+  const t0 = performance.now();
+  st.all = Promise.all(Array.from({ length: 6 }, async () => {
+    while (next < want.length) {
+      const src = await one(want[next++]);
+      if (src == null) st.failed++; else { st.got++; if (src === 'CACHE') st.cache++; else st.net++; }
+    }
+  })).then(() => { if (st.got) terrainChanged(); });
+  let done = false; st.all.then(() => { done = true; });
+  if (budgetMs) await Promise.race([st.all, new Promise(r => setTimeout(r, budgetMs))]); else await st.all;
+  st.timedOut = !done; st.ms = Math.round(performance.now() - t0);
+  return st;
 }
-/* Corredor da rota no relevo de 1 m: declive real a cada metro, medido em 5 m */
-async function fineCorridor() {
+/* Corredor da rota no relevo de 1 m: declive real a cada metro, medido em 5 m.
+   Depois, para cada trecho acima do limite, tenta um desvio medido no próprio relevo de 1 m e aplica na rota
+   (simulação, perfil, desenho e exportação). O que o 1 m não cobre continua dependendo da grade de 200 m. */
+const fineHeight = (lat, lon) => FINE.height(lat, lon);
+async function fineCorridor(again) {
   const my = ++fineToken;
   if (!state.path) { state.fine = null; return; }
-  const pts = state.path.map(cellLL);
-  if (!pts.some(p => HiRise.inside(p[0], p[1]))) { state.fine = { outside: true }; return; }
+  const path = state.path, lim = LIM[state.mode], pts = path.map(cellLL);
+  if (!pts.some(p => HiRise.inside(p[0], p[1]))) { state.fine = { outside: true, status: 'unverified' }; setStatus('hirise', 'off'); renderPanel(); return; }
   state.fine = { loading: true }; renderPanel();
-  await loadFine(HiRise.tilesAlong(pts, 12), 220);
+  const load = await loadFine(HiRise.tilesAlong(pts, 12), 220, FINE_BUDGET_MS);
   if (my !== fineToken) return;
-  const c = HiRise.corridor(pts, (lat, lon) => FINE.height(lat, lon), { limitDeg: LIM[state.mode] });
+  /* passado o prazo, analisa o que chegou (parcial, e diz isso) e refaz uma vez quando o resto terminar */
+  if (load.timedOut && !again) load.all.then(() => { if (my === fineToken) fineCorridor(true); });
+  /* desvios: trechos path[k-1] -> path[k] com algum ponto acima do limite no relevo de 1 m */
+  const detours = [];
+  const cand = [];
+  for (let k = 1; k < path.length; k++) {
+    const e = [cellLL(path[k - 1]), cellLL(path[k])];
+    if (!e.some(p => HiRise.inside(p[0], p[1]))) continue;
+    const ec = HiRise.corridor(e, fineHeight, { limitDeg: lim });
+    if (ec.steepM > 0 && ec.maxDeg > lim) cand.push({ k, beforeDeg: ec.maxDeg, at: ec.maxAt });
+  }
+  if (cand.length) {
+    const need = new Map();
+    cand.forEach(x => HiRise.tilesAlong([cellLL(path[x.k - 1]), cellLL(path[x.k])], 110).forEach(t => need.set(HiRise.key(t.tx, t.ty), t)));
+    await loadFine([...need.values()], 90, FINE_BUDGET_MS);
+    if (my !== fineToken) return;
+    const via = new Array(path.length).fill(null);
+    for (const x of cand) {
+      const a = cellLL(path[x.k - 1]), b = cellLL(path[x.k]);
+      const r = Detour.find(a, b, fineHeight, { limitDeg: lim, stepM: 5, halfWidthM: 100 });
+      const chk = r && HiRise.corridor(r.pts, fineHeight, { limitDeg: lim });
+      const ok = !!(chk && chk.coverage > 0.95 && chk.maxDeg <= lim);
+      if (ok) via[x.k] = r.pts.slice(1, -1);
+      detours.push({ k: x.k, ok, beforeDeg: x.beforeDeg, afterDeg: ok ? chk.maxDeg : null, addedM: ok ? r.lengthM - r.straightM : 0,
+        lat: x.at ? x.at.lat : a[0], lon: x.at ? x.at.lon : a[1], fromM: null });
+    }
+    if (detours.some(d => d.ok)) { state.via = via; rebuildPlan(); }
+    else if (state.via) { state.via = null; rebuildPlan(); }
+  } else if (state.via) { state.via = null; rebuildPlan(); }
+  const c = HiRise.corridor(routeLL(), fineHeight, { limitDeg: lim });   // conferência da rota final, já com os desvios
   delete c.samples;
+  c.status = HiRise.status(c);
+  c.detours = detours;
+  c.load = { asked: load.asked, cache: load.cache, net: load.net, failed: load.failed, ms: load.ms, timedOut: load.timedOut, have: FINE.size };
   state.fine = c;
-  setStatus('hirise', c.coverage > 0.5 ? 'ok' : 'fb');
-  renderPanel(); drawRoute(); emit('fine', c);
+  setStatus('hirise', c.status === 'verified' ? 'ok' : c.status === 'partial' ? 'fb' : 'off');
+  renderPanel(); drawRoute(); drawProfile(); emit('fine', c);
+  /* a geometria mudou: globo, capacete, telemetria e plano se atualizam. routeRefine avisa que é a mesma rota refinada
+     (a execução ao vivo não é encerrada por isso: ela congelou o plano na saída) */
+  if (detours.some(d => d.ok)) { state.routeRefine = true; emit('route', state); state.routeRefine = false; }
+}
+/* Refaz distância, tempos, simulação e oxigênio com a geometria atual (depois de aplicar desvios) */
+function rebuildPlan() {
+  if (!state.path) return;
+  state.info = analyse(state.path);
+  state.sim = buildSim(state.path, state.stops, !!state.goalPoi);
+  const I = state.info, total = state.sim.total;
+  state.plan = { total, work: total - I.tOut - I.tBack, o2: Physics.o2AtReturn(total, state.payloadKg, EVA_MAX), arrive: T0 + I.tOut, back: T0 + total };
+  state.simT = Math.min(state.simT, state.sim.total);
+  tick(true);
 }
 /* Em volta de um ponto (capacete): blocos num raio de ~300 m */
 const fineAround = throttle((lat, lon) => { if (HiRise.inside(lat, lon)) loadFine(HiRise.tilesAlong([[lat, lon]], 300), 12); }, 1500);
@@ -523,6 +584,45 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -
 const hIdx = new Int32Array(W * H * 8), hF = new Float64Array(W * H * 8);
 const stepLen = (dc, dr) => Math.hypot(dc * MX, dr * MY);
 const cellDist = (a, b) => stepLen(b % W - a % W, ((b / W) | 0) - ((a / W) | 0));
+/* ---------- Geometria da rota com os desvios de 1 m ----------
+   A rota é uma lista de células de 200 m. Um desvio troca o trecho reto path[k-1] -> path[k] por um contorno
+   medido no relevo HiRISE: via[k] guarda os pontos intermediários ([lat, lon]). Sem desvio, o trecho é a reta. */
+function edgePts(path, k, via) {
+  const v = via === undefined ? (path === state.path ? state.via : null) : via;
+  const a = cellLL(path[k - 1]), b = cellLL(path[k]), mid = v && v[k];
+  return mid && mid.length ? [a].concat(mid, [b]) : [a, b];
+}
+/* distância, desnível e tempo (min) de um trecho, na ida ou na volta (back) */
+function edgeWalk(path, k, back, via) {
+  const pts = edgePts(path, k, via), sg = back ? -1 : 1;
+  if (pts.length === 2) { const d = cellDist(path[k - 1], path[k]), dh = (HGT[path[k]] - HGT[path[k - 1]]) * sg; return { d, dh, t: d / (speedKmh(dh / d) / 3.6) / 60, via: false }; }
+  let d = 0, dh = 0, t = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const s = metersBetween(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]); if (!(s > 0)) continue;
+    const h = (heightAt(pts[i][0], pts[i][1]) - heightAt(pts[i - 1][0], pts[i - 1][1])) * sg;
+    d += s; dh += h; t += s / (speedKmh(h / s) / 3.6) / 60;
+  }
+  return { d, dh, t, via: true };
+}
+/* rota inteira como pontos [lat, lon], com os desvios */
+function routeLL(path, via) {
+  path = path || state.path; if (!path || !path.length) return [];
+  const out = [cellLL(path[0])];
+  for (let k = 1; k < path.length; k++) { const e = edgePts(path, k, via); for (let i = 1; i < e.length; i++) out.push(e[i]); }
+  return out;
+}
+/* ponto a uma fração f (0..1, pelo comprimento) de uma linha de pontos; devolve também o rumo do pedaço */
+function alongPts(pts, f) {
+  if (pts.length === 2) { const a = pts[0], b = pts[1]; return { lat: a[0] + (b[0] - a[0]) * f, lon: a[1] + (b[1] - a[1]) * f, a, b }; }
+  const seg = []; let tot = 0;
+  for (let i = 1; i < pts.length; i++) { const s = metersBetween(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]); seg.push(s); tot += s; }
+  let want = Math.max(0, Math.min(1, f)) * tot;
+  for (let i = 0; i < seg.length; i++) {
+    if (want <= seg[i] || i === seg.length - 1) { const g = seg[i] ? Math.min(1, want / seg[i]) : 0, a = pts[i], b = pts[i + 1]; return { lat: a[0] + (b[0] - a[0]) * g, lon: a[1] + (b[1] - a[1]) * g, a, b }; }
+    want -= seg[i];
+  }
+  const z = pts[pts.length - 1]; return { lat: z[0], lon: z[1], a: z, b: z };
+}
 function route(si, gi, mode) {
   const lim = LIM[mode];
   if (si < 0 || gi < 0 || SL[gi] > lim) return null;
@@ -552,13 +652,13 @@ function analyse(path) {
   let dist = 0, climb = 0, desc = 0, maxS = 0, tOut = 0, tBack = 0, steep = 0;
   const prof = [{ d: 0, h: HGT[path[0]], s: SL[path[0]] }];
   for (let k = 1; k < path.length; k++) {
-    const a = path[k - 1], b = path[k], d = cellDist(a, b), dh = HGT[b] - HGT[a];
+    const a = path[k - 1], b = path[k], go = edgeWalk(path, k, false), back = edgeWalk(path, k, true), d = go.d, dh = go.dh;
     dist += d; if (dh > 0) climb += dh; else desc -= dh;
     const s = Math.max(SL[a], SL[b]); maxS = Math.max(maxS, s); if (s > 8) steep += d;
-    tOut += d / (speedKmh(dh / d) / 3.6); tBack += d / (speedKmh(-dh / d) / 3.6);
+    tOut += go.t; tBack += back.t;
     prof.push({ d: dist, h: HGT[b], s });
   }
-  return { dist, climb, desc, maxS, tOut: tOut / 60, tBack: tBack / 60, steep, prof };
+  return { dist, climb, desc, maxS, tOut, tBack, steep, prof };
 }
 /* Parte um caminho em trechos de mesma classe de declive: [{ cls, ll: [[lat, lon], ...] }] */
 function slopeRuns(path) {
@@ -566,6 +666,7 @@ function slopeRuns(path) {
   for (let k = 0; k < path.length; k++) {
     const cls = slopeClass(k ? Math.max(SL[path[k - 1]], SL[path[k]]) : SL[path[0]]), p = cellLL(path[k]);
     if (!cur || cur.cls !== cls) { const prev = cur && cur.ll[cur.ll.length - 1]; cur = { cls, ll: prev ? [prev] : [] }; runs.push(cur); }
+    if (k) { const e = edgePts(path, k); for (let i = 1; i + 1 < e.length; i++) cur.ll.push(e[i]); }   // desvio de 1 m, se houver
     cur.ll.push(p);
   }
   return runs.filter(r => r.ll.length > 1);
@@ -670,13 +771,13 @@ function buildSim(path, stops, hasPoiGoal) {
   add(0, 'Na base', 0);
   const names = {}; stops.forEach(s => { names[s.k] = s.p.n; });
   for (let k = 1; k <= last; k++) {
-    const d = cellDist(path[k - 1], path[k]), v = speedKmh((HGT[path[k]] - HGT[path[k - 1]]) / d);
-    t += d / (v / 3.6) / 60; dist += d; add(k, 'Ida', v);
+    const e = edgeWalk(path, k, false), v = e.d / (e.t * 60) * 3.6;
+    t += e.t; dist += e.d; add(k, 'Ida', v);
     if (pause[k]) { t += pause[k]; add(k, k === last ? 'Trabalho no destino' : 'Parada científica', 0, names[k] || 'Destino'); }
   }
   for (let k = last - 1; k >= 0; k--) {
-    const d = cellDist(path[k + 1], path[k]), v = speedKmh((HGT[path[k]] - HGT[path[k + 1]]) / d);
-    t += d / (v / 3.6) / 60; dist += d; add(k, 'Volta', v);
+    const e = edgeWalk(path, k + 1, true), v = e.d / (e.t * 60) * 3.6;
+    t += e.t; dist += e.d; add(k, 'Volta', v);
   }
   return { S, total: t, tArrive: S.find(s => s.k === last).t };
 }
@@ -687,10 +788,13 @@ function simAt(t) {
   const S = sim.S; let lo = 0, hi = S.length - 1;
   while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m].t <= t) lo = m; else hi = m; }
   const a = S[lo], b = S[hi], f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
-  const pa = cellLL(state.path[a.k]), pb = cellLL(state.path[b.k]);
-  const lat = pa[0] + (pb[0] - pa[0]) * f, lon = pa[1] + (pb[1] - pa[1]) * f;
-  const moving = a.k !== b.k, speed = moving ? b.v : 0, cell = state.path[f < 0.5 ? a.k : b.k];
-  const slope = SL[cell], h = HGT[state.path[a.k]] + (HGT[state.path[b.k]] - HGT[state.path[a.k]]) * f;
+  /* posição ao longo do trecho a.k -> b.k: pela reta, ou pelo desvio de 1 m quando ele existe (na volta, ao contrário) */
+  const moving = a.k !== b.k, ek = Math.max(a.k, b.k);
+  let ep = moving ? edgePts(state.path, ek) : [cellLL(state.path[a.k]), cellLL(state.path[a.k])];
+  if (moving && b.k < a.k) ep = ep.slice().reverse();
+  const at = alongPts(ep, f), pa = at.a, pb = at.b, lat = at.lat, lon = at.lon, onVia = ep.length > 2;
+  const speed = moving ? b.v : 0, cell = state.path[f < 0.5 ? a.k : b.k];
+  const slope = SL[cell], h = onVia ? heightAt(lat, lon) : HGT[state.path[a.k]] + (HGT[state.path[b.k]] - HGT[state.path[a.k]]) * f;
   const climbing = moving && HGT[state.path[b.k]] > HGT[state.path[a.k]];
   const hr = 76 + ((moving ? 104 + slope * 4 + (climbing ? 8 : 0) : t === 0 ? 76 : 88) - 76) * Physics.metabolicFactor(state.payloadKg) + wob(t, 0.9, 3);
   return {
@@ -710,6 +814,7 @@ const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, pat
 function recompute(keepTime) {
   if (!HGT) return;
   const si = cellOf(BASE.lat, BASE.lon);
+  state.via = null; state.fine = null;   // rota nova: os desvios de 1 m e a conferência são refeitos
   state.path = state.goal >= 0 ? route(si, state.goal, state.mode) : null;
   state.info = state.path ? analyse(state.path) : null;
   state.stops = state.path ? stopsOn(state.path, state.goalPoi) : [];
@@ -780,9 +885,19 @@ function drawRoute() {
   groups.route.clearLayers(); groups.marks.clearLayers();
   const col = SLOPE_COL(), cc = cssv('--crit');
   if (state.path) {
-    L.polyline(state.path.map(cellLL), { pane: 'routes', color: '#000', opacity: 0.6, weight: 9, lineJoin: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route);
+    L.polyline(routeLL(), { pane: 'routes', color: '#000', opacity: 0.6, weight: 9, lineJoin: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route);
     slopeRuns(state.path).forEach(r => L.polyline(r.ll, { pane: 'routes', color: col[r.cls], weight: 4.5, lineJoin: 'round', lineCap: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route));
   }
+  const F = state.path && state.fine;
+  /* onde a rota depende só da grade de 200 m (sem o relevo de 1 m): tracejado cinza por cima */
+  if (F && F.uncovered && F.status !== 'unverified') F.uncovered.forEach(g => L.polyline(g.ll, { pane: 'routes', color: '#ECE6DC', weight: 2, opacity: 0.9, dashArray: '2 7', interactive: true })
+    .bindTooltip(`Sem relevo de 1 m: ${Math.round(g.lengthM)} m conferidos só na grade de 200 m`, { className: 'tag', sticky: true }).addTo(groups.route));
+  /* desvios de 1 m aplicados: contorno branco tracejado e um marcador com o que foi evitado */
+  if (F && F.detours && state.via) F.detours.filter(d => d.ok).forEach(d => {
+    L.polyline(edgePts(state.path, d.k), { pane: 'routes', color: '#ECE6DC', weight: 2, dashArray: '6 5', interactive: false }).addTo(groups.route);
+    L.circleMarker([d.lat, d.lon], { pane: 'routes', radius: 5, color: '#12120F', weight: 2, fillColor: '#ECE6DC', fillOpacity: 1, interactive: true })
+      .bindTooltip(`Desvio de 1 m: evita ${num(d.beforeDeg, 0)}°; o contorno fica em ${num(d.afterDeg, 1)}° (+${Math.round(d.addedM)} m)`, { direction: 'top', className: 'tag', offset: [0, -6] }).addTo(groups.route);
+  });
   if (state.path && state.fine && state.fine.steepRuns) state.fine.steepRuns.slice(0, 8).forEach(r =>
     L.circleMarker([r.lat, r.lon], { pane: 'routes', radius: 6, color: '#12120F', weight: 2, fillColor: r.maxDeg > LIM.short ? cc : cssv('--warn'), fillOpacity: 1, interactive: true })
       .bindTooltip(`${num(r.maxDeg, 0)}° em ${Math.max(2, Math.round(r.lengthM))} m (HiRISE 1 m)`, { direction: 'top', className: 'tag', offset: [0, -6] }).addTo(groups.route));
@@ -856,6 +971,7 @@ function renderChecklist() {
   g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn || caution ? 'warn' : 'ok');
   g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? 'NO-GO · íngreme demais' : v.code === 'METABOLIC' ? 'NO-GO · O₂ não chega' : crit ? 'NO-GO' : caution ? 'CAUTION' : warn ? 'GO · com ressalvas' : 'GO';
   if (!wait && state.assessment.reasons.length) { const why = document.createElement('small'); why.textContent = state.assessment.reasons[0]; g.appendChild(why); }   // o motivo principal fica à vista
+  renderBasis(wait);
   const prev = state.verdict && state.verdict.code;
   state.verdict = wait ? null : v;
   if (!wait && prev && prev !== v.code) { if (!v.go) announce(v); emit('verdict', v); }
@@ -885,18 +1001,50 @@ function renderPanel() {
     if (P.back > SUN.sunset - DARK_MARGIN) alerts.push(['var(--crit)', `A volta termina a menos de 1 h do pôr do sol (${clock(SUN.sunset)}). Encurte a caminhada ou divida em dois dias.`]);
     if (o2 < 30) alerts.push(['var(--crit)', `Reserva de oxigênio prevista de ${Math.max(0, Math.round(o2))}% na chegada, abaixo dos 30% exigidos.`]);
     if (state.mode === 'short' && I.maxS > LIM.safe) alerts.push(['var(--crit)', `A rota curta passa por declive de ${Math.round(I.maxS)}°. A rota segura é recomendada.`]);
-    const F = state.fine;
-    if (F && F.loading) alerts.push(['var(--route)', 'Carregando o relevo HiRISE de 1 m ao longo da rota…']);
-    else if (F && F.lengthM && F.coverage > 0.5) {
-      const r = F.steepRuns, worst = r[0];
-      alerts.push(F.steepM > 0
-        ? [F.maxDeg > LIM.short ? 'var(--crit)' : 'var(--warn)', `Relevo HiRISE de 1 m: ${r.length} trecho${r.length === 1 ? '' : 's'} curto${r.length === 1 ? '' : 's'} acima de ${num(F.limitDeg, 0)}° (${Math.round(F.steepM)} m no total), o mais íngreme com ${num(worst ? worst.maxDeg : F.maxDeg, 0)}° a ${fmtKm(worst ? worst.fromM : 0)} da base. Marcados no mapa: passe devagar ou contorne.`]
-        : ['var(--ok)', `Relevo HiRISE de 1 m confirma a rota: declive máximo de ${num(F.maxDeg, 1)}° medido a cada 5 m.`]);
-    } else alerts.push(['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']);
+    fineAlerts(state.fine).forEach(a => alerts.push(a));
     sp.innerHTML = renderItinerary();
   }
   state.alerts = alerts;
   al.innerHTML = alerts.map(([c, t]) => `<li class="alert" style="--c:${c}">${t}</li>`).join('');
+}
+/* Avisos do relevo de 1 m: quanto da rota foi conferido (verificada, parcial ou não verificada), onde ela ainda
+   depende só da grade de 200 m, os desvios aplicados e de onde vieram os blocos. Nunca diz "confirmada" se não cobriu. */
+function fineAlerts(F) {
+  const out = [];
+  if (F && F.loading) return [['var(--route)', 'Carregando o relevo HiRISE de 1 m ao longo da rota…']];
+  if (!F) return [['var(--route)', 'Relevo com resolução de 200 m: confirme os trechos marcados na imagem HiRISE antes de sair.']];
+  if (F.outside) return [['var(--route)', 'Rota fora do mosaico HiRISE de 1 m: depende só da grade de 200 m. Confirme os trechos marcados na imagem antes de sair.']];
+  const pct = Math.floor((F.coverage || 0) * 100), rest = (F.lengthM || 0) * (1 - (F.coverage || 0));
+  if (F.status === 'unverified') out.push(['var(--warn)', 'Relevo HiRISE de 1 m não conferiu a rota: os blocos não chegaram. Ela depende só da grade de 200 m; confirme na imagem HiRISE antes de sair.']);
+  else if (F.status === 'partial') out.push(['var(--warn)', `Relevo HiRISE de 1 m: verificação parcial, ${pct}% da rota. ${fmtKm(rest)} dependem só da grade de 200 m (tracejado cinza no mapa).`]);
+  const ok = (F.detours || []).filter(d => d.ok), bad = (F.detours || []).filter(d => !d.ok);
+  if (ok.length) out.push(['var(--ok)', `Desvio de 1 m aplicado em ${ok.length} trecho(s): contorna até ${num(Math.max(...ok.map(d => d.beforeDeg)), 0)}° e acrescenta ${Math.round(ok.reduce((s, d) => s + d.addedM, 0))} m. A simulação ▶ segue o contorno.`]);
+  if (F.status !== 'unverified') {
+    const r = F.steepRuns || [], worst = r[0], steep = F.steepM > 0 && r.length;
+    if (F.status === 'verified') out.push([steep ? 'var(--route)' : 'var(--ok)', `Relevo HiRISE de 1 m: rota verificada em ${pct}% (declive máximo de ${num(F.maxDeg, 1)}° medido a cada 5 m).`]);
+    else if (!steep) out.push(['var(--route)', `Relevo HiRISE de 1 m no trecho conferido: declive máximo de ${num(F.maxDeg, 1)}° medido a cada 5 m.`]);
+    if (steep) out.push([F.maxDeg > LIM.short ? 'var(--crit)' : 'var(--warn)', `Relevo HiRISE de 1 m: ${r.length} trecho${r.length === 1 ? '' : 's'} curto${r.length === 1 ? '' : 's'} acima de ${num(F.limitDeg, 0)}° (${Math.round(F.steepM)} m no total), o mais íngreme com ${num(worst ? worst.maxDeg : F.maxDeg, 0)}° a ${fmtKm(worst ? worst.fromM : 0)} da base. Marcados no mapa: passe devagar ou contorne.`]);
+  }
+  if (bad.length) out.push(['var(--warn)', `${bad.length} trecho(s) acima do limite sem desvio possível no relevo de 1 m: passe devagar.`]);
+  const L0 = F.load;
+  if (L0 && L0.asked) out.push(['var(--route)', `Relevo de 1 m: ${L0.asked} blocos pedidos, ${L0.cache} do cache, ${L0.net} baixados da USGS, ${L0.failed} sem resposta, em ${num(L0.ms / 1000, 1)} s.`]);
+  if (L0 && L0.timedOut) out.push(['var(--warn)', 'O relevo de 1 m passou de 25 s para chegar: a análise usa o que chegou e é refeita quando o resto terminar.']);
+  return out;
+}
+/* Base do veredito: o que é medido, o que foi conferido no relevo de 1 m, o que é simulado e o que funciona offline */
+function renderBasis(wait) {
+  let box = $('#verdictBasis');
+  if (!box) { box = document.createElement('div'); box.id = 'verdictBasis'; box.className = 'basis'; $('#gonogo').after(box); }
+  box.hidden = !!wait; if (wait) return;
+  const F = state.fine, w = state.wx, rows = [];
+  rows.push(['m', 'Medido', `relevo de 200 m (HRSC + MOLA)${w ? ` · tempo do MEDA de ${w.ageDays} dias atrás` : ' · tempo do MEDA indisponível'}`]);
+  if (F && F.loading) rows.push(['c', 'Conferindo', 'relevo de 1 m (HiRISE) ao longo da rota…']);
+  else if (F && F.status && F.status !== 'unverified') rows.push(['c', F.status === 'verified' ? 'Conferido' : 'Parcial', `relevo de 1 m (HiRISE) em ${Math.floor(F.coverage * 100)}% da rota`]);
+  else rows.push(['n', 'Não conferido', 'no relevo de 1 m: só a grade de 200 m']);
+  rows.push(['s', 'Simulado', 'consumo de O₂, ritmo e batimentos (modelo do traje)']);
+  rows.push(['o', state.linkState === 'online' ? 'Offline' : 'Sem enlace', state.linkState === 'online' ? 'rota, veredito e física funcionam sem internet' : 'usando os dados guardados no habitat']);
+  box.textContent = '';
+  rows.forEach(([k, a, b]) => { const p = document.createElement('p'), t = document.createElement('b'), s = document.createElement('span'); t.className = 'b-' + k; t.textContent = a; s.textContent = b; p.append(t, s); box.appendChild(p); });
 }
 /* Roteiro passo a passo: cada trecho com rumo, distância, tempo, hora de chegada, oxigênio e declive máximo */
 const CARD8 = window.LANG === 'en' ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] : ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
@@ -1025,7 +1173,7 @@ const api = {
   $, cssv, on, emit, throttle, start, state, setPayload, API_BASE, ensurePatch, slopeAny, setDropMode, dropAt, speak, helmet: null, POIS, BASE, KIND, LIM, LAYERS, tileUrl, tileRange, T0, EVA_MAX, NO_LOAD_SLOPE,
   API, link, photoUrl, BOX: { XMIN, XMAX, YMIN, YMAX }, R_MARS,
   setStatus, setView, drawRoute, setGoalPoi, setGoalLL, pick, readout, nearPoi, layerState, openTruth, poiTruth, targetTruth,
-  heightAt, slopeAt, fineAround, get FINE() { return FINE; }, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
+  heightAt, slopeAt, fineAround, get FINE() { return FINE; }, get fineLoading() { return FINE_LOADING.size; }, fineCorridor, routeLL, edgePts, edgeWalk, alongPts, cellLL, cellOf, metersBetween, bearing, simAt, slopeRuns, SLOPE_COL, fmtKm, fmtMin, clock, num,
   route, analyse, cellDist, losTo, routeLos, recompute, tick, setPlaying, SUN, tempAt, sampleWx, loadWeather, DARK_MARGIN, get HGT() { return HGT; }, get SL() { return SL; }, GRID: { W, H },
   traverse: null, crism: null, roverRuns: null, slopeURL: null, pano: null,
   get map() { return map; }

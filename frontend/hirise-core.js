@@ -108,12 +108,18 @@
       dist += len;
     }
     const half = Math.max(1, Math.round(o.baseM / o.stepM / 2));
-    let maxS = 0, steepM = 0, have = 0, at = null, cur = null;
-    const runs = [];
+    let maxS = 0, steepM = 0, have = 0, at = null, cur = null, gap = null;
+    const runs = [], gaps = [];
     for (let i = 0; i < s.length; i++) {
       const i0 = Math.max(0, i - half), i1 = Math.min(s.length - 1, i + half), dd = s[i1].d - s[i0].d, dh = s[i1].h - s[i0].h;
       const ok = dd > 0 && isFinite(dh);
       s[i].s = ok ? Math.atan(Math.abs(dh) / dd) / RAD : NaN;
+      /* trechos sem o relevo de 1 m: ali a rota depende só da grade de 200 m (pontos a cada ~20 m para desenhar) */
+      if (!ok) {
+        if (!gap) { gap = { fromM: s[i].d, toM: s[i].d, ll: [] }; gaps.push(gap); }
+        if (gap.toM === gap.fromM || s[i].d - gap.lastD >= 20 || gap.lastD === undefined) { gap.ll.push([s[i].lat, s[i].lon]); gap.lastD = s[i].d; }
+        gap.toM = s[i].d; gap.end = [s[i].lat, s[i].lon];
+      } else if (gap) { gap.ll.push(gap.end); gap = null; }
       if (!ok) { cur = null; continue; }
       const step = i ? s[i].d - s[i - 1].d : 0; have += step;
       if (s[i].s > maxS) { maxS = s[i].s; at = s[i]; }
@@ -125,8 +131,20 @@
     }
     const steepRuns = runs.filter(r => r.to - r.from >= 2).sort((a, b) => b.max - a.max)
       .map(r => ({ fromM: r.from, toM: r.to, lengthM: r.to - r.from, maxDeg: r.max, lat: r.at.lat, lon: r.at.lon }));
-    return { lengthM: dist, coverage: dist ? Math.min(1, have / dist) : 0, maxDeg: maxS, maxAt: at && { lat: at.lat, lon: at.lon, d: at.d }, steepM, steepRuns, limitDeg: o.limitDeg, samples: s };
+    if (gap) gap.ll.push(gap.end);
+    const uncovered = gaps.filter(g => g.toM - g.fromM >= 10).map(g => ({ fromM: g.fromM, toM: g.toM, lengthM: g.toM - g.fromM, ll: g.ll }));
+    return { lengthM: dist, coverage: dist ? Math.min(1, have / dist) : 0, maxDeg: maxS, maxAt: at && { lat: at.lat, lon: at.lon, d: at.d }, steepM, steepRuns, uncovered, limitDeg: o.limitDeg, samples: s };
   }
 
-  return { G, BOX, pixelOf, inside, tileOf, tilesAlong, key, decode, Store, corridor };
+  /* Quanto da rota o relevo de 1 m conferiu:
+     verified   = 98% ou mais da rota (o resto são frações de metro nas pontas);
+     partial    = parte da rota; o resto depende só da grade de 200 m;
+     unverified = nada (fora do mosaico HiRISE, sem rede, ou os blocos não chegaram). */
+  const VERIFIED_MIN = 0.98, PARTIAL_MIN = 0.02;
+  function status(c) {
+    if (!c || !c.lengthM || !(c.coverage > PARTIAL_MIN)) return 'unverified';
+    return c.coverage >= VERIFIED_MIN ? 'verified' : 'partial';
+  }
+
+  return { G, BOX, pixelOf, inside, tileOf, tilesAlong, key, decode, Store, corridor, status, VERIFIED_MIN, PARTIAL_MIN };
 });
