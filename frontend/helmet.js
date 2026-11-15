@@ -332,7 +332,7 @@ function renderHud() {
   } else {
     const p = cur();
     if (!p) src.textContent = panos.length ? '' : 'Carregando panoramas do rover…';
-    else if (!A.link.online) src.textContent = `OFFLINE: as fotos do rover precisam do backend AresNav · parada ${idx + 1} de ${panos.length} · sol ${p.sol}`;
+    else if (!A.link.online) src.textContent = `OFFLINE: as fotos do rover precisam do backend MarsView · parada ${idx + 1} de ${panos.length} · sol ${p.sol}`;
     else {
       const far = !manual && n ? A.metersBetween(n.lat, n.lon, p.lat, p.lon) : 0;
       src.textContent = `Foto real · Perseverance Navcam · sol ${p.sol}${p.t ? ' · ' + p.t + ' LMST' : ''} · parada ${idx + 1} de ${panos.length} · km ${num(p.km, 2)} do trajeto do rover${far > 150 ? ` · panorama mais próximo, a ${dist(far)} de você` : ''}`;

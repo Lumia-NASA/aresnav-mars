@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AresNav · Trilha Jezero</title>
+<title>MarsView · Jezero</title>
+<link rel="icon" href="assets/marsview-logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -69,8 +70,8 @@
 <!-- Barra superior -->
 <header class="topbar">
   <div class="brand" title="Controle de missão para caminhadas em Marte · Cratera Jezero">
-    <span class="logo" aria-hidden="true"></span>
-    <h1>AresNav <span>Trilha Jezero</span></h1>
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><defs><radialGradient id="mvPlanet" cx="36%" cy="32%" r="72%"><stop offset="0" stop-color="#E6A98B"/><stop offset=".55" stop-color="#C46F4B"/><stop offset="1" stop-color="#5E2717"/></radialGradient></defs><circle cx="16" cy="16" r="14.2" fill="none" stroke="#ECE6DC" stroke-opacity=".3" stroke-width="1"/><circle cx="16" cy="16" r="8" fill="url(#mvPlanet)"/><path d="M12.6 15.2c1.3-1.5 3.6-1.7 4.9-.5.9.8.3 2.2-1 2.5-1.4.3-1.7 1.4-3 1.1-1.2-.3-1.7-2-.9-3.1z" fill="#4E1F12" fill-opacity=".5"/><path d="M18.6 18.9c.8-.4 1.9-.3 2.4.4.3.5-.2 1-1 1-.8.1-1.8-.6-1.4-1.4z" fill="#4E1F12" fill-opacity=".4"/><ellipse cx="16" cy="8.95" rx="2.5" ry=".85" fill="#F6EBE3" fill-opacity=".85"/><circle cx="6" cy="10" r="2.2" fill="#ECE6DC"/></svg>
+    <h1>MarsView</h1>
   </div>
   <div class="search">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
@@ -94,8 +95,8 @@
 </div>
 
 <!-- Painel esquerdo: conteúdo da missão -->
-<aside class="side left" id="leftPanel" aria-label="Conteúdo da missão">
-  <header class="sidehead"><h2>Conteúdo da missão</h2><span class="chip">Caminhada 07 · Sol 412</span></header>
+<aside class="side left" id="leftPanel" aria-label="Preparar a caminhada">
+  <header class="sidehead"><div><h2><span class="step">1</span>Preparar a caminhada</h2><p class="sub">Checklist, carga do traje, imagem do mapa e destino</p></div></header>
   <div class="sidebody">
     <section class="block">
       <h3>Checklist de saída</h3>
@@ -115,7 +116,7 @@
       <label class="layer"><input type="radio" name="base" value="relief"><b>Relevo colorido</b><small>MOLA + HRSC</small></label>
       <h3 class="gap">Camadas</h3>
       <label class="layer"><input type="checkbox" id="ov-slope" checked><b>Declive</b><small>Calculado do relevo HRSC/MOLA (200 m)</small>
-        <span class="sw"><i style="--c:#FFB800">4–8°</i><i style="--c:#FF7828">8–12°</i><i style="--c:#FF3344">&gt;12°</i></span></label>
+        <span class="sw"><i style="--c:#D8A74E">4–8°</i><i style="--c:#D08A55">8–12°</i><i style="--c:#D8664F">&gt;12°</i></span></label>
       <label class="layer"><input type="checkbox" id="ov-themis"><b>Infravermelho diurno</b><small>THEMIS · Mars Odyssey</small></label>
       <label class="layer"><input type="checkbox" id="ov-crism" checked><b>Minerais hidratados</b><small>CRISM · MRO. Sinal de água no passado</small></label>
       <label class="layer"><input type="checkbox" id="ov-rover" checked><b>Trajeto do Perseverance</b><small>Mars 2020 · cor pelo declive</small></label>
@@ -132,7 +133,7 @@
 <!-- Painel direito: plano da caminhada -->
 <aside class="side right" id="rightPanel" aria-label="Plano da caminhada">
   <header class="sidehead">
-    <h2>Plano da caminhada</h2>
+    <div><h2><span class="step">2</span>Plano da caminhada</h2><p class="sub">Veredito, números da rota e horários do destino escolhido</p></div>
     <div class="seg" role="group" aria-label="Tipo de rota">
       <button id="m-safe" aria-pressed="true">Segura</button>
       <button id="m-short" aria-pressed="false">Mais curta</button>
@@ -153,17 +154,21 @@
 <!-- Barra da simulação -->
 <div class="dock">
   <div class="transport">
-    <button id="simPlay" class="play" aria-label="Simular a caminhada">▶</button>
-    <input type="range" id="simSlider" min="0" max="1000" value="0" aria-label="Momento da caminhada">
-    <span class="mono" id="simClock">09:00</span>
-    <span class="phase" id="simPhase">Na base</span>
-    <select id="simSpeed" aria-label="Velocidade da simulação">
+    <span class="tlabel" title="Toca a caminhada planejada do começo ao fim, em tempo acelerado">Simulação</span>
+    <button id="simPlay" class="play" aria-label="Simular a caminhada" title="Tocar a caminhada planejada">▶</button>
+    <input type="range" id="simSlider" min="0" max="1000" value="0" aria-label="Momento da caminhada" title="Arraste para ver qualquer momento da caminhada">
+    <span class="mono" id="simClock" title="Hora local em Jezero (Marte) nesse momento da caminhada">09:00</span>
+    <span class="phase" id="simPhase" title="Fase da caminhada: na base, ida, parada ou volta">Na base</span>
+    <select id="simSpeed" aria-label="Velocidade da simulação" title="Velocidade da simulação">
       <option value="0.0041667">1× tempo real</option>
       <option value="0.25">60×</option>
       <option value="1.5" selected>360×</option>
     </select>
-    <button id="uplink" class="uplink" aria-pressed="false" title="Clique para simular a queda do enlace Terra–Marte">NASA link · live</button>
-    <button class="emerg" id="emerg" aria-pressed="false">Voltar à base</button>
+    <span class="tsep" aria-hidden="true"></span>
+    <div class="tgroup" id="dockActions">
+      <button id="uplink" class="uplink" aria-pressed="false" title="Clique para simular a queda do enlace Terra–Marte">NASA link · live</button>
+      <button class="emerg" id="emerg" aria-pressed="false" title="Traça o caminho mais rápido de volta ao habitat">Voltar à base</button>
+    </div>
   </div>
 </div>
 
@@ -185,7 +190,7 @@
 
 <!-- Barra de estado -->
 <footer class="statusbar mono">
-  <span class="credit">NASA / JPL / USGS · Mars Trek · HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO) · via backend AresNav</span>
+  <span class="credit">NASA / JPL / USGS · Mars Trek · HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO) · via backend MarsView</span>
   <span class="readout" id="readout">Passe o mouse sobre o mapa para ver altitude e declive reais.</span>
   <span id="camInfo">Câmera: —</span>
 </footer>
@@ -199,7 +204,7 @@
 
 <!-- Gaveta de dados e procedência -->
 <section class="drawer" id="dataDrawer" hidden aria-label="Dados e procedência">
-  <header><h2>Dados usados: NASA, ESA/DLR e FU Berlin, sempre pelo backend AresNav</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
+  <header><h2>Dados usados: NASA, ESA/DLR e FU Berlin, sempre pelo backend MarsView</h2><button id="dataClose" aria-label="Fechar">✕</button></header>
   <div class="tablewrap">
     <table>
       <thead><tr><th>Camada</th><th>Missão</th><th>Instrumento</th><th>Rota do backend</th><th>Fonte e crédito</th><th>Status</th></tr></thead>
@@ -207,7 +212,7 @@
     </table>
   </div>
   <p class="prov mono"><b>DATA PROVENANCE:</b> MOLA DEM (463 m/px) | HRSC + MOLA (200 m/px) | HiRISE/CTX (0,25–6 m/px) | THEMIS (100 m/px) | Cor natural FU Berlin (HRSC CC BY-SA 3.0 IGO) | Mastcam-Z 360° | MEDA Sol Baseline | Navcam M20
-    <span class="seal">🔒 EvidenceGate SHA-256: <span id="provHash">aguardando o backend</span> <span id="provState"></span></span></p>
+    <span class="seal">EvidenceGate SHA-256: <span id="provHash">aguardando o backend</span> <span id="provState"></span></span></p>
   <p>O relevo usado no cálculo da rota tem resolução de 200 m. Serve para escolher o caminho geral, mas esconde pedras e degraus menores. O relevo do globo está em escala real; o botão 1× / 2,5× exagera a altura só para facilitar a leitura na vista de cima. As imagens de alta resolução (HiRISE e CTX) são em tons de cinza e recebem por cima a cor real do mosaico Viking.</p>
   <p>A base Ares-1 é hipotética. Batimentos, ritmo e a previsão de oxigênio são simulados a partir da rota, do relevo real e da carga do traje. As fotos do modo Capacete são imagens brutas reais da Navcam do Perseverance. No "Terreno 3D" a vista é montada só com dados orbitais: ao descer em qualquer ponto de Marte, o app pede ao backend o relevo real do lugar (HRSC + MOLA, cerca de 230 m por ponto).</p>
 </section>

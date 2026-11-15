@@ -62,6 +62,13 @@ function init() {
     const scene = viewer.scene, globe = scene.globe;
     globe.baseColor = C.Color.fromCssColorString('#3a2218');
     globe.enableLighting = false; globe.showGroundAtmosphere = false; globe.depthTestAgainstTerrain = true;
+    // Nomes no globo: um empurrão na direção da câmera, proporcional à altura dela (4%, até 1.200 km). De longe, perto da
+    // borda do planeta, o nome preso ao chão afundava atrás do próprio relevo; assim fica na frente. De perto o desvio é de
+    // centímetros, e o que está do outro lado do planeta continua escondido.
+    const lift = new C.Cartesian3();
+    const LIFT = new C.CallbackProperty(() => { lift.z = -Math.min(1.2e6 * K, Math.max(0, viewer.camera.positionCartographic.height) * 0.04); return lift; }, false);
+    const liftLabels = list => list.forEach(e => { if (e.label && !e._lifted) { e.label.eyeOffset = LIFT; e._lifted = true; } });
+    viewer.entities.collectionChanged.addEventListener((col, added) => liftLabels(added));
     scene.fog.enabled = false;
     if (scene.moon) scene.moon.show = false;
     if (scene.sun) scene.sun.show = false;
@@ -77,7 +84,7 @@ function init() {
     const add = (k, alpha, name, box) => {
       const d = Object.assign({}, A.LAYERS[k], box ? { box } : null), range = A.tileRange(k);
       if (!range) return; // sem backend, só existem as camadas guardadas localmente
-      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box && !d.min ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend AresNav' });
+      const provider = new C.UrlTemplateImageryProvider({ url: A.tileUrl(k), tilingScheme: geo, minimumLevel: d.box && !d.min ? range[0] : 0, maximumLevel: range[1], rectangle: d.box ? C.Rectangle.fromDegrees(...d.box) : undefined, credit: 'NASA Mars Trek via backend MarsView' });
       provider.errorEvent.addEventListener(() => {}); // blocos sem cobertura são esperados
       // d.min: a camada só aparece de perto (o tom do mosaico da FU Berlin difere do Viking visto de longe)
       let l; // imageryLayers.add() não devolve a camada; addImageryProvider() devolve

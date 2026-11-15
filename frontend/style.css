@@ -815,3 +815,19 @@ body.ge .gonogo{font-family:var(--body);font-weight:600;letter-spacing:.02em;bor
 .mission-banner b{font-size:10.5px;font-weight:500;letter-spacing:.24em;color:var(--rust);opacity:1}
 .mission-banner span{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 body.ge .seg button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+/* Marca MarsView: ícone de órbita + nome espaçado, como na landing */
+.brand{display:flex;align-items:center;gap:10px}
+.brand .logo{width:28px;height:28px;flex:none;background:none;border-radius:0;box-shadow:none}
+.brand h1{font-family:var(--body);font-weight:600;font-size:13px;letter-spacing:.26em;text-transform:uppercase;color:var(--fg);margin:0}
+/* Painéis: número do passo e uma linha dizendo para que servem */
+.sidehead .step{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:8px;border-radius:50%;border:1px solid var(--rust);color:var(--rust);font:500 10px var(--mono);vertical-align:2px}
+.sidehead .sub{margin:3px 0 0;font-size:11.5px;line-height:1.35;color:var(--muted)}
+/* Barra de baixo: grupo da simulação e grupo das ações, separados */
+.transport .tlabel{font:500 9.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--rust);cursor:help;white-space:nowrap}
+.transport .tsep{width:1px;align-self:stretch;background:var(--line);margin:2px 2px}
+.transport .tgroup{display:flex;align-items:center;gap:8px}
+body.ge .transport #simPlay{border-color:var(--accent);color:var(--accent);background:transparent}
+body.ge .transport input[type=range]{accent-color:var(--accent)}
+.ares-panel form button svg{display:block}
+.sidehead > div:first-child{flex:1 1 auto;min-width:0} .sidehead .seg{flex:none;align-self:flex-start}

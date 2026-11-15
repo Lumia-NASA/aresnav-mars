@@ -1,4 +1,4 @@
-# AresNav performance
+# MarsView performance
 
 Measured on November 14, 2026 on a Windows 11 laptop with Chrome, running the backend locally (`node backend/server.js`). "Phone" means the same machine with the screen emulated at 375 × 812. **It has not been measured on a real phone yet.** A phone's CPU and GPU are slower, so the 360° viewer and globe times should go up there.
 

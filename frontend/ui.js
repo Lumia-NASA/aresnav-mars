@@ -59,7 +59,7 @@ $('#basePick').onclick = () => {
 A.on('layers', syncBase);
 
 /* ---------- idioma ---------- */
-document.title = 'AresNav · ' + T('Trilha Jezero');
+document.title = 'MarsView · Jezero';
 
 /* ---------- gaveta de dados ---------- */
 const drawer = $('#dataDrawer');

@@ -1,4 +1,4 @@
-# AresNav · Jezero Trail (frontend)
+# MarsView (frontend)
 
 Mission control for astronaut walks in Jezero Crater, on Mars. Built for the Mars challenge of the NASA Space Apps Challenge 2026.
 
@@ -6,7 +6,7 @@ Pick a destination and the app plots the walking route from the base. It compute
 
 ## Golden rule: everything goes through the backend
 
-The browser **never calls NASA directly** (skill `01-frontend-hud-skill`). Imagery, terrain, traverse, minerals, photos and telemetry come from the AresNav backend, which relays NASA's data, validates it and caches it:
+The browser **never calls NASA directly** (skill `01-frontend-hud-skill`). Imagery, terrain, traverse, minerals, photos and telemetry come from the MarsView backend, which relays NASA's data, validates it and caches it:
 
 | What | Backend route |
 |---|---|
@@ -42,11 +42,11 @@ On the globe the terrain is also at real scale; the `1×` / `2.5×` button exagg
 The map fills the screen and the panels float on top, like planet explorers do:
 
 - **Top bar:** search for places on Mars (name or "lat, lon"; shortcut `/`), mode switch, Telemetry, Landmarks, ARES and Data.
-- **Left panel (Mission content):** pre-walk checklist, suit payload, layers and destinations. It folds away with the side tab.
-- **Right panel (Walk plan):** verdict, route numbers, elevation profile, schedule, alerts and stops.
+- **Left panel (1 · Prepare the walk):** pre-walk checklist, suit payload, layers and destinations. It folds away with the side tab.
+- **Right panel (2 · Walk plan):** verdict, route numbers, elevation profile, schedule, alerts and stops.
 - **Bottom right corner:** enter the Helmet view, switch 3D/2D, point north and zoom.
 - **Bottom left corner:** quick switch of the background image.
-- **Bottom bar:** walk simulation, the link cut and **Return to base**; in the footer, the position under the cursor and the camera altitude.
+- **Bottom bar:** two groups. **Simulation** plays the planned walk (▶, time bar, Mars clock, phase and speed). The actions are **Follow live** (the live walk panel), **NASA link · live** (cuts the Earth–Mars link) and **Return to base** (fastest way back); in the footer, the position under the cursor and the camera altitude.
 
 The look follows the team's landing page: warm charcoal, ivory and terracotta, Manrope for text and small uppercase mono labels. Muted green, ochre and brick appear only as status (GO / CAUTION / NO-GO).
 
@@ -114,7 +114,7 @@ Ideas taken from MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin and NASA
   - the time out and the time back, which differ because the climb on the way out becomes a descent on the way back (Tobler's function with the suit mass);
   - the **turn-back point**: how far you can go and still return with 30% O₂;
   - the calibration note. The app compares our terrain with the elevation Perseverance measured at each stop of the official route. Today that is **613 stops, mean offset +19.2 m, σ 19.1 m (RMS 27.1 m)**. The number is computed live, not hard-coded.
-- **Radio:** line of sight from the habitat (2 m antenna) to the helmet (1.7 m), over the real terrain and including Mars' curvature, like the MMGIS Sightline tool. It shows `DIRECT UHF` or `TERRAIN OCCLUDED -> RELAY MRO` in the status bar and in Telemetry.
+- **Radio:** line of sight from the habitat (2 m antenna) to the helmet (1.7 m), over the real terrain and including Mars' curvature, like the MMGIS Sightline tool. It shows "Radio: direct to the habitat" or "Radio: terrain blocks it, relay via MRO" in the status bar and in Telemetry.
 - **Provenance labels** on every Telemetry number: `MEASURED` (MEDA, rover stops), `DEM-DERIVED` (terrain) or `SIMULATED` (suit model).
 - **Export GeoJSON:** downloads `aresnav-mission-plan.geojson` with:
   - the route, the stops and the turn-back point;
