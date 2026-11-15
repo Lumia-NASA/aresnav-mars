@@ -81,7 +81,7 @@ const panos = JSON.parse(fs.readFileSync(path.join(root, 'backend/data/fub/panor
 
   // ---------- backend numa porta de teste ----------
   const PORT = 3917, BASE = `http://127.0.0.1:${PORT}`;
-  const env = Object.assign({}, process.env, { PORT: String(PORT), HOST: '127.0.0.1', LOG_LEVEL: 'error', ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '' });
+  const env = Object.assign({}, process.env, { PORT: String(PORT), HOST: '127.0.0.1', LOG_LEVEL: 'error', ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', NVIDIA_API_KEY: '', COPILOT_PROVIDER: '' });
   const server = spawn(process.execPath, [path.join(root, 'backend/server.js')], { env, stdio: ['ignore', 'ignore', 'pipe'] });
   let errText = ''; server.stderr.on('data', d => { errText += d; });
   const up = async () => { for (let i = 0; i < 50; i++) { try { const r = await fetch(BASE + '/health'); if (r.ok) return true; } catch (e) { /* ainda subindo */ } await new Promise(r => setTimeout(r, 200)); } return false; };

@@ -32,7 +32,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   if (!chrome) { console.log('Nenhum Chrome/Edge encontrado (defina CHROME_PATH).'); process.exit(1); }
-  const env = Object.assign({}, process.env, { PORT: String(PORT), HOST: '127.0.0.1', LOG_LEVEL: 'error', ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', PANO_CACHE_DIR: PANO_DIR });
+  const env = Object.assign({}, process.env, { PORT: String(PORT), HOST: '127.0.0.1', LOG_LEVEL: 'error', ANTHROPIC_API_KEY: '', ANTHROPIC_AUTH_TOKEN: '', NVIDIA_API_KEY: '', COPILOT_PROVIDER: '', PANO_CACHE_DIR: PANO_DIR });
   const server = spawn(process.execPath, [path.join(root, 'backend/server.js')], { env, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) { try { if ((await fetch(`http://127.0.0.1:${PORT}/health`)).ok) break; } catch (e) { /* subindo */ } await sleep(200); }
   const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=1440,900'] });
