@@ -99,7 +99,7 @@ const QUICK = ['Posso sair?', 'Quanto oxigênio sobra?', 'Onde viro para voltar?
 $('#aresQuick').innerHTML = QUICK.map(q => `<button type="button">${q}</button>`).join('');
 const log = $('#aresLog'), history = [];
 let aiReady = null;   // o backend diz se há credencial da API; sem ela nem tenta (evita erro no console)
-fetch(`${A.API}/copilot/status`).then(r => r.ok ? r.json() : null).then(j => { aiReady = !!(j && j.ai); $('#aresMode').textContent = aiReady ? `Claude · ${j.model}` : (en() ? 'local mode (no AI key)' : 'modo local (sem chave da IA)'); }).catch(() => { aiReady = false; });
+fetch(`${A.API}/copilot/status`).then(r => r.ok ? r.json() : null).then(j => { aiReady = !!(j && j.ai); $('#aresMode').textContent = aiReady ? `${j.provider === 'nvidia' ? 'NVIDIA' : 'Claude'} · ${String(j.model).split('/').pop()}` : (en() ? 'local mode (no AI key)' : 'modo local (sem chave da IA)'); }).catch(() => { aiReady = false; });
 let voiceOn = true;
 function add(role, text, meta) {
   const li = document.createElement('li'); li.className = role;
@@ -120,7 +120,7 @@ async function ask(q) {
       const r = await fetch(`${A.API}/copilot/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, context: snapshot(), history: history.slice(-6) }), signal: ctl.signal });
       clearTimeout(tmo);
       const j = await r.json().catch(() => ({}));
-      if (r.ok && j.answer) { answer = j.answer; meta = `Claude · ${j.model || 'API'}`; }
+      if (r.ok && j.answer) { answer = j.answer; meta = `${j.provider === 'nvidia' ? 'NVIDIA' : 'Claude'} · ${String(j.model || 'API').split('/').pop()}`; }
       else if (r.ok && j.refused) { answer = null; meta = 'recusado'; }
     } catch (e) { /* sem rede: modo local */ }
   }
