@@ -91,7 +91,7 @@ const panel = document.createElement('section'); panel.className = 'ares'; panel
 panel.innerHTML = `<header><b>ARES</b><small id="aresMode">Copiloto de apoio</small><button id="aresClose" aria-label="Fechar">✕</button></header>
   <ol id="aresLog" aria-live="polite"></ol>
   <div class="ares-quick" id="aresQuick"></div>
-  <form id="aresForm"><input id="aresIn" autocomplete="off" placeholder="Pergunte ao ARES…" aria-label="Pergunta para o copiloto"><button type="button" id="aresMic" aria-label="Falar" title="Segure para falar">🎙</button><button type="submit">Enviar</button></form>`;
+  <form id="aresForm"><input id="aresIn" autocomplete="off" placeholder="Pergunte ao ARES…" aria-label="Pergunta para o copiloto"><button type="button" id="aresMic" aria-label="Falar" title="Segure para falar"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button><button type="submit">Enviar</button></form>`;
 btn.className = 'pillbtn ares-fab';
 const dataBtn = $('#btnData'); dataBtn.parentNode.insertBefore(btn, dataBtn);
 document.body.append(panel);

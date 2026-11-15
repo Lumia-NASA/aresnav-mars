@@ -1,4 +1,4 @@
-/* Visor 360° dentro do AresNav, para os panoramas do WebGIS de Jezero da FU Berlin
+/* Visor 360° dentro do MarsView, para os panoramas do WebGIS de Jezero da FU Berlin
    (fotos reais da Mastcam-Z e vistas sintéticas renderizadas do relevo).
    O panorama é um cubo (6 faces) montado com CSS 3D, sem biblioteca: primeiro a prévia de 256 px de cada face,
    depois os blocos de 512 px. Panoramas esféricos são reprojetados em cubo num canvas.

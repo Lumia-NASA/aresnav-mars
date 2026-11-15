@@ -1,4 +1,4 @@
-# AresNav — Interplanetary Survival Guide: Martian Map
+# MarsView — Interplanetary Survival Guide: Martian Map
 
 > **NASA Space Apps Challenge 2026**
 > **Team Lumia**
@@ -7,7 +7,7 @@
 ---
 
 ## Overview
-**AresNav** is a prototype for planning walks (EVAs) on Mars. It combines historical NASA and ESA mission data (terrain, imagery, the Perseverance traverse, minerals) with a simulated suit model. For a chosen route it answers whether the walk is GO, CAUTION or NO-GO, explains why, and says what to change. The data comes from public files and services with a local cache: **it is not a live feed**, and the verdict is a **planning simulation**, not a safety authorization.
+**MarsView** is a prototype for planning walks (EVAs) on Mars. It combines historical NASA and ESA mission data (terrain, imagery, the Perseverance traverse, minerals) with a simulated suit model. For a chosen route it answers whether the walk is GO, CAUTION or NO-GO, explains why, and says what to change. The data comes from public files and services with a local cache: **it is not a live feed**, and the verdict is a **planning simulation**, not a safety authorization.
 
 ---
 
@@ -30,7 +30,7 @@ Science route → risk explained → comparison → real panorama of the place �
 4. **Comparison:** the dangerous short route is dashed red and the safe detour green. The map also shows the 15 and 30 min walking reach and what can be reached with the current payload.
 5. **Real panorama:** a 360° Mastcam-Z panorama of the place. Synthetic views are shown in purple and labeled "not a photo".
 6. **ARES copilot:** answers by voice ("Where do I turn back?") using only the app's numbers. It works with Claude or in local mode.
-7. **Run the walk:** the **Run the walk** button follows the EVA live (simulated) in the Helmet view.
+7. **Follow live:** the **Follow live** button follows the EVA live (simulated) in the Helmet view.
    - **Panel:** plan vs. actual (time and O₂), countdown to the turn-back point (by O₂ or by daylight, whichever comes first), next stop, radio and distance off the route.
    - **ARES:** speaks on its own at the key moments. With the actual pace at 85%, it reports the delay, "turn back in 5 min" and "turn back now".
 8. **Link cut:** the **NASA link · live** button simulates the Earth–Mars link going down. Route, verdict and physics keep working. Layers that need the internet say "unavailable offline".

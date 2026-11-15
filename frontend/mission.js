@@ -29,11 +29,11 @@ renderClock(); setInterval(renderClock, 10000);
 
 function commInfo() {
   const l = A.state.liveLos; if (!l) return null;
-  return l.losClear ? { ok: true, text: '📡 COMM: DIRECT UHF (LOS CLEAR)' } : { ok: false, text: `📡 COMM: TERRAIN OCCLUDED -> RELAY MRO (${A.num(l.maxObstructionMeters, 0)} m)` };
+  return l.losClear ? { ok: true, text: 'Rádio: direto com o habitat' } : { ok: false, text: `Rádio: o relevo bloqueia, relé pelo MRO (${A.num(l.maxObstructionMeters, 0)} m)` };
 }
 function renderComm() {
   const c = commInfo();
-  commEl.textContent = c ? c.text : '📡 COMM: —'; commEl.classList.toggle('bad', !!c && !c.ok);
+  commEl.textContent = c ? c.text : 'Rádio: —'; commEl.classList.toggle('bad', !!c && !c.ok);
   const t = $('#teleComm'); if (t) { t.textContent = commEl.textContent; t.classList.toggle('bad', !!c && !c.ok); }
 }
 
@@ -134,12 +134,12 @@ $('#exportBtn').onclick = async () => {
     simulated: ['oxygen use', 'heart rate', 'pace vs payload', 'slope limit rule'], measured: ['terrain', 'rover traverse and waypoints', 'imagery'],
   };
   const meta = {
-    generator: 'AresNav · Lumia · NASA Space Apps 2026', created: new Date().toISOString(), audit, mars_time: (m => ({ sol: m.sol, lmst: hhmm(m.lmst), ls_deg: +m.ls.toFixed(1) }))(marsTime()),
+    generator: 'MarsView · Lumia · NASA Space Apps 2026', created: new Date().toISOString(), audit, mars_time: (m => ({ sol: m.sol, lmst: hhmm(m.lmst), ls_deg: +m.ls.toFixed(1) }))(marsTime()),
     verdict: st.assessment ? st.assessment.level : null, reasons: st.assessment ? st.assessment.reasons : [],
     suit_payload_kg: st.payloadKg, max_safe_slope_deg: A.LIM.safe, radio: st.los ? { los_clear_whole_route: st.los.losClear, blind_share: +st.los.blindShare.toFixed(2), worst_obstruction_m: st.los.maxObstructionMeters } : null,
     calibration: calib ? { m20_waypoints: calib.n, bias_m: +calib.bias.toFixed(2), sigma_m: +calib.sd.toFixed(2), rms_m: +calib.rms.toFixed(2) } : null,
     evidence_sha256: { telemetry: (st.tele && st.tele.evidenceSha256) || null, plan_features: await sha256(JSON.stringify(body)) },
-    sources: ['HRSC+MOLA DEM 200 m (Mars Trek)', 'Perseverance traverse & waypoints (MMGIS)', 'MEDA telemetry (AresNav contract)']
+    sources: ['HRSC+MOLA DEM 200 m (Mars Trek)', 'Perseverance traverse & waypoints (MMGIS)', 'MEDA telemetry (MarsView contract)']
   };
   const blob = new Blob([JSON.stringify(Object.assign({ aresnav: meta }, body), null, 2)], { type: 'application/geo+json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'aresnav-mission-plan.geojson';
@@ -362,7 +362,7 @@ function sunlight(v) {
 setInterval(() => { const v = viewer(); if (v && on('ov-sun')) sunlight(v); }, 60000);
 
 /* faixa no globo */
-const banner = document.createElement('div'); banner.className = 'mission-banner'; banner.innerHTML = '<b>Every step planned. Every breath counted.</b><span>AresNav · Lumia · NASA Space Apps 2026</span>';
+const banner = document.createElement('div'); banner.className = 'mission-banner'; banner.innerHTML = '<b>Every step planned. Every breath counted.</b><span>MarsView · Lumia · NASA Space Apps 2026</span>';
 const gview = $('#view-globe'); if (gview) gview.appendChild(banner);
 
 /* ---------- WebGIS de Jezero da FU Berlin: margem do lago, canais, elipse de pouso e panoramas 360° ---------- */

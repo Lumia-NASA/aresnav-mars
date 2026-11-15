@@ -1,6 +1,6 @@
 # Model assumptions and sensitivity
 
-The AresNav verdict (GO / CAUTION / NO-GO) is a **planning simulation**. It combines real data (terrain, the rover traverse, imagery) with a suit model that **has not been validated** with astronauts, real suits or NASA standards. This page lists each assumption and how much it weighs on the result, so the team and the judges can decide how far to trust each number.
+The MarsView verdict (GO / CAUTION / NO-GO) is a **planning simulation**. It combines real data (terrain, the rover traverse, imagery) with a suit model that **has not been validated** with astronauts, real suits or NASA standards. This page lists each assumption and how much it weighs on the result, so the team and the judges can decide how far to trust each number.
 
 The parameters live in `frontend/physics.js` (`SLOPE_RULE` and `ALGORITHM`, version 1.3.0) and are included in the exported GeoJSON.
 
@@ -8,15 +8,15 @@ The parameters live in `frontend/physics.js` (`SLOPE_RULE` and `ALGORITHM`, vers
 
 | Assumption | Value used | Where it comes from | Status |
 |---|---|---|---|
-| Slope limit with payload | 15° − 0.2° per kg, floor of 8° | AresNav design choice | **simulation assumption**, not a validated EVA limit |
+| Slope limit with payload | 15° − 0.2° per kg, floor of 8° | MarsView design choice | **simulation assumption**, not a validated EVA limit |
 | O₂ endurance | 480 min | order of magnitude of an 8 h EVA | assumption |
-| Minimum O₂ reserve on return | 30% | AresNav design margin | assumption |
+| Minimum O₂ reserve on return | 30% | MarsView design margin | assumption |
 | Extra consumption per kg | +1.8% per kg | design choice | assumption |
 | Pace lost per kg | −1.2% per kg | design choice | assumption |
 | Walking pace (Tobler) | 2.7 km/h on flat ground, peak on a gentle descent | Tobler's function with the v₀ of a suited astronaut (SEXTANT/Apollo reference) | classic shape; the v₀ value is an assumption |
 | Habitat antenna and helmet | 2 m and 1.7 m | design choice | assumption (a taller antenna changes the radio result a lot) |
 | Moving in the 3D terrain: on foot | eyes at 1.7 m, 0.8 m/s (Shift 1.6 m/s), 0.7 m stride | design choice, visualization only | assumption; does not feed the O₂ math or the verdict |
-| Moving in the 3D terrain: crewed rover | eyes at 2.4 m, 10 km/h (Shift 15 km/h), stops on climbs above 20° or side tilt above 25° | order of magnitude of pressurized rovers studied by NASA; AresNav values | **assumption**, visualization only; planning is still for a walk on foot |
+| Moving in the 3D terrain: crewed rover | eyes at 2.4 m, 10 km/h (Shift 15 km/h), stops on climbs above 20° or side tilt above 25° | order of magnitude of pressurized rovers studied by NASA; MarsView values | **assumption**, visualization only; planning is still for a walk on foot |
 | Rocks and sand near the feet | drawn in the visor up to ~20 m | illustrative (orbital imagery does not show centimeter-sized rocks) | **illustration**, not data |
 | Terrain | HRSC + MOLA, 200 m per point | NASA Mars Trek | **real data**. Cannot see boulders or steps; sits on average 19 m above the elevation Perseverance measured at 613 stops (σ 19 m) |
 | Route corridor terrain | controlled HiRISE DTM, 1 m (JEZ_hirise_soc_006) | USGS Astrogeology / MRO HiRISE | **real data**. Slope measured over 5 m; the steep-stretch limit is the route limit. Differs from the 200 m terrain by 3 to 6 m at the base |

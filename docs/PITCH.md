@@ -1,9 +1,9 @@
-# AresNav — 29-second video and live demo
+# MarsView — 29-second video and live demo
 
 > Team Lumia · NASA Space Apps 2026 · Challenge: an integrated, layered view of a place on Mars to help a human explorer plan and carry out a walk.
 
 ## The one-line pitch
-**AresNav turns NASA and ESA orbital data into a go / no-go decision for a walk on Mars — and tells the astronaut exactly what to change when the answer is no.**
+**MarsView turns NASA and ESA orbital data into a go / no-go decision for a walk on Mars — and tells the astronaut exactly what to change when the answer is no.**
 
 ## The 29-second video (submission rule: 30 s maximum)
 About 70 words, read at a calm pace. Record it at 29 s so it never goes over the limit.
@@ -11,10 +11,10 @@ About 70 words, read at a calm pace. Record it at 29 s so it never goes over the
 | Time | On screen | Voice-over |
 |---|---|---|
 | 0–5 s | Globe flies into Jezero crater | "Before every walk on Mars, an astronaut needs three answers: can I get there, can I get back, and will anyone hear me?" |
-| 5–12 s | Pick **Three Forks sample depot**; the verdict shows **NO-GO · not enough O₂** | "AresNav turns real NASA and ESA data — one-meter HiRISE terrain, MEDA weather and Perseverance's own route — into a go or no-go." |
+| 5–12 s | Pick **Three Forks sample depot**; the verdict shows **NO-GO · not enough O₂** | "MarsView turns real NASA and ESA data — one-meter HiRISE terrain, MEDA weather and Perseverance's own route — into a go or no-go." |
 | 12–20 s | Click **Why?**, then **Carry 13.5 kg instead of 18.5**: the verdict changes | "When the answer is no, it says why, and what to change: carry less, or turn back at three kilometers." |
-| 20–26 s | Helmet view, **Run the walk**; ARES says "turn back now" | "Out there, ARES follows the walk and calls the turn-back point." |
-| 26–29 s | AresNav logo | "AresNav. Every step planned. Every breath counted." |
+| 20–26 s | Helmet view, **Follow live**; ARES says "turn back now" | "Out there, ARES follows the walk and calls the turn-back point." |
+| 26–29 s | MarsView logo | "MarsView. Every step planned. Every breath counted." |
 
 ## The live demo (about 4 minutes, if there is time with the judges)
 
@@ -28,13 +28,13 @@ An astronaut leaving a habitat in Jezero crater needs to answer three questions 
 | 1 | Open the app on the globe, fly to Jezero. The ground turns to natural color as you zoom in. | "Everything you see is real: NASA terrain and imagery, ESA's HRSC camera, FU Berlin's color mosaic of Jezero." | MOLA, HRSC, HiRISE, CTX via NASA Mars Trek; FU Berlin WebGIS |
 | 2 | Pick **Three Forks sample depot** — the real place where Perseverance left sample tubes. | "Our astronaut wants to visit the sample depot, 3.7 km away, carrying 18.5 kg of equipment." | Perseverance traverse and waypoints (MMGIS) |
 | 3 | The verdict reads **NO-GO · not enough O₂ — return O₂ 21% < 30%**. Click **Why?** | "The route is flat enough. The problem is oxygen: the walk out is 1 h 54 because it climbs, the walk back is 1 h 40. With 18.5 kg the suit burns oxygen faster." | Tobler walking model + suit mass; asymmetric out/back times |
-| 4 | Click the verdict. The map flies to the stretch past the **turn-back point** and marks it in red. | "AresNav doesn't just say no. It shows where the plan breaks: past 3.07 km she can't get home with a 30% reserve." | Turn-back point from the oxygen budget, stops included |
+| 4 | Click the verdict. The map flies to the stretch past the **turn-back point** and marks it in red. | "MarsView doesn't just say no. It shows where the plan breaks: past 3.07 km she can't get home with a 30% reserve." | Turn-back point from the oxygen budget, stops included |
 | 5 | Click **Carry 13.5 kg instead of 18.5**. Verdict becomes **CAUTION**. | "Drop five kilos and the walk is feasible. The remaining caution is radio." | Max payload solved from the same model |
 | 6 | Click **Show segments without radio**. | "From the habitat's 2 m antenna, the terrain hides her for most of the route, so comms relay through the Mars Reconnaissance Orbiter." | Line of sight over the real terrain, with Mars curvature |
 | 7 | Switch to **Shortest** route on a far point: the direct path is dashed red, the safe detour green. | "When the short way is too steep for the load, it offers the safe detour in one click." | Slope from the 200 m terrain model |
 | 8 | Click a **360°** point near the depot. | "Before going, she can stand there: this is a real Mastcam-Z panorama from Perseverance. Purple points are synthetic views rendered from the terrain — we label them so nobody mistakes them for photos." | Mastcam-Z panoramas stitched by FU Berlin |
 | 9 | Open **ARES** and ask "Where do I turn back?" | "ARES answers by voice, using only the numbers the app computed. With no AI key or no network it still answers, in local mode." | Claude (Anthropic) through our backend, or local rules |
-| 10 | Click **Run the walk** with actual pace at 85%. Speed up the clock. | "Now she is out there. The panel compares plan and reality: she is 13 minutes behind, so the turn-back point is coming closer. ARES calls it out: turn back in 5 minutes... turn back now." Click **Turn back now**. | Execution engine on the same physics; real sunset at Jezero (Mars24, checked against MEDA) |
+| 10 | Click **Follow live** with actual pace at 85%. Speed up the clock. | "Now she is out there. The panel compares plan and reality: she is 13 minutes behind, so the turn-back point is coming closer. ARES calls it out: turn back in 5 minutes... turn back now." Click **Turn back now**. | Execution engine on the same physics; real sunset at Jezero (Mars24, checked against MEDA) |
 | 11 | Click **NASA link · live** to cut the Earth–Mars link. | "Mars is up to 22 light-minutes away. When the link drops, route, verdict and physics keep working from the habitat's cache. Layers that need the internet say so." | Offline-first cache in the backend |
 
 ### What makes it different (20 s)

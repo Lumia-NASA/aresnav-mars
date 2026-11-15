@@ -1,6 +1,6 @@
-/* AresNav · Trilha Jezero — núcleo do app.
+/* MarsView · Trilha Jezero — núcleo do app.
    Regra de ouro (skill 01): o navegador NUNCA chama a NASA direto. Imagens, relevo, trajeto,
-   minerais, fotos e telemetria vêm do backend AresNav (/api/v1/...), que repassa e guarda em cache.
+   minerais, fotos e telemetria vêm do backend MarsView (/api/v1/...), que repassa e guarda em cache.
    Se o backend cair ou responder degraded: true, o app entra em redundância local (pasta data/)
    e mostra o aviso OFFLINE TELEMETRY (CACHED).
    Este arquivo calcula a rota a pé (A*), simula a caminhada e desenha o mapa 2D e o painel do plano.
@@ -20,7 +20,7 @@ function throttle(fn, ms) {
   return function () { const now = Date.now(), wait = ms - (now - last); clearTimeout(timer); if (wait <= 0) { last = now; fn(); } else timer = setTimeout(() => { last = Date.now(); fn(); }, wait); };
 }
 
-/* ---------- Backend AresNav ---------- */
+/* ---------- Backend MarsView ---------- */
 /* Em desenvolvimento o frontend roda na porta 5183 e o backend na 3000. Em produção (VPS) o Fastify
    serve tudo na mesma porta: a base fica vazia, sem CORS e sem porta extra no firewall. */
 const API_BASE = window.ARESNAV_API != null ? String(window.ARESNAV_API).replace(/\/$/, '') : (window.location.port === '5183' ? 'http://localhost:3000' : '');
@@ -69,7 +69,7 @@ const MY = DY * Math.PI / 180 * R_MARS;
 /* [chave, camada, missão, instrumento, rota do backend, fonte e crédito exigido] */
 const SOURCES = [
   ['meda', 'Tempo medido (mínima, máxima, pressão)', 'Mars 2020', 'MEDA', '/api/v1/weather', 'NASA/JPL-Caltech/CAB (mars.nasa.gov weather feed)'],
-  ['telemetry', 'Telemetria unificada (contrato)', 'MOLA + MEDA + Mars 2020', 'CONTRATO_API.json', '/api/v1/telemetry', 'Contrato AresNav (valores de exemplo)'],
+  ['telemetry', 'Telemetria unificada (contrato)', 'MOLA + MEDA + Mars 2020', 'CONTRATO_API.json', '/api/v1/telemetry', 'Contrato MarsView (valores de exemplo)'],
   ['viking', 'Mosaico global colorido', 'Viking Orbiter', 'VIS (232 m)', '/api/v1/tiles/viking', 'NASA/JPL/USGS · Mars Trek'],
   ['hirise', 'Imagem HiRISE 25 cm', 'Mars Reconnaissance Orbiter', 'HiRISE', '/api/v1/tiles/hirise', 'NASA/JPL/University of Arizona · Mars Trek'],
   ['ctx', 'Imagem CTX 6 m', 'Mars Reconnaissance Orbiter', 'CTX', '/api/v1/tiles/ctx', 'NASA/JPL-Caltech/MSSS · Mars Trek'],
@@ -315,7 +315,7 @@ async function pollTelemetry() {
 }
 function renderLink() {
   const off = state.linkState !== 'online', chip = $('#dataChip'), up = $('#uplink');
-  chip.textContent = state.linkState === 'online' ? 'Backend AresNav · NASA ao vivo' : 'OFFLINE TELEMETRY (CACHED)';
+  chip.textContent = state.linkState === 'online' ? 'Backend MarsView · NASA ao vivo' : 'OFFLINE TELEMETRY (CACHED)';
   chip.classList.toggle('warn', off);
   document.body.classList.toggle('offline', off);
   up.textContent = off ? 'Link down · local cache' : 'NASA link · live';
@@ -446,7 +446,7 @@ function initMap() {
   map = L.map('map', { crs: L.CRS.EPSG4326, minZoom: 1, maxZoom: 18, zoomSnap: 0.5, maxBounds: [[-90, -200], [90, 200]], maxBoundsViscosity: 0.8, worldCopyJump: false })
     .setView([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
   map.attributionControl.setPrefix(false);
-  map.attributionControl.addAttribution('Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend AresNav');
+  map.attributionControl.addAttribution('Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend MarsView');
   buildTiles();
   map.createPane('routes').style.zIndex = 450;
   groups = { slope: L.layerGroup(), crism: L.layerGroup(), rover: L.layerGroup(), poi: L.layerGroup(), targets: L.layerGroup(), route: L.layerGroup().addTo(map), marks: L.layerGroup().addTo(map) };
@@ -499,7 +499,7 @@ function openTruth(t) {
   const fallback = () => {
     const u = near && photoUrl(near.url);
     if (u) { img.onerror = () => { img.hidden = true; cap.textContent = 'Foto indisponível agora (backend ou NASA fora do ar).'; }; img.src = u; img.hidden = false; cap.textContent = `Foto real da Navcam do Perseverance · sol ${near.sol} · tirada a ${near.dist >= 1000 ? fmtKm(near.dist) : Math.round(near.dist) + ' m'} deste ponto`; }
-    else { img.hidden = true; cap.textContent = link.online ? 'Nenhuma foto de solo perto deste ponto.' : 'OFFLINE: fotos de solo precisam do backend AresNav.'; }
+    else { img.hidden = true; cap.textContent = link.online ? 'Nenhuma foto de solo perto deste ponto.' : 'OFFLINE: fotos de solo precisam do backend MarsView.'; }
   };
   const first = photoUrl(t.photo);
   if (first) { img.onerror = fallback; img.onload = () => { cap.textContent = 'Foto de solo indicada pelo contrato (optical_first_person_url) · Perseverance'; }; img.src = first; img.hidden = false; cap.textContent = 'Carregando foto…'; }

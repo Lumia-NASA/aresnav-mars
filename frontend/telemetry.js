@@ -1,7 +1,7 @@
 /* Modo Telemetria: mostradores e gráficos da caminhada, no estilo de um painel de controle de missão.
    Altitude e declive são reais (relevo da NASA ao longo da rota). Sinais vitais e dados do traje
    são simulados a partir do ritmo e do declive. Os blocos da direita mostram a telemetria do
-   contrato (CONTRATO_API.json), lida do backend AresNav. */
+   contrato (CONTRATO_API.json), lida do backend MarsView. */
 (function () {
 'use strict';
 const A = App, $ = A.$;
@@ -104,13 +104,13 @@ function renderMeda() {
   const block = (title, rows) => `<h4>${title}</h4><div class="meda">${rows.map(([a, b, k]) => `<div><span>${a} ${badge(k)}</span><b class="mono">${b}</b></div>`).join('')}</div>`;
   $('#meda').innerHTML =
     (A.state.linkState === 'online' ? '' : '<p class="offline-note">OFFLINE TELEMETRY (CACHED)</p>') +
-    '<p class="comm-line mono" id="teleComm">📡 COMM: —</p>' +
+    '<p class="comm-line mono" id="teleComm">Rádio: —</p>' +
     (w => block(w ? `Ambiente · MEDA sol ${w.sol} (${w.date}, há ${w.ageDays} dias)` : 'Ambiente · MEDA', [['Mínima', w ? val(w.minC, 1, ' °C') : '—', 'm'], ['Máxima', w ? val(w.maxC, 1, ' °C') : '—', 'm'], ['Pressão', w ? val(w.pressurePa, 0, ' Pa') : '—', 'm'], ['Agora (estimada)', (tc => tc == null ? '—' : '≈ ' + val(tc, 0, ' °C'))(A.tempAt(A.T0 + (A.state.now ? A.state.now.t : 0))), 's']]))(A.state.wx) +
     block('Exemplo do contrato (o MEDA público não traz)', [['Vento', val(m.wind_speed_ms, 1, ' m/s'), 'e'], ['Radiação', val(m.radiation_msv_day, 2, ' mSv/sol'), 'e'], ['Poeira', m.dust_storm_alert == null ? '—' : m.dust_storm_alert ? 'Alerta (exemplo)' : 'Normal', 'e'], ['Luz do Sol', `nasce ${A.clock(A.SUN.sunrise)} · põe ${A.clock(A.SUN.sunset)}`, 'd']]) +
     block('Mobilidade', [['O₂ restante', val(mob.o2_remaining_pct, 0, '%'), 's'], ['Carga do traje', val(mob.suit_payload_kg, 1, ' kg'), 's'], ['Dupla', val(mob.buddy_eva2_distance_m, 1, ' m'), 's'], ['Rover de apoio', statusPt(mob.support_rover_status), 'm']]) +
     block('Topografia', [['Declive', val(topo.slope_deg, 1, '°'), 'd'], ['Limite seguro', val(topo.max_safe_slope_deg, 0, '°'), 's'], ['Terreno', statusPt(topo.terrain_status), 'd'], ['Modo', statusPt(mob.mode), 's']]) +
     block('Posição', [['Latitude', val(loc.lat, 4, '° N'), 'm'], ['Longitude', val(loc.lng, 4, '° L'), 'm'], ['Altitude', val(loc.elevation_m, 1, ' m'), 'd'], ['Local', loc.name || '—', 'm']]) +
-    `<p class="note">${A.state.linkState === 'online' ? 'Lido do backend AresNav (/api/v1/telemetry) a cada 5 s.' : 'Sem enlace com o backend: mostrando a última telemetria guardada.'}${t.evidenceSha256 ? ' Evidência SHA-256 ' + String(t.evidenceSha256).slice(0, 12) + '…' : ''}</p>`;
+    `<p class="note">${A.state.linkState === 'online' ? 'Lido do backend MarsView (/api/v1/telemetry) a cada 5 s.' : 'Sem enlace com o backend: mostrando a última telemetria guardada.'}${t.evidenceSha256 ? ' Evidência SHA-256 ' + String(t.evidenceSha256).slice(0, 12) + '…' : ''}</p>`;
 }
 
 buildGauges(); renderMeda();

@@ -12,9 +12,9 @@ const A = App, $ = A.$, X = ExecCore, tr = s => (window.T ? window.T(s) : s), en
 
 /* ---------- interface ---------- */
 const startBtn = document.createElement('button');
-startBtn.id = 'execBtn'; startBtn.className = 'exec-btn'; startBtn.textContent = 'Executar caminhada';
+startBtn.id = 'execBtn'; startBtn.className = 'exec-btn'; startBtn.textContent = 'Acompanhar ao vivo';
 startBtn.title = 'Acompanhar a caminhada ao vivo (simulada): plano x real, ponto de retorno e avisos do ARES';
-$('#simPlay').after(startBtn);
+$('#dockActions').prepend(startBtn);
 const card = document.createElement('section');
 card.className = 'exec'; card.id = 'exec'; card.hidden = true; card.setAttribute('aria-label', 'Execução da caminhada');
 card.innerHTML = `<header><b>EXECUÇÃO · AO VIVO</b><span class="exec-sim">simulada</span>
@@ -55,7 +55,7 @@ function start() {
 }
 function stop(silent) {
   clearInterval(timer); timer = null; run = null;
-  card.hidden = true; startBtn.textContent = tr('Executar caminhada'); startBtn.setAttribute('aria-pressed', 'false');
+  card.hidden = true; startBtn.textContent = tr('Acompanhar ao vivo'); startBtn.setAttribute('aria-pressed', 'false');
   document.body.classList.remove('executing');
   if (!silent) A.emit('exec', null);
 }
