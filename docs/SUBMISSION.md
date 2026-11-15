@@ -56,7 +56,13 @@ MarsView is a walk planner and helmet HUD for the first astronauts on Mars. It l
 Paste the public link to the 30-second video (YouTube or Google Drive, set to "anyone with the link") or to the slides. Script: `docs/PITCH.md`.
 
 ### Link to Final Project
-Paste the public repository link (see Blocker 1) and, if there is one, the live site.
+**Use the live site:** https://marsview.vercel.app, once it is deployed. On Nov 15 it still returned 404 DEPLOYMENT_NOT_FOUND. The site has to open with no login, and the MarsView dashboard behind it has to work for a judge: it needs the backend running and reachable (see "Hosting" below). Put the public code repository in the Detailed Project Description, so judges can also see the code.
+
+### Hosting the live demo
+- Vercel serves the static pages: the landing page and the `frontend/` folder.
+- The MarsView backend (Fastify) has to run on a server that keeps running, for example Render, Railway or Fly.io. The repository already has a `Dockerfile`. On that server, set `NVIDIA_API_KEY` as an environment variable, and set `ALLOWED_ORIGIN=https://marsview.vercel.app`.
+- Point the frontend to it: in `frontend/config.js`, set `window.ARESNAV_API` to the backend address.
+- Without the backend the dashboard still opens in offline mode (route, verdict and physics from local data), but the imagery, panoramas and ARES AI need the backend.
 
 ### Detailed Project Description
 **What it does.** MarsView helps an astronaut plan and carry out a Marswalk in Jezero crater, Perseverance's landing site. Pick a destination, for example the Three Forks sample depot 3.7 km from a hypothetical Ares-1 base, and MarsView:
@@ -79,6 +85,28 @@ Paste the public repository link (see Blocker 1) and, if there is one, the live 
 **Tools.** JavaScript, Node.js, Fastify 5, CesiumJS, Leaflet, Python (data preparation), automated tests (unit tests plus a full demo run in headless Chrome) and GitHub Actions CI.
 
 ### NASA Data
+The form asks for **Link text + URL** for each resource. Every URL below was checked on Nov 15, 2026.
+
+| Link text | URL |
+|---|---|
+| NASA Mars Trek (JPL): imagery, terrain and layers | https://trek.nasa.gov/mars/ |
+| Mars Reconnaissance Orbiter (HiRISE, CTX, CRISM) | https://science.nasa.gov/mission/mars-reconnaissance-orbiter/ |
+| HiRISE images and DTMs | https://www.uahirise.org/ |
+| CTX camera (MRO) | https://www.msss.com/all_projects/mro-ctx.php |
+| CRISM hydrated minerals (PDS) | https://pds-geosciences.wustl.edu/missions/mro/crism.htm |
+| Mars Global Surveyor (MOLA, TES) | https://science.nasa.gov/mission/mars-global-surveyor/ |
+| MOLA elevation data (PDS) | https://pds-geosciences.wustl.edu/missions/mgs/mola.html |
+| Mars Odyssey | https://science.nasa.gov/mission/odyssey/ |
+| THEMIS infrared (Mars Odyssey) | https://themis.asu.edu/ |
+| Viking Orbiter color mosaic | https://science.nasa.gov/mission/viking-1/ |
+| Mars 2020 Perseverance mission | https://science.nasa.gov/mission/mars-2020-perseverance/ |
+| Perseverance raw images (Navcam) | https://mars.nasa.gov/mars2020/multimedia/raw-images/ |
+| Perseverance MEDA weather | https://mars.nasa.gov/mars2020/weather/ |
+| Perseverance location and traverse map | https://mars.nasa.gov/maps/location/ |
+| Mars24 sunclock algorithm (NASA GISS) | https://www.giss.nasa.gov/tools/mars24/ |
+| USGS Astrogeology: HiRISE DTM of Jezero | https://astrogeology.usgs.gov/ |
+
+In short:
 - MRO HiRISE: 25 cm orthomosaic of Jezero, and the controlled 1 m HiRISE DTM of the Mars 2020 landing site (USGS Astrogeology)
 - MRO CTX: 6 m orthomosaic of Jezero
 - MRO CRISM: hydrated mineral detections
@@ -92,6 +120,20 @@ Paste the public repository link (see Blocker 1) and, if there is one, the live 
 - NASA GISS Mars24 algorithm: Mars local time, sunrise and sunset
 
 ### Space Agency Partner Data and Other References
+| Link text | URL |
+|---|---|
+| ESA Mars Express (HRSC camera) | https://www.esa.int/Science_Exploration/Space_Science/Mars_Express |
+| HRSC data (PDS) | https://pds-geosciences.wustl.edu/missions/mars_express/hrsc.htm |
+| FU Berlin Jezero WebGIS (mosaic, channels, Mastcam-Z panoramas) | https://maps.planet.fu-berlin.de/jezero/ |
+| CesiumJS (3D globe) | https://cesium.com/platform/cesiumjs/ |
+| Leaflet (2D map) | https://leafletjs.com/ |
+| Fastify (backend) | https://fastify.dev/ |
+| NVIDIA API catalog: Nemotron 3.5 Bolt (ARES copilot) | https://build.nvidia.com/ |
+| Manrope font | https://fonts.google.com/specimen/Manrope |
+| JetBrains Mono font | https://www.jetbrains.com/lp/mono/ |
+| MarsView source code (public copy) | add the public repository URL once it is created |
+
+In short:
 - **ESA:** Mars Express HRSC (ESA/DLR/FU Berlin, CC BY-SA 3.0 IGO), used for terrain and color.
 - **Freie Universität Berlin, Jezero WebGIS:**
   - natural-color HiRISE + CTX + HRSC mosaic;
