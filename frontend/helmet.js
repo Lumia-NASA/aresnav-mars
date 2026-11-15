@@ -224,8 +224,20 @@ function setMode(m, at) {
 /* ---------- HUD ---------- */
 const CARD = window.LANG === 'en' ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] : ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
 const dist = m => m >= 1000 ? A.fmtKm(m) : Math.round(m) + ' m';
+/* Longe de Jezero (bonequinho solto em outro lugar de Marte): rota, alvo, alertas e rover de apoio são da base em
+   Jezero e não valem ali. O visor passa a mostrar o lugar onde a pessoa está. */
+const AWAY_M = 50000;
+function away() {
+  if (mode !== 'terrain') return false;
+  const w = A.globe.walk; return A.metersBetween(w.lat, w.lon, A.BASE.lat, A.BASE.lon) > AWAY_M;
+}
+function nearestLanding(lat, lon) {
+  let best = null;
+  (A.LANDINGS || []).forEach(([name, year, la, lo]) => { const d = A.metersBetween(lat, lon, la, lo); if (!best || d < best.d) best = { name, year, d }; });
+  return best;
+}
 function target() {
-  const st = A.state, n = st.now, me = position(); if (!me) return null;
+  const st = A.state, n = st.now, me = position(); if (!me || away()) return null;
   const back = !manual && mode === 'photo' && n && (n.phase === 'Volta' || n.phase === 'De volta à base');
   const toBase = back || !st.goalLL, to = toBase ? [A.BASE.lat, A.BASE.lon] : st.goalLL;
   return { name: toBase ? 'BASE' : T(st.goalPoi ? st.goalPoi.n : 'Destino escolhido no mapa').toUpperCase(), d: A.metersBetween(me.lat, me.lon, to[0], to[1]), b: A.bearing(me.lat, me.lon, to[0], to[1]) };
@@ -276,12 +288,22 @@ function renderHud() {
      a distância da dupla vem do contrato (valor de exemplo) e o ponto de recarga é calculado. */
   const me = position() || A.BASE, kg = st.payloadKg != null ? st.payloadKg : mob.suit_payload_kg;
   const buddy0 = mob.buddy_eva2_distance_m != null ? Number(mob.buddy_eva2_distance_m) : 14.2;
-  const extract = A.metersBetween(me.lat, me.lon, A.BASE.lat, A.BASE.lon);
+  const extract = A.metersBetween(me.lat, me.lon, A.BASE.lat, A.BASE.lon), far = away();
   $('#hudCrew').innerHTML = '<div class="squad-title">Equipe</div>' +
     `<div class="crew"><b>Helena · você</b><span class="mono">${n ? Math.round(n.hr) + ' bpm' : '—'}</span>${hasO2 ? bar(o2, tone(o2, 45, 30)) : ''}<small>O₂ ${hasO2 ? Math.round(o2) + '%' : '—'} · carga ${kg != null ? A.num(kg, 1) + ' kg' : '—'} · limite ${A.num(A.LIM.safe, 1)}° (${A.NO_LOAD_SLOPE}° sem carga)</small></div>` +
     `<div class="crew"><b>Parceiro</b><span class="mono">a ${A.num(buddy0, 1)} m</span><small>mesma rota · valor de exemplo</small></div>` +
-    `<div class="crew"><b>Rover de apoio</b><span class="mono">a ${dist(extract)}</span><small>ponto de recarga e extração</small></div>`;
+    (far ? `<div class="crew"><b>Base Ares-1</b><span class="mono">a ${dist(extract)}</span><small>em Jezero · fora do alcance a pé</small></div>`
+      : `<div class="crew"><b>Rover de apoio</b><span class="mono">a ${dist(extract)}</span><small>ponto de recarga e extração</small></div>`);
   const steep = Number(topo.slope_deg) > Number(topo.max_safe_slope_deg);
+  if (far) {   // dados do lugar onde a pessoa está (relevo da NASA), não os de Jezero
+    const w = A.globe.walk, sl = A.slopeAny(w.lat, w.lon), lim = A.LIM.safe, lnd = nearestLanding(w.lat, w.lon);
+    $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
+      [['Declive aqui', isFinite(sl) ? `<i style="color:${sl > lim ? 'var(--crit)' : 'var(--ok)'}">${A.num(sl, 1)}°</i> / ${A.num(lim, 1)}°` : '—'],
+        ['Chão', A.num(A.heightAt(w.lat, w.lon), 0) + ' m'],
+        ['Perto de', lnd && lnd.d < 800000 ? `${lnd.name} · ${dist(lnd.d)}` : '—']]
+        .map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('') +
+      `<div class="loc mono">${A.num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'} ${A.num(Math.abs(w.lon), 4)}° ${w.lon >= 0 ? 'L' : 'O'} · ${A.num(A.heightAt(w.lat, w.lon), 0)} m</div>`;
+  } else
   $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
     [['Declive', topo.slope_deg != null ? `<i style="color:${steep ? 'var(--crit)' : 'var(--ok)'}">${A.num(topo.slope_deg, 1)}°</i> / ${A.num(topo.max_safe_slope_deg, 0)}°` : '—'],
       ['Terreno', statusPt(topo.terrain_status)], ['Temp.', (tc => tc != null ? '≈ ' + A.num(tc, 0) + ' °C' : '—')(A.tempAt(A.T0 + (n ? n.t : 0)))], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
@@ -292,7 +314,7 @@ function renderHud() {
   const nogo = st.verdict && !st.verdict.go ? (st.verdict.code === 'SLOPE'
     ? `NO-GO · com ${A.num(st.payloadKg, 1)} kg o limite de declive cai para ${A.num(A.LIM.safe, 1)}°. Desvie por terreno plano ou reduza a carga.`
     : `NO-GO · com ${A.num(st.payloadKg, 1)} kg o O₂ fica abaixo de 30% na volta. Reduza a carga ou encurte a rota.`) : null;
-  const msg = st.emerg ? 'VOLTANDO À BASE · siga a rota tracejada'
+  const msg = far ? null : st.emerg ? 'VOLTANDO À BASE · siga a rota tracejada'
     : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'ALERTA DE POEIRA · valor de exemplo do contrato' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';
@@ -306,7 +328,7 @@ function renderHud() {
   const src = $('#hudSource');
   if (mode === 'terrain') {
     const w = A.globe.walk;
-    src.textContent = `Terreno real da NASA (${A.FINE.weight(w.lat, w.lon) > 0.5 ? 'relevo HiRISE de 1 m' : 'relevo MOLA/HRSC'} em escala 1:1 + imagem orbital) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(w.lon, 4)}° L · chão a ${A.num(A.heightAt(w.lat, w.lon), 0)} m · você a ${altText(w.alt)} do chão · declive local ${num(A.slopeAny(w.lat, w.lon), 1)}° · ${num(w.speed * 3.6, 1)} km/h`;
+    src.textContent = `Terreno real da NASA (${A.FINE.weight(w.lat, w.lon) > 0.5 ? 'relevo HiRISE de 1 m' : 'relevo MOLA/HRSC'} em escala 1:1 + imagem orbital) · ${num(Math.abs(w.lat), 4)}° ${w.lat >= 0 ? 'N' : 'S'}  ${num(Math.abs(w.lon), 4)}° ${w.lon >= 0 ? 'L' : 'O'} · chão a ${A.num(A.heightAt(w.lat, w.lon), 0)} m · você a ${altText(w.alt)} do chão · declive local ${num(A.slopeAny(w.lat, w.lon), 1)}° · ${num(w.speed * 3.6, 1)} km/h`;
   } else {
     const p = cur();
     if (!p) src.textContent = panos.length ? '' : 'Carregando panoramas do rover…';
@@ -332,12 +354,14 @@ function renderBar() {
     `<select id="hudJump" aria-label="Ir para"><option value="">Ir para…</option>${jumps}</select>` +
     (photo ? `<button data-follow="1" aria-pressed="${!manual}">Seguir caminhada</button>`
       : `<span class="seg2"><button data-pace="real" aria-pressed="${w.pace === 'real'}">A pé</button><button data-pace="rover" aria-pressed="${w.pace === 'rover'}">Rover</button><button data-pace="fast" aria-pressed="${w.pace === 'fast'}">Voo livre</button></span>` +
+        (w.pace !== 'fast' ? `<button data-person="1" aria-pressed="${w.person === 'third'}" title="${T('Trocar a câmera (V)')}">${w.person === 'third' ? 'Terceira pessoa' : 'Primeira pessoa'}</button>` : '') +
         (w.pace === 'fast' ? `<label class="alt">Altura <input type="range" id="hudAlt" min="0" max="1000" value="${altToSlider(w.alt)}" aria-label="Altura acima do chão"><b class="mono" id="hudAltVal">${altText(w.alt)}</b></label>` : ''));
   $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram'
-    : w.pace === 'real' ? 'A pé: 2,9 km/h com os olhos a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar'
-    : w.pace === 'rover' ? 'Rover tripulado: 10 km/h com os olhos a 2,4 m (Shift = 15 km/h) · W/S aceleram e freiam · A/D viram · sobe até 20° · arraste para olhar'
+    : w.pace === 'real' ? 'A pé: 2,9 km/h, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · Espaço pula (gravidade de Marte) · V troca a câmera · arraste para olhar'
+    : w.pace === 'rover' ? 'Rover tripulado: 10 km/h (Shift = 15 km/h) · W/S aceleram e freiam · A/D viram · sobe até 20° · V troca a câmera · arraste para olhar'
     : 'Voo livre: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar';
-  $('#pano').classList.toggle('rover', !photo && w.pace === 'rover');
+  $('#pano').classList.toggle('rover', !photo && w.pace === 'rover' && w.person !== 'third');   // para-brisa só de dentro do rover
+  $('#view-helmet').classList.toggle('third', !photo && w.pace !== 'fast' && w.person === 'third');
   renderDrive();
 }
 
@@ -363,6 +387,7 @@ $('#hudSols').addEventListener('click', e => {
   else if (b.dataset.walk) walkStep(+b.dataset.walk);
   else if (b.dataset.turn) turnTo((mode === 'terrain' ? A.globe.walk.heading : viewAz) + 30 * b.dataset.turn);
   else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); lastPace = A.globe.walk.pace; renderBar(); renderHud(); }
+  else if (b.dataset.person) { togglePerson(); }
   else if (b.dataset.follow) { manual = false; follow(); setCam(); renderHud(); renderBar(); }
   else if (b.dataset.mastcam) { const mz = nearMastcam(); if (mz && A.pano360) A.pano360.open(mz.p); }
 });
@@ -380,11 +405,13 @@ panoEl.addEventListener('wheel', e => { // roda do mouse sobe e desce no Terreno
   if (mode !== 'terrain') return;
   e.preventDefault(); A.globe.setAlt(A.globe.walk.alt * Math.exp(-e.deltaY * 0.0015)); syncAlt();
 }, { passive: false });
-const KEYS = { ArrowUp: 'fwd', w: 'fwd', W: 'fwd', ArrowDown: 'back', s: 'back', S: 'back', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', Shift: 'fast', e: 'up', E: 'up', PageUp: 'up', q: 'down', Q: 'down', PageDown: 'down' };
+const KEYS = { ArrowUp: 'fwd', w: 'fwd', W: 'fwd', ArrowDown: 'back', s: 'back', S: 'back', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', Shift: 'fast', e: 'up', E: 'up', PageUp: 'up', q: 'down', Q: 'down', PageDown: 'down', ' ': 'jump', v: 'person', V: 'person' };
+/* primeira pessoa (de dentro do capacete) ou terceira (o astronauta / o rover na tela) */
+function togglePerson() { const w = A.globe.walk; A.globe.setPerson(w.person === 'third' ? 'first' : 'third'); if (w.person === 'third') w.pitch = -3; renderBar(); }
 window.addEventListener('keydown', e => {
   const k = KEYS[e.key]; if (!k || !visible() || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if (k !== 'fast') e.preventDefault();
-  if (mode === 'terrain') { A.globe.walk.keys[k] = true; return; }
+  if (mode === 'terrain') { if (k === 'person') { if (!e.repeat) togglePerson(); return; } A.globe.walk.keys[k] = true; return; }
   if (e.repeat) return;
   if (k === 'fwd') walkStep(1); else if (k === 'back') walkStep(-1); else if (k === 'left') turnTo(viewAz - 30); else if (k === 'right') turnTo(viewAz + 30);
 });
@@ -393,6 +420,13 @@ window.addEventListener('blur', () => { A.globe.walk.keys = {}; });
 
 const cam1Hz = A.throttle(setCam, 1000);
 let lastPatch = 0;
+/* Salto em Marte x na Terra com o mesmo impulso: altura v²/2g e tempo no ar 2v/g */
+function jumpRows(w) {
+  const G = A.globe, v = G.JUMP_V, hE = v * v / (2 * G.G_EARTH), tE = 2 * v / G.G_EARTH;
+  if (w.jz > 0) return [['Salto', `${num(w.jz, 2)} m`]];
+  if (!w.lastJump) return [['Salto (Espaço)', `${num(v * v / (2 * G.G_MARS), 2)} m · ${num(2 * v / G.G_MARS, 2)} s`]];
+  return [['Último salto', `${num(w.lastJump.h, 2)} m · ${num(w.lastJump.t, 2)} s`], ['Na Terra', `${num(hE, 2)} m · ${num(tE, 2)} s`]];
+}
 /* Painel do jeito de andar (a pé, rover, voo livre): velocidade, distância percorrida e limites */
 let lastPace = null;
 function renderDrive() {
@@ -404,7 +438,7 @@ function renderDrive() {
   const rows = w.pace === 'rover'
     ? [['Inclinação', `<i style="color:${Math.abs(w.vp) > R.slopeMax ? 'var(--crit)' : Math.abs(w.vp) > R.slopeMax * 0.7 ? 'var(--warn)' : 'var(--ok)'}">${num(w.vp, 1)}°</i> / ${R.slopeMax}°`],
        ['Lateral', `<i style="color:${Math.abs(w.vr) > R.rollMax ? 'var(--crit)' : 'var(--ok)'}">${num(w.vr, 1)}°</i> / ${R.rollMax}°`], ['Declive aqui', slope], ['Percorrido', dist(w.odo)], ['Olhos', num(R.eye, 1) + ' m']]
-    : w.pace === 'real' ? [['Declive aqui', slope], ['Percorrido', dist(w.odo)], ['Passos', String(Math.floor(w.phase))], ['Olhos', num(A.globe.EYE, 1) + ' m']]
+    : w.pace === 'real' ? [['Declive aqui', slope], ['Percorrido', dist(w.odo)], ['Passos', String(Math.floor(w.phase))], ['Gravidade', '3,71 m/s² · 0,38 g'], ...jumpRows(w)]
     : [['Altura', altText(w.alt)], ['Declive aqui', slope], ['Percorrido', dist(w.odo)]];
   const warn = w.pace === 'rover' && w.warn ? `<div class="warn">${w.warn === 'slope' ? 'Subida acima de 20°: o rover não sobe' : 'Inclinação lateral perigosa'}</div>` : '';
   el.innerHTML = `<div class="big"><span>${title}</span><b class="mono">${kmh}<small> km/h</small></b></div>` +

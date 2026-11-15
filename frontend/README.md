@@ -32,6 +32,8 @@ The interface is **English only**, as the submission rules require. The code wri
 3. In the Helmet view, 3D terrain mode, there are three ways to move:
    - **On foot:** a suited astronaut with eyes at 1.7 m, 2.9 km/h (Shift = 5.8 km/h), with a natural step and head bob.
    - **Rover:** a crewed rover with eyes at 2.4 m, 10 km/h (Shift = 15 km/h). It tilts with the ground and stops on climbs above 20°.
+   - **First or third person:** `V` (or the button) switches between the view from inside the helmet and the view from outside, with the astronaut walking (legs and arms move with each step) or the rover seen from above (it tilts with the ground and the wheels turn).
+   - **Jump:** on foot, `Space` jumps with Mars gravity (3.71 m/s²). The panel shows the height and time in the air next to the same jump on Earth.
    - **Free flight:** `E` climbs, `Q` descends (or the mouse wheel, or the "Height" slider, from 1.7 m to 20 km); speed grows with height.
    - The visor footer shows latitude, longitude, ground elevation, your height and the local slope, all computed from NASA's terrain.
 
@@ -206,6 +208,7 @@ It uses the same globe as the 3D globe mode, with the camera at eye height. `W`/
 
 ## Known limitations
 
+- The 1 m HiRISE terrain sits up to ~28 m below the 200 m terrain in Jezero (it uses another height reference). The app measures that offset on each 256 m block and removes it, so HiRISE only adds the fine detail and the blocks blend in without steps.
 - The route terrain has 200 m resolution. It is good for choosing the general path, but it hides boulders and steps. The 1 m HiRISE terrain checks the route corridor afterwards (only inside the mosaic area around the landing site), but it does not change the chosen path yet.
 - Outside Jezero, the on-demand terrain is about 230 m per point and the image is 100 m THEMIS with Viking color: up close, on the ground, it is blurry. The geometry (mountains, craters, canyons) is real.
 - Voice quality depends on the voices installed in the presenter's browser.

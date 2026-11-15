@@ -61,7 +61,34 @@
       if (!tiles.has(key(tx, ty - 1))) d = Math.min(d, ly); if (!tiles.has(key(tx, ty + 1))) d = Math.min(d, G.T - ly);
       const w = Math.max(0, Math.min(1, d / f)); return w * w * (3 - 2 * w);
     }
-    return { tiles, has: (tx, ty) => tiles.has(key(tx, ty)), put: (tx, ty, arr) => tiles.set(key(tx, ty), arr), height, heightPx, weight, get size() { return tiles.size; } };
+    /* Desvio de cada bloco em relação ao relevo de 200 m (média de HiRISE − 200 m). O HiRISE fica até ~28 m abaixo
+       do relevo de 200 m em Jezero; misturado direto, cada bloco virava um quadrado afundado com paredão na borda.
+       Tirando o desvio (interpolado entre os centros dos blocos, sem degrau), o HiRISE só acrescenta o detalhe fino. */
+    const bias = new Map();
+    function biasPx(px, py) {
+      const own = bias.get(key(Math.floor(px / G.T), Math.floor(py / G.T)));
+      if (own === undefined) return 0;
+      const fx = px / G.T - 0.5, fy = py / G.T - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+      const b = (x, y) => { const v = bias.get(key(x, y)); return v === undefined ? own : v; };
+      const a = b(x0, y0), c = b(x0 + 1, y0), e = b(x0, y0 + 1), d = b(x0 + 1, y0 + 1);
+      return a + (c - a) * tx + (e - a) * ty + (a - c - e + d) * tx * ty;
+    }
+    /* mede o desvio de um bloco contra `coarse(lat, lon)` numa grade de 8 x 8 pontos */
+    function measureBias(tx, ty, coarse) {
+      let s = 0, n = 0;
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+        const px = tx * G.T + 16 + i * 32, py = ty * G.T + 16 + j * 32, f = heightPx(px + 0.5, py + 0.5);
+        if (!isFinite(f)) continue;
+        const c = coarse((G.y0 - py - 0.5) / G.R / RAD, (px + 0.5 + G.x0) / G.R / RAD);
+        if (isFinite(c)) { s += f - c; n++; }
+      }
+      if (n) bias.set(key(tx, ty), s / n);
+      return n ? s / n : null;
+    }
+    /* altura HiRISE já alinhada ao relevo de 200 m */
+    const aligned = (lat, lon) => { const p = pixelOf(lat, lon); return heightPx(p.px, p.py) - biasPx(p.px, p.py); };
+    return { tiles, bias, has: (tx, ty) => tiles.has(key(tx, ty)), put: (tx, ty, arr) => tiles.set(key(tx, ty), arr), height, heightPx, weight,
+      biasPx, measureBias, aligned, get size() { return tiles.size; } };
   }
 
   /* Corredor da rota a cada 1 m: declive medido em uma base de `baseM` metros (5 m: a escala de um passo largo

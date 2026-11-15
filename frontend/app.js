@@ -138,7 +138,8 @@ function bilinear(arr, w, h, fx, fy) {
   return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
 }
 /* Altitude em qualquer ponto de Marte: relevo detalhado em Jezero, regional em volta, MOLA global no resto */
-function heightAt(lat, lon) {
+/* Relevo de base (global MOLA, região, blocos sob demanda e 200 m de Jezero), sem o HiRISE de 1 m */
+function coarseAt(lat, lon) {
   let g = 0;
   if (GDEM) g = bilinear(GDEM, GW, GH, ((lon + 180) / 360 * GW - 0.5 + GW) % GW, (90 - lat) / 180 * GH - 0.5);
   const ramp = (x0, x1, y0, y1, k) => { // 0 na borda da área, 1 no miolo
@@ -151,16 +152,29 @@ function heightAt(lat, lon) {
   }
   if (PATCH.size) {
     const pt = PATCH.get(patchKey(lat, lon));
-    if (pt) { const py = Math.floor(lat / PS) * PS, px = Math.floor(lon / PS) * PS; g = bilinear(pt, PN, PN, (lon - px) / PS * PN - 0.5, (py + PS - lat) / PS * PN - 0.5); }
+    if (pt) {
+      const py = Math.floor(lat / PS) * PS, px = Math.floor(lon / PS) * PS, p = bilinear(pt, PN, PN, (lon - px) / PS * PN - 0.5, (py + PS - lat) / PS * PN - 0.5);
+      // borda suave contra o relevo global onde o bloco vizinho ainda não chegou (antes trocava de uma vez: paredão reto na borda do bloco)
+      const has = (dy, dx) => PATCH.has(patchKey(lat + dy * PS, lon + dx * PS));
+      let d = Infinity;
+      if (!has(0, -1)) d = Math.min(d, lon - px); if (!has(0, 1)) d = Math.min(d, px + PS - lon);
+      if (!has(-1, 0)) d = Math.min(d, lat - py); if (!has(1, 0)) d = Math.min(d, py + PS - lat);
+      const w = Math.max(0, Math.min(1, d / 0.25));
+      g += (p - g) * w * w * (3 - 2 * w);
+    }
   }
   if (HGT && lon >= XMIN && lon <= XMAX && lat >= YMIN && lat <= YMAX) {
     const j = bilinear(HGT, W, H, (lon - XMIN) / DX - 0.5, (YMAX - lat) / DY - 0.5);
     g += (j - g) * ramp(XMIN, XMAX, YMIN, YMAX, 0.1);
   }
-  if (FINE.size) {   // relevo HiRISE de 1 m onde o bloco já chegou (some suave na borda do que foi carregado)
-    const w = FINE.weight(lat, lon);
-    if (w > 0) { const f = FINE.height(lat, lon); if (isFinite(f)) g += (f - g) * w; }
-  }
+  return g;
+}
+function heightAt(lat, lon) {
+  const g = coarseAt(lat, lon);
+  if (!FINE.size) return g;
+  // relevo HiRISE de 1 m onde o bloco já chegou, alinhado ao de 200 m (só o detalhe fino entra; some suave na borda)
+  const w = FINE.weight(lat, lon, 64);   // 64 m de transição na borda do que já chegou
+  if (w > 0) { const f = FINE.aligned(lat, lon); if (isFinite(f)) return g + (f - g) * w; }
   return g;
 }
 /* ---------- Relevo HiRISE de 1 m (USGS, mosaico do pouso do Perseverance) ---------- */
@@ -174,7 +188,7 @@ async function loadFine(list, max) {
   const one = t => {
     const k = HiRise.key(t.tx, t.ty);
     if (!FINE_LOADING.has(k)) FINE_LOADING.set(k, fetchT(`${API}/dem/hirise/${t.tx}/${t.ty}`, 60000)
-      .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => { if (b && b.byteLength === 256 * 256 * 2) { FINE.put(t.tx, t.ty, new Int16Array(b)); return true; } return false; })
+      .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => { if (b && b.byteLength === 256 * 256 * 2) { FINE.put(t.tx, t.ty, new Int16Array(b)); FINE.measureBias(t.tx, t.ty, coarseAt); return true; } return false; })
       .catch(() => false).finally(() => FINE_LOADING.delete(k)));
     return FINE_LOADING.get(k);
   };
