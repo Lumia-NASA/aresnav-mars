@@ -185,7 +185,7 @@ const LANDINGS = [
   ['Mars 3', 1971, -44.9, -160.1], ['Mars 6', 1974, -23.9, -19.42], ['Viking 1', 1976, 22.27, -47.95], ['Viking 2', 1976, 47.64, -134.29],
   ['Mars Pathfinder', 1997, 19.13, -33.22], ['Beagle 2', 2003, 11.53, 90.43], ['Spirit', 2004, -14.57, 175.47], ['Opportunity', 2004, -1.95, -5.53],
   ['Phoenix', 2008, 68.22, -125.75], ['Curiosity', 2012, -4.59, 137.44], ['Schiaparelli', 2016, -2.05, -6.21], ['InSight', 2018, 4.5, 135.62],
-  ['Perseverance', 2021, 18.44, 77.45], ['Zhurong', 2021, 25.07, 109.93]
+  ['Perseverance', 2021, 18.44, 77.45]
 ];
 let zones = [];
 async function loadZones() {
@@ -289,18 +289,18 @@ function drawPlan() {
   if (l) {
     l.plan.clearLayers();
     if (on('ov-compare') && cmp) {
-      L.polyline(cmp.short, { pane: 'routes', color: '#FF3344', weight: 3, dashArray: '8 8', opacity: 0.95, interactive: false }).bindTooltip(`Direta: ${A.num(cmp.sMax, 1)}° (perigosa)`, { permanent: false }).addTo(l.plan);
-      if (cmp.safe) L.polyline(cmp.safe, { pane: 'routes', color: '#00FFAA', weight: 10, opacity: 0.22, interactive: false }).addTo(l.plan);
+      L.polyline(cmp.short, { pane: 'routes', color: '#D8664F', weight: 3, dashArray: '8 8', opacity: 0.95, interactive: false }).bindTooltip(`Direta: ${A.num(cmp.sMax, 1)}° (perigosa)`, { permanent: false }).addTo(l.plan);
+      if (cmp.safe) L.polyline(cmp.safe, { pane: 'routes', color: '#9DBB98', weight: 10, opacity: 0.22, interactive: false }).addTo(l.plan);
     }
-    if (on('ov-iso') && iso) [['m15', 0.9], ['m30', 0.55]].forEach(([k, o]) => L.polygon(iso[k], { color: '#9CC2FF', weight: 1.2, opacity: o, dashArray: '4 6', fill: false, interactive: false }).addTo(l.plan));
+    if (on('ov-iso') && iso) [['m15', 0.9], ['m30', 0.55]].forEach(([k, o]) => L.polygon(iso[k], { color: '#93AFCB', weight: 1.2, opacity: o, dashArray: '4 6', fill: false, interactive: false }).addTo(l.plan));
   }
   if (v) {
     ge.plan.forEach(e => v.entities.remove(e)); ge.plan = [];
     if (on('ov-compare') && cmp) {
-      ge.plan.push(gLine(v, cmp.short, '#FF3344', 4, true));
-      if (cmp.safe) ge.plan.push(gLine(v, cmp.safe, '#00FFAA', 14, false, 0.5));
+      ge.plan.push(gLine(v, cmp.short, '#D8664F', 4, true));
+      if (cmp.safe) ge.plan.push(gLine(v, cmp.safe, '#9DBB98', 14, false, 0.5));
     }
-    if (on('ov-iso') && iso) [['m15', 0.9], ['m30', 0.55]].forEach(([k, o]) => ge.plan.push(gLine(v, iso[k].concat([iso[k][0]]), '#9CC2FF', 2, true, o)));
+    if (on('ov-iso') && iso) [['m15', 0.9], ['m30', 0.55]].forEach(([k, o]) => ge.plan.push(gLine(v, iso[k].concat([iso[k][0]]), '#93AFCB', 2, true, o)));
   }
 }
 
@@ -312,8 +312,8 @@ function drawGlobal() {
     const map = A.map;
     ['dust', 'inertia', 'rough', 'grid'].forEach(k => on('ov-' + k) ? l[k].addTo(map) : map.removeLayer(l[k]));
     l.sites.clearLayers(); l.zones.clearLayers(); l.lake.clearLayers();
-    LANDINGS.forEach(([n, y, lat, lon]) => L.circleMarker([lat, lon], { radius: 5, color: '#fff', weight: 1.5, fillColor: '#FFB800', fillOpacity: 0.9 }).bindTooltip(`${n} (${y})`, { className: 'tag' }).addTo(l.sites));
-    zones.forEach(z => L.circle([z.lat, z.lon], { radius: 100000, color: '#B98CFF', weight: 1, fillOpacity: 0.08 }).bindTooltip(zoneTxt(z), { className: 'tag' }).addTo(l.zones));
+    LANDINGS.forEach(([n, y, lat, lon]) => L.circleMarker([lat, lon], { radius: 5, color: '#fff', weight: 1.5, fillColor: '#D8A74E', fillOpacity: 0.9 }).bindTooltip(`${n} (${y})`, { className: 'tag' }).addTo(l.sites));
+    zones.forEach(z => L.circle([z.lat, z.lon], { radius: 100000, color: '#B4A3C9', weight: 1, fillOpacity: 0.08 }).bindTooltip(zoneTxt(z), { className: 'tag' }).addTo(l.zones));
     if (lakeImage()) L.imageOverlay(lakeURL, [[A.BOX.YMIN, A.BOX.XMIN], [A.BOX.YMAX, A.BOX.XMAX]], { opacity: 1, interactive: false }).addTo(l.lake);
     [['sites', l.sites], ['zones', l.zones], ['lake', l.lake]].forEach(([k, g]) => on('ov-' + k) ? g.addTo(map) : map.removeLayer(g));
   }
@@ -335,9 +335,9 @@ function drawGlobal() {
       for (let y = -80; y <= 80; y += 10) { const p = []; for (let x = -180; x <= 180; x += 2) p.push(x, y, H); mk(p); }
     }
     ge.grid.show = on('ov-grid');
-    if (!ge.sites.length) LANDINGS.forEach(([n, y, lat, lon]) => ge.sites.push(gLabel(v, lat, lon, `${n} (${y})`, '#FFB800')));
+    if (!ge.sites.length) LANDINGS.forEach(([n, y, lat, lon]) => ge.sites.push(gLabel(v, lat, lon, `${n} (${y})`, '#D8A74E')));
     ge.sites.forEach(e => { e.show = on('ov-sites'); });
-    if (zones.length && !ge.zones.length) zones.forEach(z => ge.zones.push(gLabel(v, z.lat, z.lon, z.name, '#B98CFF', 1.2e7)));
+    if (zones.length && !ge.zones.length) zones.forEach(z => ge.zones.push(gLabel(v, z.lat, z.lon, z.name, '#B4A3C9', 1.2e7)));
     ge.zones.forEach(e => { e.show = on('ov-zones'); });
     if (!ge.lake && lakeImage()) {
       ge.lake = v.imageryLayers.addImageryProvider(new C.SingleTileImageryProvider({ url: lakeURL, rectangle: C.Rectangle.fromDegrees(A.BOX.XMIN, A.BOX.YMIN, A.BOX.XMAX, A.BOX.YMAX), tileWidth: A.GRID.W, tileHeight: A.GRID.H }));
@@ -381,8 +381,8 @@ const isSynthetic = p => Number(p.pano_id) < 0;
 const panoTxt = p => `${p.name || 'Panorama'} · ${tr(isSynthetic(p) ? 'vista sintética do relevo (não é foto)' : 'foto real · Mastcam-Z')} · ${tr('abrir 360°')}`;
 function buildFubLeaflet() {
   if (!window.L || !A.map) return;
-  if (FUB.lake) fubL.shore = L.geoJSON(FUB.lake, { style: { color: '#4FA3FF', weight: 2, fillColor: '#4FA3FF', fillOpacity: 0.12, dashArray: '6 4' }, interactive: false });
-  if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#7FD4FF', weight: 1.6, opacity: 0.9 }, interactive: false });
+  if (FUB.lake) fubL.shore = L.geoJSON(FUB.lake, { style: { color: '#7FA3C4', weight: 2, fillColor: '#7FA3C4', fillOpacity: 0.12, dashArray: '6 4' }, interactive: false });
+  if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#9BBBD4', weight: 1.6, opacity: 0.9 }, interactive: false });
   if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
   if (FUB.panoramas) { fubL.pano360 = L.layerGroup(); A.map.on('zoomend', layoutPanos); layoutPanos(); }
 }
@@ -423,13 +423,13 @@ function drawFub() {
   const lineE = (ring, color, width, dash) => v.entities.add({ polyline: { positions: C.Cartesian3.fromDegreesArray(ring.flat()), clampToGround: true, width,
     material: dash ? new C.PolylineDashMaterialProperty({ color: C.Color.fromCssColorString(color), dashLength: 14 }) : C.Color.fromCssColorString(color) } });
   if (!fubG.shore.length && FUB.lake) FUB.lake.features.forEach(f => ringsOf(f.geometry).forEach(r => {
-    fubG.shore.push(lineE(r, '#4FA3FF', 2.5, true));
-    fubG.shore.push(v.entities.add({ polygon: { hierarchy: C.Cartesian3.fromDegreesArray(r.flat()), material: C.Color.fromCssColorString('#4FA3FF').withAlpha(0.13), classificationType: C.ClassificationType.TERRAIN } }));
+    fubG.shore.push(lineE(r, '#7FA3C4', 2.5, true));
+    fubG.shore.push(v.entities.add({ polygon: { hierarchy: C.Cartesian3.fromDegreesArray(r.flat()), material: C.Color.fromCssColorString('#7FA3C4').withAlpha(0.13), classificationType: C.ClassificationType.TERRAIN } }));
   }));
-  if (!fubG.channels.length && FUB['channel-lines']) FUB['channel-lines'].features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.channels.push(lineE(r, '#7FD4FF', 2))));
+  if (!fubG.channels.length && FUB['channel-lines']) FUB['channel-lines'].features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.channels.push(lineE(r, '#9BBBD4', 2))));
   if (!fubG.ellipse.length && FUB.landingellipse) FUB.landingellipse.features.forEach(f => ringsOf(f.geometry).forEach(r => fubG.ellipse.push(lineE(r, '#FFFFFF', 1.6, true))));
   if (!fubG.pano360.length && FUB.panoramas) FUB.panoramas.features.forEach(f => {
-    const [lon, lat] = f.geometry.coordinates, syn = isSynthetic(f.properties), e = gLabel(v, lat, lon, syn ? tr('360° sintético') : '360°', syn ? '#B98CFF' : '#FF9F43', 60000);
+    const [lon, lat] = f.geometry.coordinates, syn = isSynthetic(f.properties), e = gLabel(v, lat, lon, syn ? tr('360° sintético') : '360°', syn ? '#B4A3C9' : '#D08A55', 60000);
     e._aresTour = f.properties; fubG.pano360.push(e);
   });
   Object.keys(fubG).forEach(k => fubG[k].forEach(e => { e.show = on('ov-' + k) && !walking; }));

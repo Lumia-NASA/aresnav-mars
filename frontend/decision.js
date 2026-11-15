@@ -28,7 +28,7 @@ function mark(lines, color, point) {
   if (map && window.L) {
     lf = lf || L.layerGroup().addTo(map);
     lines.forEach(ll => { L.polyline(ll, { pane: 'routes', color: '#000', weight: 12, opacity: 0.5, interactive: false }).addTo(lf); L.polyline(ll, { pane: 'routes', color, weight: 7, opacity: 0.95, interactive: false }).addTo(lf); });
-    if (point) L.circleMarker(point, { pane: 'routes', radius: 9, color: '#0B0E14', weight: 3, fillColor: color, fillOpacity: 1 }).addTo(lf);
+    if (point) L.circleMarker(point, { pane: 'routes', radius: 9, color: '#12120F', weight: 3, fillColor: color, fillOpacity: 1 }).addTo(lf);
   }
   const v = A.globe && A.globe.viewer;
   if (v && C) {
@@ -69,7 +69,7 @@ function actions() {
     out.text = `${tr('Na grade de relevo de 200 m, a busca não achou caminho que fique abaixo de')} ${A.num(lim, 1)}° ${tr('com')} ${A.num(kg, 1)} kg.`;
     if (shortP) {
       const sI = A.analyse(shortP), kSlope = Math.floor((15 - sI.maxS) / 0.2 * 2) / 2;   // limite = 15° − 0,2°/kg
-      out.items.push({ label: tr('Mostrar o trecho íngreme'), primary: true, run: () => mark(steepRuns(shortP, lim), '#FF5A6E') });
+      out.items.push({ label: tr('Mostrar o trecho íngreme'), primary: true, run: () => mark(steepRuns(shortP, lim), '#D8664F') });
       if (sI.maxS <= 15 && kSlope >= 0 && kSlope < kg) out.items.push({ label: `${tr('Levar')} ${A.num(kSlope, 1)} kg ${tr('libera')} ${A.num(sI.maxS, 1)}°`, run: () => { clearMarks(); A.setPayload(kSlope); } });
     }
     return out;
@@ -77,7 +77,7 @@ function actions() {
   if (I && I.maxS > lim) {   // declive: rota curta passa do limite
     out.title = tr('Declive acima do limite na rota curta');
     out.text = `${tr('Máximo de')} ${A.num(I.maxS, 1)}° ${tr('para um limite de')} ${A.num(lim, 1)}°.`;
-    out.items.push({ label: tr('Mostrar o trecho íngreme'), primary: true, run: () => mark(steepRuns(st.path, lim), '#FF5A6E') });
+    out.items.push({ label: tr('Mostrar o trecho íngreme'), primary: true, run: () => mark(steepRuns(st.path, lim), '#D8664F') });
     out.items.push({ label: tr('Usar a rota segura'), run: () => { clearMarks(); $('#m-safe').click(); } });
     return out;
   }
@@ -87,7 +87,7 @@ function actions() {
     out.title = tr('O₂ abaixo da reserva na volta');
     out.text = pl && pl.tb.index >= 0 ? `${tr('Daqui para a frente não dá para voltar com 30% de O₂')}: ${tr('vire a')} ${A.num(tbKm, 2)} km ${tr('da base')}.` : tr('Nem a saída fecha com 30% de O₂.');
     if (pl && pl.tb.index >= 0) {
-      out.items.push({ label: tr('Mostrar onde virar'), primary: true, run: () => mark([pathLL(st.path, pl.tb.index, st.path.length - 1)], '#FF5A6E', pl.tbLL) });
+      out.items.push({ label: tr('Mostrar onde virar'), primary: true, run: () => mark([pathLL(st.path, pl.tb.index, st.path.length - 1)], '#D8664F', pl.tbLL) });
       out.items.push({ label: tr('Virar no ponto de retorno'), run: () => { clearMarks(); A.setGoalLL(pl.tbLL[0], pl.tbLL[1], null); } });
     }
     if (kmax !== null && kmax < kg) out.items.push({ label: `${tr('Levar')} ${A.num(kmax, 1)} kg ${tr('em vez de')} ${A.num(kg, 1)}`, run: () => { clearMarks(); A.setPayload(kmax); } });
@@ -96,7 +96,7 @@ function actions() {
   if (st.los && !st.los.losClear) {   // rádio
     out.title = tr('Rádio sem visada direta com o habitat');
     out.text = `${tr('O terreno bloqueia')} ${Math.round(st.los.blindShare * 100)}% ${tr('da rota: a comunicação passa pelo orbitador (MRO).')}`;
-    out.items.push({ label: tr('Mostrar trechos sem rádio'), primary: true, run: () => mark(blindRuns(st.path), '#FFB020') });
+    out.items.push({ label: tr('Mostrar trechos sem rádio'), primary: true, run: () => mark(blindRuns(st.path), '#D8A74E') });
   }
   return out.items.length ? out : null;
 }

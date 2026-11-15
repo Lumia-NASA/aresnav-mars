@@ -13,7 +13,7 @@ const anchor = $('#ov-sites') ? $('#ov-sites').closest('label') : document.query
 const box = document.createElement('div');
 box.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-shade" checked><b>Sombras do relevo</b><small>Luz rasante de noroeste sobre o relevo real (MOLA + HRSC)</small></label>
-  <label class="layer"><input type="checkbox" id="ov-radar" checked><b>Radares</b><small>2 no solo e 4 detecções de radares em órbita (posições aprox.)</small></label>`;
+  <label class="layer"><input type="checkbox" id="ov-radar" checked><b>Radares</b><small>1 no solo e 4 detecções de radares em órbita (posições aprox.)</small></label>`;
 anchor.before(...box.children);
 ['ov-shade', 'ov-radar'].forEach(id => $('#' + id).addEventListener('change', () => draw()));
 
@@ -21,13 +21,12 @@ anchor.before(...box.children);
 /* [sigla, missão, o que mediu, lat, lon, tipo, raio da área em km] — órbita: centro aproximado da região estudada */
 const RADARS = [
   { n: 'RIMFAX', src: 'Perseverance · no solo', why: 'Radar de penetração no solo do rover: enxerga camadas até cerca de 10 m abaixo do chão ao longo do trajeto em Jezero.', lat: 18.4446, lon: 77.4509, kind: 'ground' },
-  { n: 'RoPeR', src: 'Zhurong · no solo', why: 'Radar de penetração no solo do rover chinês em Utopia Planitia: mostrou camadas de sedimento enterradas.', lat: 25.066, lon: 109.925, kind: 'ground' },
   { n: 'MARSIS · Ultimi Scopuli', src: 'Mars Express · órbita', why: 'Reflexo forte sob 1,5 km de gelo perto do polo sul (2018), interpretado como possível água líquida salgada. Posição aproximada.', lat: -81, lon: -167, kind: 'orbit', km: 100 },
   { n: 'SHARAD · Utopia Planitia', src: 'MRO · órbita', why: 'Depósito de gelo enterrado do tamanho de um grande lago, a poucos metros da superfície (2016). Posição aproximada.', lat: 45, lon: 85, kind: 'orbit', km: 300 },
   { n: 'SHARAD · Arcadia Planitia', src: 'MRO · órbita', why: 'Camada extensa de gelo raso sob a planície (2015), candidata a fonte de água para tripulações. Posição aproximada.', lat: 45, lon: -160, kind: 'orbit', km: 300 },
   { n: 'SHARAD · Planum Boreum', src: 'MRO · órbita', why: 'O radar atravessa a calota polar norte e revela as camadas de gelo e poeira que guardam o clima antigo.', lat: 87, lon: 0, kind: 'orbit', km: 250 }
 ];
-const RADAR_COL = '#5BE7FF';
+const RADAR_COL = '#8EC3CB';
 A.RADARS = RADARS;
 /* o RIMFAX viaja com o rover: usa o último ponto conhecido do trajeto */
 function placeRimfax() {
@@ -107,7 +106,7 @@ function draw() {
       lf.radar = L.layerGroup();
       RADARS.forEach(r => {
         if (r.km) L.circle([r.lat, r.lon], { radius: r.km * 1000, color: RADAR_COL, weight: 1, dashArray: '4 5', fillOpacity: 0.07, interactive: false }).addTo(lf.radar);
-        L.circleMarker([r.lat, r.lon], { radius: 6, color: '#06222b', weight: 1.5, fillColor: RADAR_COL, fillOpacity: 1 }).bindTooltip(fmt(r), { className: 'tag' }).addTo(lf.radar);
+        L.circleMarker([r.lat, r.lon], { radius: 6, color: '#12120F', weight: 1.5, fillColor: RADAR_COL, fillOpacity: 1 }).bindTooltip(fmt(r), { className: 'tag' }).addTo(lf.radar);
       });
     }
     showRadar ? lf.radar.addTo(map) : map.removeLayer(lf.radar);
@@ -126,7 +125,7 @@ function draw() {
         if (r.km) ge.radar.push(v.entities.add({ position: C.Cartesian3.fromDegrees(r.lon, r.lat),
           ellipse: { semiMajorAxis: r.km * 1000, semiMinorAxis: r.km * 1000, material: col.withAlpha(0.1), outline: false } }));
         ge.radar.push(v.entities.add({ position: C.Cartesian3.fromDegrees(r.lon, r.lat),
-          point: { pixelSize: 9, color: col, outlineColor: C.Color.fromCssColorString('#06222b'), outlineWidth: 2, heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 4e5 },
+          point: { pixelSize: 9, color: col, outlineColor: C.Color.fromCssColorString('#12120F'), outlineWidth: 2, heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 4e5 },
           label: { text: r.n, font: '12px Roboto, sans-serif', fillColor: col, outlineColor: C.Color.BLACK, outlineWidth: 3, style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(10, 0), horizontalOrigin: C.HorizontalOrigin.LEFT,
             heightReference: C.HeightReference.CLAMP_TO_GROUND, distanceDisplayCondition: new C.DistanceDisplayCondition(r.kind === 'ground' ? 3000 : 0, 2.5e7), disableDepthTestDistance: 4e5 } }));
       });

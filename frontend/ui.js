@@ -59,8 +59,6 @@ $('#basePick').onclick = () => {
 A.on('layers', syncBase);
 
 /* ---------- idioma ---------- */
-$('#langBtn').textContent = window.LANG === 'en' ? 'Português' : 'English';
-$('#langBtn').onclick = () => window.setLang(window.LANG === 'en' ? 'pt' : 'en');
 document.title = 'AresNav · ' + T('Trilha Jezero');
 
 /* ---------- gaveta de dados ---------- */
@@ -81,7 +79,7 @@ function renderPois() {
   poiItems().forEach(({ p, radar }, k) => {
     if (radar && k === A.POIS.length) poiList.append(el('li', 'poisep', 'Radares'));
     const li = el('li', 'poicard'), head = el('div', 'poihead'), dot = el('span', 'dot');
-    dot.style.setProperty('--c', radar ? '#5BE7FF' : A.KIND[p.k]);
+    dot.style.setProperty('--c', radar ? '#8EC3CB' : A.KIND[p.k]);
     head.append(dot, el('b', '', p.n), el('span', 'tag', p.src));
     const facts = el('div', 'poifacts mono');
     facts.append(el('span', 'poicoord', coordText(p)));

@@ -103,7 +103,7 @@ function setStatus(id, s) {
 }
 
 /* ---------- Pontos de interesse (posições reais do Perseverance nos sóis indicados) ---------- */
-const KIND = { base: '#E8ECF8', sci: '#FFB800', samp: '#FFB800', crism: '#6EA8FF', target: '#FFB800' };
+const KIND = { base: '#ECE6DC', sci: '#D8A74E', samp: '#D8A74E', crism: '#93AFCB', target: '#D8A74E' };
 const POIS = [
   { n: 'Base Ares-1 (hipotética)', lat: 18.4405, lon: 77.4625, k: 'base', src: 'Ponto de partida', why: 'Habitat da tripulação em terreno plano, perto do local de pouso do Perseverance.', site: 'habitat', see: 'Cúpula do habitat, dois módulos, câmara de ar, painéis solares e mastro de comunicação.' },
   { n: 'Local de pouso Octavia E. Butler', lat: 18.44463, lon: 77.45089, k: 'sci', sol: 14, src: 'Mars 2020 · sol 14', why: 'Onde o Perseverance começou a rodar. Referência histórica da missão.', site: 'landing', see: 'Anel de pouso com as marcas dos motores de descida, marco e bandeira.' },
@@ -304,7 +304,7 @@ function renderLink() {
   chip.textContent = state.linkState === 'online' ? 'Backend AresNav · NASA ao vivo' : 'OFFLINE TELEMETRY (CACHED)';
   chip.classList.toggle('warn', off);
   document.body.classList.toggle('offline', off);
-  up.textContent = off ? '[ 🟠 UPLINK: OFFLINE CACHE FALLBACK ]' : '[ 🟢 UPLINK: NASA LIVE ]';
+  up.textContent = off ? 'Link down · local cache' : 'NASA link · live';
   up.classList.toggle('off', off); up.setAttribute('aria-pressed', !!window.FORCE_OFFLINE_MODE);
   $('#offlineBadge').hidden = !off;
   const h = state.tele && state.tele.evidenceSha256;
@@ -329,7 +329,9 @@ function bestVoice(lang) {
   const pre = lang.slice(0, 2).toLowerCase();
   // vozes neurais primeiro (Edge: "Francisca/Antonio Online (Natural)"; Chrome: "Google português do Brasil");
   // as vozes "Desktop" antigas do Windows são as mais robóticas e ficam por último
-  const score = v => (v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase() ? 4 : 0) + (/natural|neural/i.test(v.name) ? 8 : 0)
+  // em inglês fica a voz feminina natural (Google US English no Chrome; Aria, Jenny, Ava ou Emma no Edge)
+  const female = /google us english|aria|jenny|ava|emma|michelle|samantha|zira|susan|libby|sonia/i;
+  const score = v => (v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase() ? 4 : 0) + (/natural|neural/i.test(v.name) ? 8 : 0) + (pre === 'en' && female.test(v.name) ? 12 : 0)
     + (/google/i.test(v.name) ? 5 : 0) + (/online/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1) - (/desktop|espeak/i.test(v.name) ? 4 : 0);
   return voices.filter(v => v.lang.toLowerCase().startsWith(pre)).sort((x, y) => score(y) - score(x))[0] || null;
 }
@@ -436,11 +438,11 @@ function initMap() {
   groups = { slope: L.layerGroup(), crism: L.layerGroup(), rover: L.layerGroup(), poi: L.layerGroup(), targets: L.layerGroup(), route: L.layerGroup().addTo(map), marks: L.layerGroup().addTo(map) };
   POIS.forEach(p => {
     if (p.k === 'base') return;
-    L.circleMarker([p.lat, p.lon], { radius: 6, color: KIND[p.k], weight: 2, fillColor: '#0A0D14', fillOpacity: 0.85 })
+    L.circleMarker([p.lat, p.lon], { radius: 6, color: KIND[p.k], weight: 2, fillColor: '#12120F', fillOpacity: 0.85 })
       .bindTooltip(`${p.n} · ${p.src}`, { className: 'tag', direction: 'top', offset: [0, -6] })
       .on('click', e => { L.DomEvent.stopPropagation(e); openTruth(poiTruth(p)); }).addTo(groups.poi);
   });
-  L.rectangle([[YMIN, XMIN], [YMAX, XMAX]], { color: '#e8ecf8', weight: 1, opacity: 0.35, fill: false, dashArray: '4 6', interactive: false }).addTo(map);
+  L.rectangle([[YMIN, XMIN], [YMAX, XMAX]], { color: '#ECE6DC', weight: 1, opacity: 0.35, fill: false, dashArray: '4 6', interactive: false }).addTo(map);
   map.on('mousemove', e => readout(e.latlng.lat, e.latlng.lng));
   map.on('click', e => pick(e.latlng.lat, e.latlng.lng));
   $('#m-jezero').onclick = () => map.flyTo([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
@@ -758,7 +760,7 @@ function readout(lat, lon) {
 }
 
 /* ---------- Desenho da rota no mapa 2D ---------- */
-const flagIcon = c => L.divIcon({ className: '', iconSize: [18, 26], iconAnchor: [2, 26], html: `<svg width="18" height="26" viewBox="0 0 18 26"><path d="M2 26V2" stroke="#0A0D14" stroke-width="3"/><path d="M2 26V2" stroke="#e8ecf8" stroke-width="1.5"/><path d="M3 2h13l-4 5 4 5H3z" fill="${c}" stroke="#0A0D14" stroke-width="1.5"/></svg>` });
+const flagIcon = c => L.divIcon({ className: '', iconSize: [18, 26], iconAnchor: [2, 26], html: `<svg width="18" height="26" viewBox="0 0 18 26"><path d="M2 26V2" stroke="#12120F" stroke-width="3"/><path d="M2 26V2" stroke="#ECE6DC" stroke-width="1.5"/><path d="M3 2h13l-4 5 4 5H3z" fill="${c}" stroke="#12120F" stroke-width="1.5"/></svg>` });
 function drawRoute() {
   if (!map) return;
   groups.route.clearLayers(); groups.marks.clearLayers();
@@ -768,7 +770,7 @@ function drawRoute() {
     slopeRuns(state.path).forEach(r => L.polyline(r.ll, { pane: 'routes', color: col[r.cls], weight: 4.5, lineJoin: 'round', lineCap: 'round', interactive: false, smoothFactor: 0.5 }).addTo(groups.route));
   }
   if (state.path && state.fine && state.fine.steepRuns) state.fine.steepRuns.slice(0, 8).forEach(r =>
-    L.circleMarker([r.lat, r.lon], { pane: 'routes', radius: 6, color: '#0A0D14', weight: 2, fillColor: r.maxDeg > LIM.short ? cc : cssv('--warn'), fillOpacity: 1, interactive: true })
+    L.circleMarker([r.lat, r.lon], { pane: 'routes', radius: 6, color: '#12120F', weight: 2, fillColor: r.maxDeg > LIM.short ? cc : cssv('--warn'), fillOpacity: 1, interactive: true })
       .bindTooltip(`${num(r.maxDeg, 0)}° em ${Math.max(2, Math.round(r.lengthM))} m (HiRISE 1 m)`, { direction: 'top', className: 'tag', offset: [0, -6] }).addTo(groups.route));
   if (state.emPath) {
     const ll = state.emPath.map(cellLL);
@@ -778,9 +780,9 @@ function drawRoute() {
   L.marker([BASE.lat, BASE.lon], { icon: L.divIcon({ className: '', iconSize: [16, 16], iconAnchor: [8, 8], html: '<div class="basemark"></div>' }), interactive: false })
     .bindTooltip('BASE', { permanent: true, direction: 'right', className: 'tag', offset: [8, 0] }).addTo(groups.marks);
   if (state.goalLL) L.marker(state.goalLL, { icon: flagIcon(state.path ? col[0] : cc), interactive: false }).addTo(groups.marks);
-  if (state.now) L.circleMarker([state.now.lat, state.now.lon], { pane: 'routes', radius: 7, color: '#0A0D14', weight: 2, fillColor: state.emerg ? cc : '#fff', fillOpacity: 1, interactive: false })
+  if (state.now) L.circleMarker([state.now.lat, state.now.lon], { pane: 'routes', radius: 7, color: '#12120F', weight: 2, fillColor: state.emerg ? cc : '#fff', fillOpacity: 1, interactive: false })
     .bindTooltip('VOCÊ', { permanent: true, direction: 'right', className: 'tag', offset: [10, 0] }).addTo(groups.marks);
-  if (state.cam) L.circleMarker([state.cam.lat, state.cam.lon], { pane: 'routes', radius: 6, color: '#0A0D14', weight: 2, fillColor: cssv('--blue'), fillOpacity: 1, interactive: false })
+  if (state.cam) L.circleMarker([state.cam.lat, state.cam.lon], { pane: 'routes', radius: 6, color: '#12120F', weight: 2, fillColor: cssv('--blue'), fillOpacity: 1, interactive: false })
     .bindTooltip('VISTA DO CAPACETE', { permanent: true, direction: 'left', className: 'tag', offset: [-10, 0] }).addTo(groups.marks);
 }
 function drawRover() {
@@ -805,7 +807,7 @@ function drawProfile() {
   x.strokeStyle = line; x.lineWidth = 1;
   [mn, (mn + mx) / 2, mx].forEach(v => { x.beginPath(); x.moveTo(L0, Y(v)); x.lineTo(w - R0, Y(v)); x.stroke(); x.fillStyle = muted; x.fillText(Math.round(v).toLocaleString(LOC), 4, Y(v) + 4); });
   x.beginPath(); x.moveTo(X(0), Y(mn)); pr.forEach(p => x.lineTo(X(p.d), Y(p.h))); x.lineTo(X(tot), Y(mn)); x.closePath();
-  x.fillStyle = 'rgba(0,255,170,.08)'; x.fill();
+  x.fillStyle = 'rgba(157,187,152,.10)'; x.fill();
   x.lineWidth = 2.2;
   for (let k = 1; k < pr.length; k++) { x.strokeStyle = col[slopeClass(pr[k].s)]; x.beginPath(); x.moveTo(X(pr[k - 1].d), Y(pr[k - 1].h)); x.lineTo(X(pr[k].d), Y(pr[k].h)); x.stroke(); }
   x.fillStyle = muted; const kmT = tot / 1000, step = (kmT > 8 ? 2 : kmT > 4 ? 1 : kmT > 2 ? 0.5 : 0.25) * (w < 380 ? 2 : 1); // menos marcas quando o gráfico é estreito
@@ -838,7 +840,7 @@ function renderChecklist() {
   const g = $('#gonogo');
   const caution = state.assessment.level === 'CAUTION';
   g.className = 'gonogo ' + (wait ? 'wait' : !v.go || crit ? 'crit' : warn || caution ? 'warn' : 'ok');
-  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? 'NO-GO · SLOPE' : v.code === 'METABOLIC' ? 'NO-GO · METABOLIC' : crit ? 'NO-GO' : caution ? 'CAUTION' : warn ? 'GO · com ressalvas' : 'GO';
+  g.textContent = wait ? 'Aguardando dados' : v.code === 'SLOPE' ? 'NO-GO · íngreme demais' : v.code === 'METABOLIC' ? 'NO-GO · O₂ não chega' : crit ? 'NO-GO' : caution ? 'CAUTION' : warn ? 'GO · com ressalvas' : 'GO';
   if (!wait && state.assessment.reasons.length) { const why = document.createElement('small'); why.textContent = state.assessment.reasons[0]; g.appendChild(why); }   // o motivo principal fica à vista
   const prev = state.verdict && state.verdict.code;
   state.verdict = wait ? null : v;
@@ -904,7 +906,7 @@ function renderItinerary() {
   const row = (n, l) => `<div class="leg"><span class="n" style="--c:${l.color}">${n}</span><b>${l.name}</b><span class="km">${fmtKm(l.dist)} · ${fmtMin(l.walk)}</span>
     <small><span class="mono">rumo ${String(Math.round(l.brg)).padStart(3, '0')}° (${cardinal(l.brg)}) · chegada ${clock(T0 + l.at)} · O₂ ${Math.round(l.o2)}% · declive máx. ${num(l.maxS, 1)}°</span>${l.wait ? ` · parada de ${l.wait} min` : ''}${l.also.length ? ' · também: ' + l.also.join(', ') : ''}${l.why ? '<br>' + l.why : ''}</small></div>`;
   return legs.map((l, i) => row(i + 1, l)).join('') +
-    row('↩', { name: 'Volta para a base', why: '', color: '#E8ECF8', dist: I.dist, walk: I.tBack, at: sim.total, o2: state.plan.o2, maxS: I.maxS, brg: backBrg, wait: 0, also: [] });
+    row('↩', { name: 'Volta para a base', why: '', color: '#ECE6DC', dist: I.dist, walk: I.tBack, at: sim.total, o2: state.plan.o2, maxS: I.maxS, brg: backBrg, wait: 0, also: [] });
 }
 function renderEmergency() {
   const em = $('#emcard');
