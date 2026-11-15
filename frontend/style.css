@@ -747,3 +747,13 @@ body.executing .hud-drive{display:none}
   background:linear-gradient(97deg,rgba(14,12,12,.94) 0 4.2%,rgba(14,12,12,0) 4.5%),linear-gradient(-97deg,rgba(14,12,12,.94) 0 4.2%,rgba(14,12,12,0) 4.5%),
     linear-gradient(180deg,rgba(14,12,12,.92) 0 6%,rgba(14,12,12,0) 6.4%),linear-gradient(0deg,rgba(18,15,14,.9) 0 5%,rgba(18,15,14,0) 5.6%)}
 @media (max-width:900px){.hud-drive{display:none}}
+
+/* Capacete: a barra de reprodução (.dock, por cima de tudo) cobria a fileira de baixo do visor — os botões
+   Fotos do rover / Terreno 3D, A pé / Rover / Voo livre e Mastcam-Z 360° ficavam escondidos atrás dela.
+   Com o capacete aberto, tudo o que fica embaixo sobe 52 px para ficar acima da barra. */
+body.helmet-mode .hud-sols{bottom:60px}
+body.helmet-mode .hud-hint{bottom:96px}
+body.helmet-mode .hud-source{bottom:118px}
+body.helmet-mode .hud-target{bottom:146px}
+body.helmet-mode .hud-alert{bottom:186px}
+body.helmet-mode .hud-drive{bottom:176px}
