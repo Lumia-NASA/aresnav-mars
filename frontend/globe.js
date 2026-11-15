@@ -12,7 +12,15 @@ let EX = 1, userEx = 1;    // exagero vertical em uso e o escolhido pela pessoa 
 const EYE = 1.7;           // altura dos olhos de um astronauta em pé, em metros
 let viewer = null, failed = false, C = null, buildImagery = null, makeTerrain = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
-const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, alt: EYE, vel: 0, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0, gx: 0, gy: 0 };
+const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, alt: EYE, vel: 0, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0, gx: 0, gy: 0,
+  odo: 0, phase: 0, gz: null, yaw: 0, vp: 0, vr: 0, warn: null };
+/* Três jeitos de andar no Terreno 3D (hipóteses em docs/HIPOTESES.md):
+   a pé (pace 'real'): astronauta de traje, olhos a 1,7 m, 0,8 m/s (2,9 km/h), passos de 0,7 m;
+   rover ('rover'): rover tripulado pressurizado, olhos a 2,4 m, 10 km/h de cruzeiro (Shift = 15 km/h), sobe até 20°;
+   voo livre ('fast'): câmera solta, a velocidade cresce com a altura. */
+const FOOT = { cruise: 0.8, max: 1.6, stride: 0.7, turn: 70 };
+const ROVER = { eye: 2.4, cruise: 10 / 3.6, max: 15 / 3.6, accel: 0.8, brake: 2.2, slopeMax: 20, rollMax: 25, turn: 28 };
+const eyeFor = p => (p === 'rover' ? ROVER.eye : EYE);
 /* Passo real: astronauta de traje, 0,8 m/s (2,9 km/h) e 1,6 m/s com Shift, sempre a 1,7 m do chão.
    Visualização: a pessoa escolhe a altura (1,7 m a 20 km) e a velocidade cresce com ela. */
 const ALT_MAX = 20000;
@@ -299,12 +307,34 @@ function drawNow() {
 }
 
 /* ---------- Andar pelo terreno (usado pelo modo Capacete) ---------- */
-function placeCamera() {
+function placeCamera(dt) {
   if (A.fineAround) A.fineAround(walk.lat, walk.lon);   // relevo HiRISE de 1 m em volta de quem anda (onde existe)
   const c = C.Cartographic.fromDegrees(walk.lon, walk.lat), mesh = viewer.scene.globe.getHeight(c);
   const ground = Math.max(A.heightAt(walk.lat, walk.lon) * VS, mesh == null ? -1e9 : mesh);
-  const bob = walk.moving && walk.alt < 3 ? Math.sin(performance.now() / 1000 * Math.PI * 2 * 1.7) * 0.035 : 0; // balanço do passo
-  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(walk.lon, walk.lat, ground + (walk.alt + bob) * K), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(walk.pitch), roll: 0 } });
+  // chão suavizado: a malha troca de detalhe enquanto carrega e a câmera tremia junto; salto grande (teleporte) vai direto
+  if (walk.gz == null || !dt || Math.abs(ground - walk.gz) > 4 * K) walk.gz = ground; else walk.gz += (ground - walk.gz) * Math.min(1, dt * 9);
+  const base = Math.max(walk.gz, ground - 0.4 * K);       // nunca afunda no chão
+  let up = 0, side = 0, roll = 0, pitch = walk.pitch;
+  if (walk.pace === 'real' && walk.alt < 3) {
+    // passada: a cabeça desce no apoio de cada pé e balança de um lado para o outro a cada dois passos
+    const a = Math.min(1, walk.speed / FOOT.cruise), s = walk.phase;
+    up = -0.045 * a * (1 - Math.cos(2 * Math.PI * s)) / 2;
+    side = 0.03 * a * Math.sin(Math.PI * s); roll = 0.45 * a * Math.sin(Math.PI * s); pitch += 0.35 * a * Math.sin(2 * Math.PI * s);
+  } else if (walk.pace === 'rover') {
+    // o rover inclina com o chão (suspensão) e vibra um pouco andando
+    const a = Math.min(1, walk.speed / 2), t = performance.now() / 1000;
+    pitch += walk.vp; roll = walk.vr; up = 0.008 * a * Math.sin(t * 2 * Math.PI * 7.3) * Math.sin(t * 2 * Math.PI * 1.1);
+  }
+  let lat = walk.lat, lon = walk.lon;
+  if (side) { const r = Math.PI / 180, h = walk.heading * r; lat += -Math.sin(h) * side / (A.R_MARS * r); lon += Math.cos(h) * side / (A.R_MARS * r * Math.cos(lat * r)); }
+  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(lon, lat, base + (walk.alt + up) * K), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(pitch), roll: C.Math.toRadians(roll) } });
+}
+/* Inclinação do rover sob as rodas: alturas 1,8 m à frente/atrás e 1,2 m dos lados (graus) */
+function tilt() {
+  const r = Math.PI / 180, h = walk.heading * r, f = [Math.sin(h), Math.cos(h)], rt = [Math.cos(h), -Math.sin(h)], L = 1.8, W = 1.2;
+  const at = (e, n) => A.heightAt(walk.lat + n / (A.R_MARS * r), walk.lon + e / (A.R_MARS * r * Math.cos(walk.lat * r)));
+  return { pitch: Math.atan2(at(f[0] * L, f[1] * L) - at(-f[0] * L, -f[1] * L), 2 * L) / r,
+    roll: Math.atan2(at(-rt[0] * W, -rt[1] * W) - at(rt[0] * W, rt[1] * W), 2 * W) / r };
 }
 /* Acabamento da vista do chão: céu marciano, poeira que cresce com a distância, cor de Marte sobre a
    imagem orbital (que vem em tons de cinza) e um granulado fino no solo perto dos pés. Roda na placa de vídeo. */
@@ -369,6 +399,32 @@ void main() {
     vec2 g = u_ground + vec2(dot(dirWC, u_east), dot(dirWC, u_north)) * dist;
     float grain = vnoise(g * 0.35) * 0.45 + vnoise(g * 1.7) * 0.35 + vnoise(g * 7.0) * 0.2;
     col *= 1.0 + (grain - 0.5) * 0.5 * exp(-dist / 140.0);
+    // detalhe perto dos pés (a foto orbital não tem): ondulações de areia, seixos e pedras soltas com sombra do sol do céu.
+    // Ilustrativo, dá a escala do chão; some com a distância e só aparece onde se olha para baixo (chão, não paredes).
+    float nearD = exp(-dist / 22.0) * smoothstep(0.05, 0.25, -sinEl);
+    if (nearD > 0.02) {
+      vec2 sg = normalize(vec2(dot(sunDir, u_east), dot(sunDir, u_north)) + 1e-4);
+      float rip = sin(dot(g, vec2(0.83, 0.56)) * 9.0 + vnoise(g * 0.8) * 5.0);
+      col *= 1.0 + rip * 0.035 * nearD;
+      float rock = 0.0, lit = 0.0, shade = 0.0;
+      for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+        vec2 cell = floor(g / 0.9) + vec2(float(i), float(j));
+        float h1 = hash(cell), h2 = hash(cell + 17.3), h3 = hash(cell + 41.7);
+        if (h1 > 0.42) continue;                                        // ~40% das células têm uma pedra
+        vec2 c = (cell + vec2(h2, h3)) * 0.9;
+        float rad = min(0.04 + 1.56 * h1 * h1 * (0.4 + 0.6 * h2), 0.34);   // muitos seixos, poucas pedras grandes
+        vec2 dv = g - c;
+        float r0 = length(dv * vec2(1.0, 1.25)) / rad;
+        float inR = 1.0 - smoothstep(0.85, 1.0, r0);
+        rock = max(rock, inR);
+        lit = max(lit, inR * clamp(dot(normalize(dv + 1e-4), sg) * 0.5 + 0.5, 0.0, 1.0));
+        float rs = length((dv + sg * rad * 0.9) * vec2(1.0, 1.25)) / (rad * 1.15);   // sombra do lado oposto ao sol
+        shade = max(shade, (1.0 - smoothstep(0.7, 1.0, rs)) * (1.0 - inR));
+      }
+      vec3 rockCol = mix(vec3(0.24, 0.16, 0.12), vec3(0.62, 0.47, 0.36), lit);
+      col = mix(col, col * 0.62, shade * 0.75 * nearD);
+      col = mix(col, rockCol * (0.75 + 0.5 * lum), rock * 0.85 * nearD);
+    }
     float haze = (1.0 - exp(-dist / u_haze)) * 0.94;
     col = mix(col, mix(horizon, sky, 0.35), haze);
   }
@@ -389,7 +445,7 @@ function fxOn() {
     fx.east = new C.Cartesian3(1, 0, 0); fx.north = new C.Cartesian3(0, 1, 0); fx.ground = new C.Cartesian2(0, 0);
     fx.stage = scene.postProcessStages.add(new C.PostProcessStage({ fragmentShader: WALK_FS, uniforms: {
       u_east: () => fx.east, u_north: () => fx.north, u_ground: () => fx.ground,
-      u_haze: () => (walk.pace === 'real' ? 9000 : 60000) * K, u_unit: () => K } }));
+      u_haze: () => (walk.pace === 'fast' ? 60000 : 9000) * K, u_unit: () => K } }));
     // neblina invisível (o céu e a poeira vêm do shader): serve só para o Cesium pedir menos detalhe e descartar
     // blocos que a poeira já esconderia. Corta ~40% dos blocos desenhados sem mudar a imagem.
     scene.fog.enabled = true; scene.fog.renderable = false; scene.fog.density = 2.0e-4 / K; scene.fog.screenSpaceErrorFactor = 4;
@@ -472,21 +528,43 @@ function groundLook(on) {
   if (layers.tint) layers.tint.alpha = on && tintStage ? 0 : 0.5;
 }
 function setAlt(m) {
-  walk.alt = Math.max(EYE, Math.min(ALT_MAX, m));
-  if (walk.alt > 3 && walk.pace === 'real') walk.pace = 'fast'; // acima do chão já não é caminhada
+  m = Math.max(EYE, Math.min(ALT_MAX, m));
+  if (walk.pace !== 'fast') {                       // a pé e de rover os olhos ficam na altura certa; subir de verdade é voar
+    if (m <= eyeFor(walk.pace) + 1.3) { walk.alt = eyeFor(walk.pace); return; }
+    walk.pace = 'fast';
+  }
+  walk.alt = m;
+}
+function setPace(p) {
+  if (p === 'real' || p === 'rover') { walk.pace = p; walk.alt = eyeFor(p); walk.vel = Math.min(walk.vel, p === 'real' ? FOOT.max : ROVER.max); walk.vp = walk.vr = 0; walk.warn = null; }
+  else if (p === 'fast') { walk.pace = 'fast'; walk.alt = Math.max(walk.alt, 30); walk.warn = null; }   // o voo começa claramente no ar
 }
 function step() {
   const now = performance.now(), dt = Math.min(0.1, (now - walk.last) / 1000), k = walk.keys; walk.last = now;
   const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0), mv = (k.fwd ? 1 : 0) - (k.back ? 1 : 0), lift = (k.up ? 1 : 0) - (k.down ? 1 : 0);
-  if (turn) walk.heading = (walk.heading + turn * 60 * dt + 360) % 360;
+  const foot = walk.pace === 'real', rover = walk.pace === 'rover';
+  // curva: a pé e de rover ela começa e termina aos poucos; no voo responde na hora
+  walk.yaw += (turn * (foot ? FOOT.turn : rover ? ROVER.turn : 60) - walk.yaw) * Math.min(1, dt * (foot || rover ? 6 : 20));
+  if (Math.abs(walk.yaw) > 0.05) walk.heading = (walk.heading + walk.yaw * dt + 360) % 360;
   if (lift) setAlt(walk.alt * Math.exp(lift * 1.3 * dt) + lift * 0.8 * dt);
-  // passo real: 0,8 m/s; visualização: a velocidade acompanha a altura (voo baixo é lento, voo alto é rápido)
-  const cruise = walk.pace === 'real' ? 0.8 : Math.max(25, walk.alt * 1.5);
-  const want = mv * cruise * (k.fast ? (walk.pace === 'real' ? 2 : 10) : 1);
-  walk.vel += (want - walk.vel) * Math.min(1, dt * 5);   // acelera e freia aos poucos, sem tranco
-  if (Math.abs(walk.vel) > 0.005) move(walk.vel * dt);
+  if (foot) {
+    walk.vel += (mv * (k.fast ? FOOT.max : FOOT.cruise) - walk.vel) * Math.min(1, dt * 3);   // arranca e para em ~1 s, como de traje
+  } else if (rover) {
+    const t = tilt(); walk.vp += (t.pitch - walk.vp) * Math.min(1, dt * 3); walk.vr += (t.roll - walk.vr) * Math.min(1, dt * 3);
+    let want = mv * (k.fast ? ROVER.max : ROVER.cruise);
+    // subida acima do limite no sentido em que se anda: o rover não vence e para (a descida segue liberada)
+    const climb = want > 0 ? walk.vp : want < 0 ? -walk.vp : 0;
+    walk.warn = climb > ROVER.slopeMax ? 'slope' : Math.abs(walk.vr) > ROVER.rollMax ? 'roll' : null;
+    if (walk.warn === 'slope') want = 0;
+    const d = want - walk.vel, lim = (Math.abs(want) > Math.abs(walk.vel) && want * walk.vel >= 0 ? ROVER.accel : ROVER.brake) * dt;
+    walk.vel += Math.max(-lim, Math.min(lim, d));
+  } else {
+    // voo livre: a velocidade acompanha a altura (voo baixo é lento, voo alto é rápido)
+    walk.vel += (mv * Math.max(25, walk.alt * 1.5) * (k.fast ? 10 : 1) - walk.vel) * Math.min(1, dt * 5);
+  }
+  if (Math.abs(walk.vel) > 0.005) { move(walk.vel * dt); walk.odo += Math.abs(walk.vel * dt); walk.phase += Math.abs(walk.vel * dt) / FOOT.stride; }
   walk.moving = Math.abs(walk.vel) > 0.05; walk.speed = Math.abs(walk.vel);
-  placeCamera(); fxFrame();
+  placeCamera(dt); fxFrame();
   // céu: caramelo perto do chão, escurecendo até o preto do espaço conforme a pessoa sobe
   viewer.scene.backgroundColor = C.Color.lerp(C.Color.BLACK, SKY || (SKY = C.Color.fromCssColorString('#cfa67f')), Math.max(0, 1 - walk.alt / 30000), new C.Color());
   if (now - walk.sent > 100) { walk.sent = now; A.emit('walk', walk); }
@@ -494,7 +572,7 @@ function step() {
 function enterWalk(host, lat, lon, heading) {
   init(); if (!viewer) return false;
   viewer.camera.cancelFlight();
-  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now(), moved: false });
+  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now(), moved: false, gz: null, yaw: 0, vp: 0, vr: 0, warn: null, odo: 0 });
   setEx(1);                                   // no chão a escala é sempre real
   viewer.camera.frustum.near = 0.2 * K;       // deixa ver o chão a 1,7 m sem cortar
   if ('renderable' in viewer.scene.fog) viewer.scene.fog.renderable = false;   // a névoa do Cesium escurece o horizonte; o filtro do capacete faz a dele
@@ -539,15 +617,15 @@ let teleSig = '';
 A.on('telemetry', () => { const sig = JSON.stringify((A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || []); if (sig !== teleSig) { teleSig = sig; drawTargets(); } });
 A.globe = {
   get viewer() { return viewer; }, get quality() { return quality; }, flyJezero, walk, enterWalk, exitWalk,
-  teleport(lat, lon) { walk.lat = lat; walk.lon = lon; },
+  teleport(lat, lon) { walk.lat = lat; walk.lon = lon; walk.gz = null; },
   /* Para a alguns passos ao sul do ponto, olhando para ele */
-  visit(p) { const back = ({ habitat: 24, landing: 20, crystals: 22, depot: 17, strata: 15 }[p.site] || 9) * EYE / 1.7; walk.lat = p.lat - back / (A.R_MARS * Math.PI / 180); walk.lon = p.lon; walk.heading = 0; walk.pitch = -6; walk.vel = 0; },
+  visit(p) { const back = ({ habitat: 24, landing: 20, crystals: 22, depot: 17, strata: 15 }[p.site] || 9) * EYE / 1.7; walk.lat = p.lat - back / (A.R_MARS * Math.PI / 180); walk.lon = p.lon; walk.heading = 0; walk.pitch = -6; walk.vel = 0; walk.gz = null; },
   look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-85, Math.min(60, walk.pitch + dEl)); },
-  setAlt, EYE, ALT_MAX,
+  setAlt, EYE, ALT_MAX, ROVER, FOOT,
   setExaggeration(v) { userEx = v; if (!walk.on) setEx(v); return EX; },
   get exaggeration() { return userEx; },
   stepBy(m) { move(m); },
-  setPace(p) { if (p === 'real') { walk.pace = 'real'; walk.alt = EYE; } else if (p === 'fast') walk.pace = 'fast'; },
+  setPace,
   /* usados pela busca e pelos controles do mapa */
   flyTo(lat, lon, rangeKm) {
     if (!viewer) return;

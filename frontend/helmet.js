@@ -190,7 +190,7 @@ function turnTo(az) { // gira suavemente até o rumo pedido
   anim = requestAnimationFrame(stepFn);
 }
 function walkStep(dir) {
-  if (mode === 'terrain') { A.globe.stepBy(dir * (A.globe.walk.pace === 'real' ? 5 : 60)); return; }
+  if (mode === 'terrain') { A.globe.stepBy(dir * ({ real: 5, rover: 20 }[A.globe.walk.pace] || 60)); return; }
   if (!panos.length) return;
   manual = true;
   const to = Math.max(0, Math.min(panos.length - 1, idx + dir));
@@ -218,7 +218,7 @@ function setMode(m, at) {
   mode = m;
   $('#pano').classList.toggle('terrain', m === 'terrain');
   if (m === 'photo') { manual = true; const w = A.globe.walk; setIdx(nearest(w.lat, w.lon)); build(); }
-  setCam(); renderHud(); renderBar();
+  setCam(); renderHud(); renderBar(); renderDrive();
 }
 
 /* ---------- HUD ---------- */
@@ -333,10 +333,14 @@ function renderBar() {
     `<button data-turn="-1" aria-label="Virar à esquerda">◀</button><button data-walk="-1">▼ voltar</button><button data-walk="1" class="go">▲ avançar</button><button data-turn="1" aria-label="Virar à direita">▶</button>` +
     `<select id="hudJump" aria-label="Ir para"><option value="">Ir para…</option>${jumps}</select>` +
     (photo ? `<button data-follow="1" aria-pressed="${!manual}">Seguir caminhada</button>`
-      : `<span class="seg2"><button data-pace="real" aria-pressed="${w.pace === 'real'}">Passo real</button><button data-pace="fast" aria-pressed="${w.pace === 'fast'}">Visualização</button></span>` +
-        `<label class="alt">Altura <input type="range" id="hudAlt" min="0" max="1000" value="${altToSlider(w.alt)}" aria-label="Altura acima do chão"><b class="mono" id="hudAltVal">${altText(w.alt)}</b></label>`);
-  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram' : A.globe.walk.pace === 'real' ? 'Passo real: 2,9 km/h a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar · E sobe e muda para visualização'
-      : 'Visualização: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar';
+      : `<span class="seg2"><button data-pace="real" aria-pressed="${w.pace === 'real'}">A pé</button><button data-pace="rover" aria-pressed="${w.pace === 'rover'}">Rover</button><button data-pace="fast" aria-pressed="${w.pace === 'fast'}">Voo livre</button></span>` +
+        (w.pace === 'fast' ? `<label class="alt">Altura <input type="range" id="hudAlt" min="0" max="1000" value="${altToSlider(w.alt)}" aria-label="Altura acima do chão"><b class="mono" id="hudAltVal">${altText(w.alt)}</b></label>` : ''));
+  $('#hudHint').textContent = photo ? 'Arraste para olhar em volta · setas ↑ ↓ andam pelo caminho do rover · ← → viram'
+    : w.pace === 'real' ? 'A pé: 2,9 km/h com os olhos a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar'
+    : w.pace === 'rover' ? 'Rover tripulado: 10 km/h com os olhos a 2,4 m (Shift = 15 km/h) · W/S aceleram e freiam · A/D viram · sobe até 20° · arraste para olhar'
+    : 'Voo livre: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar';
+  $('#pano').classList.toggle('rover', !photo && w.pace === 'rover');
+  renderDrive();
 }
 
 /* ---------- Interação ---------- */
@@ -360,7 +364,7 @@ $('#hudSols').addEventListener('click', e => {
   if (b.dataset.mode) setMode(b.dataset.mode);
   else if (b.dataset.walk) walkStep(+b.dataset.walk);
   else if (b.dataset.turn) turnTo((mode === 'terrain' ? A.globe.walk.heading : viewAz) + 30 * b.dataset.turn);
-  else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); renderBar(); renderHud(); }
+  else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); lastPace = A.globe.walk.pace; renderBar(); renderHud(); }
   else if (b.dataset.follow) { manual = false; follow(); setCam(); renderHud(); renderBar(); }
   else if (b.dataset.mastcam) { const mz = nearMastcam(); if (mz && A.pano360) A.pano360.open(mz.p); }
 });
@@ -391,13 +395,32 @@ window.addEventListener('blur', () => { A.globe.walk.keys = {}; });
 
 const cam1Hz = A.throttle(setCam, 1000);
 let lastPatch = 0;
+/* Painel do jeito de andar (a pé, rover, voo livre): velocidade, distância percorrida e limites */
+let lastPace = null;
+function renderDrive() {
+  const el = $('#hudDrive'); if (!el) return;
+  const on = mode === 'terrain' && visible(); el.hidden = !on; if (!on) return;
+  const w = A.globe.walk, R = A.globe.ROVER, kmh = num(w.speed * 3.6, 1);
+  const title = { real: 'A PÉ', rover: 'ROVER TRIPULADO', fast: 'VOO LIVRE' }[w.pace] || 'VOO LIVRE';
+  const sl = A.slopeAny(w.lat, w.lon), slope = isFinite(sl) ? num(sl, 1) + '°' : '—';
+  const rows = w.pace === 'rover'
+    ? [['Inclinação', `<i style="color:${Math.abs(w.vp) > R.slopeMax ? 'var(--crit)' : Math.abs(w.vp) > R.slopeMax * 0.7 ? 'var(--warn)' : 'var(--ok)'}">${num(w.vp, 1)}°</i> / ${R.slopeMax}°`],
+       ['Lateral', `<i style="color:${Math.abs(w.vr) > R.rollMax ? 'var(--crit)' : 'var(--ok)'}">${num(w.vr, 1)}°</i> / ${R.rollMax}°`], ['Declive aqui', slope], ['Percorrido', dist(w.odo)], ['Olhos', num(R.eye, 1) + ' m']]
+    : w.pace === 'real' ? [['Declive aqui', slope], ['Percorrido', dist(w.odo)], ['Passos', String(Math.floor(w.phase))], ['Olhos', num(A.globe.EYE, 1) + ' m']]
+    : [['Altura', altText(w.alt)], ['Declive aqui', slope], ['Percorrido', dist(w.odo)]];
+  const warn = w.pace === 'rover' && w.warn ? `<div class="warn">${w.warn === 'slope' ? 'Subida acima de 20°: o rover não sobe' : 'Inclinação lateral perigosa'}</div>` : '';
+  el.innerHTML = `<div class="big"><span>${title}</span><b class="mono">${kmh}<small> km/h</small></b></div>` +
+    rows.map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('') + warn;
+}
 A.on('walk', w => {
   viewAz = w.heading; if (!visible()) return;
+  if (w.pace !== lastPace) { lastPace = w.pace; renderBar(); }   // E/roda do mouse podem mudar para voo livre
+  renderDrive();
   renderCompass(); renderTarget(); syncAlt(); hud1Hz(); cam1Hz();
   if (Date.now() - lastPatch > 2000) { lastPatch = Date.now(); A.ensurePatch(w.lat, w.lon, 1); } // relevo real acompanhando a caminhada
 });
 A.on('view', async v => {
-  if (v !== 'helmet') { if (mode === 'terrain') { A.globe.exitWalk(); mode = 'photo'; $('#pano').classList.remove('terrain'); } A.state.cam = null; A.drawRoute(); A.emit('cam'); return; }
+  if (v !== 'helmet') { if (mode === 'terrain') { A.globe.exitWalk(); mode = 'photo'; $('#pano').classList.remove('terrain', 'rover'); renderDrive(); } A.state.cam = null; A.drawRoute(); A.emit('cam'); return; }
   renderBar(); await loaded; follow(); if (idx < 0) setIdx(0);
   build(); setCam(); renderHud(); renderBar();
   if (pendingDrop) { const d = pendingDrop; pendingDrop = null; setMode('terrain', d); }

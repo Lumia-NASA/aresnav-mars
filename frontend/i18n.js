@@ -16,6 +16,23 @@ window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
+  'A pé': 'On foot',
+  'Rover': 'Rover',
+  'Voo livre': 'Free flight',
+  'A PÉ': 'ON FOOT',
+  'ROVER TRIPULADO': 'CREWED ROVER',
+  'VOO LIVRE': 'FREE FLIGHT',
+  'Inclinação': 'Pitch',
+  'Lateral': 'Roll',
+  'Declive aqui': 'Slope here',
+  'Percorrido': 'Travelled',
+  'Passos': 'Steps',
+  'Olhos': 'Eye height',
+  'Subida acima de 20°: o rover não sobe': 'Climb above 20°: the rover cannot go up',
+  'Inclinação lateral perigosa': 'Dangerous side tilt',
+  'A pé: 2,9 km/h com os olhos a 1,7 m do chão, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · arraste para olhar': 'On foot: 2.9 km/h with eyes 1.7 m above ground, like a suited astronaut (Shift = 5.8 km/h) · W/S walk · A/D turn · drag to look',
+  'Rover tripulado: 10 km/h com os olhos a 2,4 m (Shift = 15 km/h) · W/S aceleram e freiam · A/D viram · sobe até 20° · arraste para olhar': 'Crewed rover: 10 km/h with eyes at 2.4 m (Shift = 15 km/h) · W/S accelerate and brake · A/D turn · climbs up to 20° · drag to look',
+  'Voo livre: W/S andam · A/D viram · E sobe e Q desce (ou a roda do mouse) · a velocidade cresce com a altura · Shift = 10× · arraste para olhar': 'Free flight: W/S move · A/D turn · E climbs and Q descends (or the mouse wheel) · speed grows with height · Shift = 10× · drag to look',
   'Relevo de 1 m no corredor da rota': '1 m relief along the route corridor',
   'HiRISE (DTM controlado, 1 m)': 'HiRISE (controlled DTM, 1 m)',
   'Carregando o relevo HiRISE de 1 m ao longo da rota…': 'Loading the 1 m HiRISE relief along the route…',
