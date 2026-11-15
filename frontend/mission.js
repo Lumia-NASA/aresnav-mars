@@ -158,8 +158,8 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-shore" checked><b>Margem do antigo lago</b><small>Contorno mapeado pela FU Berlin</small></label>
   <label class="layer"><input type="checkbox" id="ov-channels" checked><b>Canais dos rios</b><small>Neretva e Sava (entrada), Pliva (saída)</small></label>
   <label class="layer"><input type="checkbox" id="ov-ellipse" checked><b>Elipse de pouso do Perseverance</b><small>Área-alvo do pouso da Mars 2020</small></label>
-  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>Laranja: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°</small></label>
-  <label class="layer"><input type="checkbox" id="ov-contour"><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
+  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>Câmera: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°</small></label>
+  <label class="layer"><input type="checkbox" id="ov-contour" checked><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
   <h3 class="gap">Marte inteiro</h3>
   <label class="layer"><input type="checkbox" id="ov-sites" checked><b>Locais de pouso</b><small>14 sondas e rovers, 1971–2021</small></label>
   <label class="layer"><input type="checkbox" id="ov-zones"><b>Zonas de exploração humana</b><small>51 propostas · workshop NASA 2015</small></label>
@@ -384,8 +384,36 @@ function buildFubLeaflet() {
   if (FUB.lake) fubL.shore = L.geoJSON(FUB.lake, { style: { color: '#4FA3FF', weight: 2, fillColor: '#4FA3FF', fillOpacity: 0.12, dashArray: '6 4' }, interactive: false });
   if (FUB['channel-lines']) fubL.channels = L.geoJSON(FUB['channel-lines'], { style: { color: '#7FD4FF', weight: 1.6, opacity: 0.9 }, interactive: false });
   if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
-  if (FUB.panoramas) fubL.pano360 = L.geoJSON(FUB.panoramas, { pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 5, color: '#0A0D14', weight: 1.5, fillColor: isSynthetic(f.properties) ? '#B98CFF' : '#FF9F43', fillOpacity: 0.95 }),
-    onEachFeature: (f, l) => { l.bindTooltip(panoTxt(f.properties), { className: 'tag' }); l.on('click', e => { L.DomEvent.stopPropagation(e); openTour(f.properties); }); } });
+  if (FUB.panoramas) { fubL.pano360 = L.layerGroup(); A.map.on('zoomend', layoutPanos); layoutPanos(); }
+}
+/* Panoramas no mapa 2D: ícone de câmera (foto real) ou de relevo (vista sintética).
+   Ícones que ficariam um em cima do outro viram um círculo com a contagem; clicar nele aproxima até separar. */
+const PANO_SVG = { real: '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 7h3.2l1.4-2h6.8l1.4 2H20a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 7z" fill="currentColor"/><circle cx="12" cy="13" r="3.4" fill="#fff"/><circle cx="12" cy="13" r="1.7" fill="currentColor"/></svg>',
+  syn: '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 19l6.5-11 4 6.5 2.5-3.5L22 19z" fill="currentColor"/></svg>' };
+function layoutPanos() {
+  const map = A.map, grp = fubL.pano360;
+  if (!map || !grp || !FUB.panoramas) return;
+  grp.clearLayers();
+  const z = map.getZoom(), R = 26, clusters = [];
+  FUB.panoramas.features.forEach(f => {
+    const [lon, lat] = f.geometry.coordinates, pt = map.project([lat, lon], z);
+    const c = z < 17 ? clusters.find(k => Math.abs(k.pt.x - pt.x) < R && Math.abs(k.pt.y - pt.y) < R) : null;
+    if (c) c.items.push(f); else clusters.push({ pt, items: [f] });
+  });
+  clusters.forEach(c => {
+    if (c.items.length === 1) {
+      const f = c.items[0], p = f.properties, syn = isSynthetic(p), [lon, lat] = f.geometry.coordinates;
+      const m = L.marker([lat, lon], { keyboard: false, icon: L.divIcon({ className: '', iconSize: [24, 24], iconAnchor: [12, 12], html: `<div class="panoico${syn ? ' syn' : ''}">${PANO_SVG[syn ? 'syn' : 'real']}</div>` }) });
+      m.bindTooltip(panoTxt(p), { className: 'tag' }); m.on('click', e => { L.DomEvent.stopPropagation(e); openTour(p); });
+      grp.addLayer(m);
+    } else {
+      const lls = c.items.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]), mid = lls.reduce((a, b) => [a[0] + b[0] / lls.length, a[1] + b[1] / lls.length], [0, 0]);
+      const m = L.marker(mid, { keyboard: false, icon: L.divIcon({ className: '', iconSize: [40, 24], iconAnchor: [20, 12], html: `<div class="panocluster">${PANO_SVG.real}<b>${c.items.length}</b></div>` }) });
+      m.bindTooltip(`${c.items.length} ${tr('panoramas 360° aqui · clique para aproximar')}`, { className: 'tag' });
+      m.on('click', e => { L.DomEvent.stopPropagation(e); map.flyToBounds(L.latLngBounds(lls).pad(0.4), { maxZoom: 17, duration: 0.6 }); });
+      grp.addLayer(m);
+    }
+  });
 }
 function ringsOf(g) { return g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []; }
 function drawFub() {

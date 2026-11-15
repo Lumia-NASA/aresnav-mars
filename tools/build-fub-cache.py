@@ -71,13 +71,14 @@ def tour_folders():
         m = re.search(r'<cube url="/vtour/panos/([^"/]+)\.tiles/([^"]+)" multires="([^"]+)"', block)
         sph = re.search(r'<sphere url="/vtour/panos/([^"/]+)\.tiles/[^"]+" multires="\d+,(\d+)x(\d+)', block)
         if sid and not m and sph:   # panorama esférico (equirretangular): nível 1, montado em cubo no navegador
-            out[sid.group(1)] = {'folder': sph.group(1), 'sphere': True, 'lvl': 1, 'w': int(sph.group(2)), 'h': int(sph.group(3))}
+            levels = [[int(a), int(b)] for a, b in re.findall(r'(\d+)x(\d+)', re.search(r'<sphere [^>]*multires="([^"]+)"', block).group(1))]
+            out[sid.group(1)] = {'folder': sph.group(1), 'sphere': True, 'lvl': 1, 'w': int(sph.group(2)), 'h': int(sph.group(3)), 'levels': levels}
             continue
         if not sid or not m:
             continue
         tile, *sizes = [int(x) for x in m.group(3).split(',')]   # krpano: multires="tamanho_do_bloco,nível1,nível2,..."
         lvl = max([i + 1 for i, v in enumerate(sizes) if v <= 1280] or [1])
-        out[sid.group(1)] = {'folder': m.group(1), 'mono': not m.group(2).startswith('%t/'), 'lvl': lvl, 'size': sizes[lvl - 1], 'tile': tile}
+        out[sid.group(1)] = {'folder': m.group(1), 'mono': not m.group(2).startswith('%t/'), 'lvl': lvl, 'size': sizes[lvl - 1], 'tile': tile, 'sizes': sizes}   # sizes: todos os níveis, para a nitidez sob demanda
     return out
 
 

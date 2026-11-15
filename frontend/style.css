@@ -726,3 +726,12 @@ body.right-collapsed:not(.helmet-mode) .exec{right:14px}
 .exec-log li{font-size:12px;line-height:1.35} .exec-log li span{font-family:var(--mono);color:#7EF2C8;margin-right:4px}
 body.executing.helmet-mode .hud-target{display:none}
 @media (max-width:900px){.exec{top:auto;bottom:150px;right:8px}}
+
+/* ---------- Mapa em estilo de carta: ícones dos panoramas 360° ---------- */
+.panoico{width:24px;height:24px;border-radius:7px;background:#fff;color:#0A0D14;border:1.5px solid #0A0D14;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.55);cursor:pointer}
+.panoico.syn{background:#B98CFF}
+.panoico:hover,.panocluster:hover{transform:scale(1.12)}
+.panocluster{width:40px;height:24px;border-radius:12px;background:#fff;color:#0A0D14;border:1.5px solid #0A0D14;display:flex;align-items:center;justify-content:center;gap:3px;font:700 12px var(--mono);box-shadow:0 1px 4px rgba(0,0,0,.55);cursor:pointer}
+
+/* ---------- Visor 360°: blocos nítidos sob demanda, por cima do nível base ---------- */
+.p360-hdt{position:absolute;background-size:100% 100%;background-repeat:no-repeat;opacity:0;transition:opacity .25s;pointer-events:none}

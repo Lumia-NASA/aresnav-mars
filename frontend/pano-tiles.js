@@ -37,12 +37,46 @@
     return { n, fractions, tiles };
   }
 
-  /* Blocos de uma esfera (equirretangular) no nível 1 */
-  function sphereTiles(cube) {
+  /* Blocos de uma esfera (equirretangular). Sem `lvl`, o nível 1; com `lvl`, usa cube.levels ([[w, h], ...]) */
+  function sphereSize(cube, lvl) {
+    const L = cube && cube.levels && lvl ? cube.levels[lvl - 1] : null;
+    return L ? { lvl, w: L[0], h: L[1] } : { lvl: 1, w: cube.w, h: cube.h };
+  }
+  function sphereTiles(cube, lvl) {
     if (!cube || !cube.sphere) return [];
-    const cols = Math.ceil(cube.w / TILE), rows = Math.ceil(cube.h / TILE), pad = x => String(x).padStart(3, '0'), out = [];
-    for (let r = 1; r <= rows; r++) for (let c = 1; c <= cols; c++) out.push({ row: r, col: c, path: `l1/${pad(r)}/l1_${pad(r)}_${pad(c)}.jpg` });
+    const s = sphereSize(cube, lvl);
+    const cols = Math.ceil(s.w / TILE), rows = Math.ceil(s.h / TILE), pad = x => String(x).padStart(3, '0'), out = [];
+    for (let r = 1; r <= rows; r++) for (let c = 1; c <= cols; c++) out.push({ row: r, col: c, path: `l${s.lvl}/${pad(r)}/l${s.lvl}_${pad(r)}_${pad(c)}.jpg` });
     return out;
+  }
+  /* Nível da esfera a usar: o maior com largura até maxW (a reprojeção roda no navegador) */
+  function sphereLevel(cube, maxW) {
+    const Ls = (cube && cube.levels) || [];
+    let best = 1;
+    Ls.forEach((L, i) => { if (L[0] <= maxW) best = i + 1; });
+    return best;
+  }
+
+  /* ---------- nitidez sob demanda ----------
+     cube.sizes = lado da face em cada nível do krpano (ex.: [640, 1152, 2304, 4736, 9472]).
+     O nível base (cube.lvl) carrega inteiro; os níveis acima só para os blocos que estão na tela. */
+  function hdLevel(cube, needPx) {
+    const sizes = (cube && cube.sizes) || [];
+    if (!cube || cube.sphere || !cube.lvl || sizes.length <= cube.lvl || needPx <= cube.size) return 0;
+    for (let l = cube.lvl + 1; l <= sizes.length; l++) if (sizes[l - 1] >= needPx) return l;
+    return sizes.length;
+  }
+  const maxSize = cube => { const s = (cube && cube.sizes) || []; return s.length ? s[s.length - 1] : ((cube && cube.size) || TILE); };
+  /* Grade de um nível: n x n blocos por face; rect devolve a posição do bloco na face, em frações 0..1 */
+  function levelGrid(cube, lvl) {
+    const size = cube.sizes[lvl - 1], n = Math.ceil(size / TILE);
+    const pad = x => (cube.mono ? String(x) : String(x).padStart(2, '0'));
+    const edge = k => Math.min(size, k * TILE) / size;
+    return {
+      lvl, size, n,
+      rect: (v, h) => ({ x0: edge(h - 1), x1: edge(h), y0: edge(v - 1), y1: edge(v) }),
+      path: (f, v, h) => (cube.mono ? `${f}/l${lvl}/${v}/l${lvl}_${f}_${v}_${h}.jpg` : `1/${f}/l${lvl}/${pad(v)}/l${lvl}_1/${f}_${pad(v)}_${pad(h)}.jpg`)
+    };
   }
 
   /* Resumo do carregamento. state: loading | complete | partial | failed | preview (só prévia) */
@@ -65,5 +99,5 @@
     return `${base}/fub/pano/${encodeURIComponent(folder)}/${path}${q.length ? '?' + q.join('&') : ''}`;
   }
 
-  return { TILE, FACES, isSynthetic, pickCube, cubeTiles, sphereTiles, summarize, tileUrl };
+  return { TILE, FACES, isSynthetic, pickCube, cubeTiles, sphereTiles, sphereSize, sphereLevel, hdLevel, maxSize, levelGrid, summarize, tileUrl };
 });
