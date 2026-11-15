@@ -76,11 +76,52 @@ function hdUpdate() {
     const el = document.createElement('div'); el.className = 'p360-hdt';
     el.style.cssText = `left:${t.r.x0 * 100}%;top:${t.r.y0 * 100}%;width:${(t.r.x1 - t.r.x0) * 100}%;height:${(t.r.y1 - t.r.y0) * 100}%;z-index:${lvl}`;
     hd.tiles.set(t.key, el);
-    const src = url(c.folder, g.path(t.f, t.v, t.hh)), img = new Image(), wasOffline = offline();
-    img.onload = () => { if (token !== buildToken || hd.tiles.get(t.key) !== el || !faceEls[t.fi]) return; el.style.backgroundImage = `url('${src}')`; faceEls[t.fi].appendChild(el); requestAnimationFrame(() => { el.style.opacity = 1; }); };
-    img.onerror = () => { if (token !== buildToken) return; hd.tiles.delete(t.key); if (!wasOffline) hd.bad.add(t.key); };   // sem enlace o bloco só não estava no cache: tenta de novo quando o olhar mexer
-    img.src = src;
+    const wasOffline = offline();
+    const show = src => { if (token !== buildToken || hd.tiles.get(t.key) !== el || !faceEls[t.fi]) return; el.style.backgroundImage = `url('${src}')`; faceEls[t.fi].appendChild(el); requestAnimationFrame(() => { el.style.opacity = 1; }); };
+    const fail = () => { if (token !== buildToken) return; hd.tiles.delete(t.key); if (!wasOffline) hd.bad.add(t.key); };   // sem enlace o bloco só não estava no cache: tenta de novo quando o olhar mexer
+    if (c.sph) { sphereTile(c, g, t).then(src => (src ? show(src) : fail()), fail); return; }
+    const src = url(c.folder, g.path(t.f, t.v, t.hh)), img = new Image();
+    img.onload = () => show(src); img.onerror = fail; img.src = src;
   });
+}
+/* Panorama esférico: o bloco nítido de uma face é reprojetado aqui, só a partir dos blocos da esfera que ele usa */
+const sphCache = new Map();   // bloco da esfera já decodificado (no máximo 90)
+function sphSrc(c0, lvl, row, col) {
+  const key = `${c0.folder}/${lvl}/${row}/${col}`, pad = x => String(x).padStart(3, '0');
+  if (!sphCache.has(key)) {
+    if (sphCache.size >= 90) sphCache.delete(sphCache.keys().next().value);
+    sphCache.set(key, loadImg(url(c0.folder, `l${lvl}/${pad(row)}/l${lvl}_${pad(row)}_${pad(col)}.jpg`)).then(img => {
+      if (!img) { sphCache.delete(key); return null; }
+      const cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+      return g.getImageData(0, 0, cv.width, cv.height);
+    }));
+  }
+  return sphCache.get(key);
+}
+async function sphereTile(c, g, t) {
+  const [W, H] = c.sph.levels[g.lvl - 1], S = g.size, T = P.TILE;
+  const w = Math.max(1, Math.round((t.r.x1 - t.r.x0) * S)), h = Math.max(1, Math.round((t.r.y1 - t.r.y0) * S));
+  const sx = new Int32Array(w * h), sy = new Int32Array(w * h), need = new Set();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const [dx, dy, dz] = FACE_DIR[t.f](2 * (t.r.x0 + (x + 0.5) / S) - 1, 2 * (t.r.y0 + (y + 0.5) / S) - 1);
+    const lon = Math.atan2(dx, dz), lat = Math.atan2(dy, Math.hypot(dx, dz));
+    const X = Math.min(W - 1, Math.floor((lon / (2 * Math.PI) + 0.5) * W)), Y = Math.min(H - 1, Math.floor((0.5 - lat / Math.PI) * H)), k = y * w + x;
+    sx[k] = X; sy[k] = Y; need.add(Math.floor(Y / T) * 1000 + Math.floor(X / T));
+  }
+  if (need.size > 36) return null;   // perto dos polos um bloco da face pede a esfera quase inteira: fica no nível base
+  const src = new Map();
+  await Promise.all([...need].map(async k => { src.set(k, await sphSrc(c.sph, g.lvl, Math.floor(k / 1000) + 1, (k % 1000) + 1)); }));
+  if ([...src.values()].some(v => !v)) return null;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cg = cv.getContext('2d'), out = cg.createImageData(w, h), d = out.data;
+  for (let k = 0; k < w * h; k++) {
+    const td = src.get(Math.floor(sy[k] / T) * 1000 + Math.floor(sx[k] / T));
+    const si = (Math.min(td.height - 1, sy[k] % T) * td.width + Math.min(td.width - 1, sx[k] % T)) * 4, di = k * 4;
+    d[di] = td.data[si]; d[di + 1] = td.data[si + 1]; d[di + 2] = td.data[si + 2]; d[di + 3] = 255;
+  }
+  cg.putImageData(out, 0, 0);
+  return cv.toDataURL('image/jpeg', 0.92);
 }
 function hdNote(px) {
   const el = $('#p360Hd'); if (!el) return;
@@ -130,6 +171,8 @@ async function sphereFaces(c0, token) {
     }
     fg.putImageData(img, 0, 0); out[f] = fc.toDataURL('image/jpeg', 0.9);
   }
+  /* daqui para cima, a nitidez vem sob demanda: "cubo virtual" com face = um quarto da largura de cada nível da esfera */
+  if (c0.levels) out.hd = { folder: c0.folder, lvl: lv, size: N, sizes: c0.levels.map(L => Math.ceil(L[0] / 4)), sph: c0 };
   return out;
 }
 
@@ -148,6 +191,7 @@ function build(cube) {
     sphereFaces(cube, token).then(fs => {
       if (!fs || token !== buildToken) return;
       cubeEl.querySelectorAll('.p360-face').forEach((el, k) => { el.style.backgroundImage = `url('${fs[FACES[k]]}')`; el.style.backgroundSize = '100% 100%'; el.style.backgroundPosition = '0 0'; });
+      if (fs.hd) { hd.cube = fs.hd; hdUpdate(); }
     });
     return;
   }
