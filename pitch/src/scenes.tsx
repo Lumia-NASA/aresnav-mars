@@ -90,13 +90,14 @@ export const Title: React.FC = () => {
 };
 
 /* ---------------------------------------------------------------- 10-20 s: como funciona (5 telas reais de 2 s) */
-type ShotCfg = { src: string; caption: string; accent: number[]; chips: string[]; origin: string; zoom: [number, number] };
+type ShotCfg = { src: string; src2?: string; caption: string; accent: number[]; chips: string[]; origin: string; zoom: [number, number] };
 const SHOT_LEN = 60;
 const SHOTS: ShotCfg[] = [
   { src: "nogo-turnback", caption: "Pick a route. NASA terrain says NO-GO.", accent: [5, 6], chips: ["HiRISE 1 m", "MOLA · HRSC"], origin: "0% 60%", zoom: [1.0, 1.4] },
   { src: "why", caption: "It shows why, in numbers.", accent: [4, 5], chips: ["613 rover stops check the terrain", "Mars24 sunset"], origin: "50% 50%", zoom: [1.12, 1.85] },
   { src: "planner-caution", caption: "And what to change: carry less.", accent: [5, 6], chips: ["Suit payload model"], origin: "12% 68%", zoom: [1.0, 1.45] },
-  { src: "helmet-turnback", caption: "Live in the helmet, ARES calls the turn-back.", accent: [5, 6, 7], chips: ["Perseverance Navcam", "MEDA weather"], origin: "95% 52%", zoom: [1.0, 1.85] },
+  // o Terreno 3D em primeira pessoa (o que o astronauta enxerga) e, no meio da tela, o aviso "turn back now" aparece por cima
+  { src: "helmet-3d", src2: "helmet-3d-turnback", caption: "Live in the helmet, ARES calls the turn-back.", accent: [5, 6, 7], chips: ["1 m HiRISE terrain", "MEDA weather"], origin: "100% 55%", zoom: [1.0, 1.3] },
   { src: "pano360", caption: "Real rover views of the place.", accent: [1, 2, 3], chips: ["Mastcam-Z 360°", "ESA HRSC · FU Berlin"], origin: "50% 62%", zoom: [1.0, 1.18] },
 ];
 
@@ -132,6 +133,21 @@ const Shot: React.FC<{ cfg: ShotCfg; index: number; total: number; length: numbe
             scale: interpolate(frame, [0, length], cfg.zoom, { ...clamp, easing: Easing.out(Easing.quad) }),
           }}
         />
+        {cfg.src2 ? (
+          <Img
+            src={staticFile(`footage/${cfg.src2}.jpg`)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transformOrigin: cfg.origin,
+              scale: interpolate(frame, [0, length], cfg.zoom, { ...clamp, easing: Easing.out(Easing.quad) }),
+              opacity: interpolate(frame, [26, 34], [0, 1], clamp),
+            }}
+          />
+        ) : null}
       </div>
       <div style={{ position: "absolute", left: 110, top: 190, width: 530, opacity: textOpacity }}>
         <Label size={22}>

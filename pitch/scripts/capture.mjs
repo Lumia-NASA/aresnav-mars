@@ -51,6 +51,27 @@ const done = async code => { try { if (browser) await browser.close(); } catch (
   await sleep(1500);
 
   // FLY_ONLY=1: só o sobrevoo, com a interface escondida (fundo limpo para o título e o desafio)
+  // HELMET3D=1: só o capacete em primeira pessoa (Terreno 3D, o que o astronauta enxerga) com o aviso "turn back now"
+  if (process.env.HELMET3D === '1') {
+    log('capacete em 3D, primeira pessoa');
+    await clickText('#destList button', 'Three Forks');
+    await until(() => App.state.goalPoi && /Three Forks/.test(App.state.goalPoi.n), 8000, 'destino');
+    await payload(18.5);
+    await until(() => /NO-GO/.test(document.querySelector('#gonogo').innerText), 10000, 'NO-GO');
+    await clickText('button', '^Helmet HUD$'); await sleep(3000);
+    await page.evaluate(() => document.querySelector('#hudSols [data-mode="terrain"]').click());
+    await sleep(2500);
+    const HEADING = Number(process.env.HEADING || 285);
+    await page.evaluate(h => { const w = App.globe.walk; w.heading = h; w.pitch = -3; }, HEADING);
+    await until(() => App.FINE && App.FINE.size > 3, 90000, 'relevo de 1 m chegar');
+    await settle(60000); await sleep(1500); await settle(20000);
+    await shot('helmet-3d');
+    await page.evaluate(() => { document.querySelector('#execPace').value = '0.85'; document.querySelector('#execBtn').click(); App.state.speed = 3; });
+    await until(() => /TURN BACK NOW/.test(document.querySelector('#execTurnText').innerText), 120000, 'vire agora');
+    await sleep(350); await shot('helmet-3d-turnback');   // na hora: o relevo já está carregado e a caminhada simulada não pode seguir adiante
+    log('terminei (capacete 3D)'); await done(0); return;
+  }
+
   const FLY_ONLY = process.env.FLY_ONLY === '1';
   if (FLY_ONLY) await page.addStyleTag({ content: '.topbar,.side,.sidetoggle,.dock,.mapctl,.basepick,.mission-banner,.floating,.statusbar,.credit,.offline-badge,.exec,.cesium-viewer-bottom{display:none!important}' });
 
