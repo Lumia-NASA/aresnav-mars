@@ -132,10 +132,11 @@ Ideas taken from MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin and NASA
   - a 10° grid and the **current Sun**: real day and night from the time on Mars.
 - **Mars clock** in the status bar: local mean solar time at Jezero (LMST), Mars 2020 mission sol and Ls. Uses the NASA GISS Mars24 algorithm.
 - **ARES, the AI copilot** (button at the top). Ask by text or voice: "Can I go out?", "Where do I turn back?", "Does the radio work on the route?".
-  - The app sends the backend a summary of the walk state, and the backend asks Claude (`claude-opus-5-5`, with a server fallback if the model refuses).
+  - The app sends the backend a summary of the walk state, and the backend asks the AI: NVIDIA's free `nvidia/nemotron-3.5-bolt-e4b` by default, or Claude when only `ANTHROPIC_API_KEY` is set.
+  - It also answers general questions (math, unit conversions, physics, Mars science). A calculator in the backend (`backend/calc.js`) computes the exact numbers, and the AI only explains them.
   - The answer is spoken over the helmet radio.
   - With no API key, or no network, ARES answers in **local mode**, with the same math as the app.
-  - To turn the AI on, put `ANTHROPIC_API_KEY` in `backend/.env`.
+  - **The AI works out of the box for the team:** the team's NVIDIA key is in `backend/team.env` (this repository is private). A personal key in `backend/.env` takes priority. **If the repository is ever made public, revoke that key at build.nvidia.com and delete `backend/team.env` first**: it stays in the git history.
 
 ## FU Berlin's Jezero
 

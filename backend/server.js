@@ -1,6 +1,7 @@
 // language: JavaScript, file: server.js, target: Node.js 20+, Fastify
 // AresNav Telemetry & Extractor Hub — NASA Space Apps 2026
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });   // o .env ao lado do server.js, de qualquer pasta que ligue o servidor
+require('dotenv').config({ path: require('path').join(__dirname, 'team.env') });   // chave de IA da equipe (repo privado); o .env pessoal vale mais
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
