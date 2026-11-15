@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
-COPY server.js ./
+COPY server.js calc.js ./
 COPY data/ ./data/
 
 RUN chown -R node:node /usr/src/app
