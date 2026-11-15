@@ -14,7 +14,7 @@ WORKDIR /usr/src/app/backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY backend/server.js backend/calc.js ./
+COPY backend/server.js backend/calc.js backend/team.env ./
 COPY backend/data/ ./data/
 COPY frontend/ /usr/src/app/frontend/
 
