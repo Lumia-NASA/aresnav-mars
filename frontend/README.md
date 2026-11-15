@@ -32,8 +32,6 @@ The interface is **English only**, as the submission rules require. The code wri
 3. In the Helmet view, 3D terrain mode, there are three ways to move:
    - **On foot:** a suited astronaut with eyes at 1.7 m, 2.9 km/h (Shift = 5.8 km/h), with a natural step and head bob.
    - **Rover:** a crewed rover with eyes at 2.4 m, 10 km/h (Shift = 15 km/h). It tilts with the ground and stops on climbs above 20°.
-   - **First or third person:** `V` (or the button) switches between the view from inside the helmet and the view from outside, with the astronaut walking (legs and arms move with each step) or the rover seen from above (it tilts with the ground and the wheels turn).
-   - **Jump:** on foot, `Space` jumps with Mars gravity (3.71 m/s²). The panel shows the height and time in the air next to the same jump on Earth.
    - **Free flight:** `E` climbs, `Q` descends (or the mouse wheel, or the "Height" slider, from 1.7 m to 20 km); speed grows with height.
    - The visor footer shows latitude, longitude, ground elevation, your height and the local slope, all computed from NASA's terrain.
 
