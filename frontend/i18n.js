@@ -14,17 +14,6 @@ window.setLang = () => {};
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
-  'Terceira pessoa': 'Third person',
-  'Primeira pessoa': 'First person',
-  'Trocar a câmera (V)': 'Switch camera (V)',
-  'Gravidade': 'Gravity',
-  'Salto': 'Jump',
-  'Salto (Espaço)': 'Jump (Space)',
-  'Último salto': 'Last jump',
-  'Na Terra': 'On Earth',
-  'A pé: 2,9 km/h, como um astronauta de traje (Shift = 5,8 km/h) · W/S andam · A/D viram · Espaço pula (gravidade de Marte) · V troca a câmera · arraste para olhar': 'On foot: 2.9 km/h, like a suited astronaut (Shift = 5.8 km/h) · W/S walk · A/D turn · Space jumps (Mars gravity) · V switches the camera · drag to look',
-  'Rover tripulado: 10 km/h (Shift = 15 km/h) · W/S aceleram e freiam · A/D viram · sobe até 20° · V troca a câmera · arraste para olhar': 'Crewed rover: 10 km/h (Shift = 15 km/h) · W/S accelerate and brake · A/D turn · climbs up to 20° · V switches the camera · drag to look',
-  '3,71 m/s² · 0,38 g': '3.71 m/s² · 0.38 g',
   'Base Ares-1': 'Ares-1 base',
   'em Jezero · fora do alcance a pé': 'in Jezero · out of walking range',
   'Chão': 'Ground',
