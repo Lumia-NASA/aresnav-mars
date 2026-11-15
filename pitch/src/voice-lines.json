@@ -1,0 +1,67 @@
+{
+  "voice": "en-US-AriaNeural",
+  "rate": "+22%",
+  "lines": [
+    {
+      "id": "01-team",
+      "start": 0.45,
+      "text": "We are Team Lumia."
+    },
+    {
+      "id": "02-challenge",
+      "start": 2.15,
+      "text": "Our challenge: a survival map for Mars."
+    },
+    {
+      "id": "03-name",
+      "start": 5.7,
+      "text": "MarsView. Every step planned. Every breath counted."
+    },
+    {
+      "id": "04-nogo",
+      "start": 10.15,
+      "text": "NASA data says: no-go."
+    },
+    {
+      "id": "05-why",
+      "start": 12.15,
+      "text": "It shows why, in numbers."
+    },
+    {
+      "id": "06-change",
+      "start": 14.15,
+      "text": "And what to change."
+    },
+    {
+      "id": "07-ares",
+      "start": 16.15,
+      "text": "ARES calls the turn-back, live."
+    },
+    {
+      "id": "08-rover",
+      "start": 18.15,
+      "text": "With real rover views."
+    },
+    {
+      "id": "09-any",
+      "start": 20.25,
+      "text": "Any site on Mars."
+    },
+    {
+      "id": "10-tablet",
+      "start": 21.6,
+      "text": "On a tablet, in a visor, with real suit data.",
+      "rate": "+28%"
+    },
+    {
+      "id": "11-safer",
+      "start": 24.2,
+      "text": "Safer, bolder science."
+    },
+    {
+      "id": "12-close",
+      "start": 26.5,
+      "text": "MarsView, by Team Lumia."
+    }
+  ]
+}

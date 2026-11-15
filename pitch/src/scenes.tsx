@@ -195,9 +195,8 @@ export const Future: React.FC = () => {
         <Photo src="footage/jezero-clean.jpg" dim={0.78} from={1.06} to={1.16} duration={270} blur={5} />
       </div>
       <Statement text="Any site on Mars." from={4} to={50} accent={[2, 3]} />
-      <Statement text="On a tablet, or in the visor." from={48} to={94} accent={[5]} />
-      <Statement text="Fed by real suit telemetry." from={92} to={138} accent={[3, 4]} />
-      <Statement text="Safer, bolder science." from={136} to={CLOSE - 8} accent={[0, 1, 2]} size={130} />
+      <Statement text="On a tablet, in a visor, with real suit data." from={46} to={112} accent={[8, 9]} size={92} />
+      <Statement text="Safer, bolder science." from={110} to={CLOSE - 8} accent={[0, 1, 2]} size={130} />
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 30, opacity: closing }}>
         <div style={{ scale: interpolate(frame, [CLOSE, CLOSE + 30], [0.8, 1], { ...clamp, easing: EASE }) }}>
           <Logo size={150} />

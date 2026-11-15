@@ -130,7 +130,7 @@ export const Watermark: React.FC = () => (
       padding: "7px 14px",
     }}
   >
-    SI-ASSISTED
+    SI-ASSISTED · AI VOICE
   </div>
 );
 

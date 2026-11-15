@@ -1,8 +1,24 @@
 import React from "react";
-import { AbsoluteFill, Sequence } from "remotion";
+import { Audio } from "@remotion/media";
+import { AbsoluteFill, Sequence, staticFile, useVideoConfig } from "remotion";
 import { SceneFade, Watermark } from "./components";
 import { Challenge, Future, HowItWorks, Intro, Title } from "./scenes";
 import { colors, OVERLAP, SCENES } from "./theme";
+import voice from "./voice-lines.json";
+
+/** Narração: uma fala por arquivo (pitch/public/voice, gerado por pitch/scripts/voice.py), cada uma no seu segundo */
+const Narration: React.FC = () => {
+  const { fps } = useVideoConfig();
+  return (
+    <>
+      {voice.lines.map((l) => (
+        <Sequence key={l.id} name={`Voz: ${l.text}`} from={Math.round(l.start * fps)} layout="none">
+          <Audio src={staticFile(`voice/${l.id}.mp3`)} />
+        </Sequence>
+      ))}
+    </>
+  );
+};
 
 /** Uma cena: entra e sai com fade e se sobrepõe um pouco à próxima (OVERLAP quadros) */
 const Scene: React.FC<{ name: string; range: readonly [number, number]; first?: boolean; last?: boolean; children: React.ReactNode }> = ({
@@ -41,5 +57,6 @@ export const MarsViewPitch: React.FC = () => (
       <Future />
     </Scene>
     <Watermark />
+    <Narration />
   </AbsoluteFill>
 );
