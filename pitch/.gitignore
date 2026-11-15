@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignore the output video from Git but not videos you import into src/.
+out
+
+# Skills do Remotion (copias de terceiros): quem precisar roda "npx remotion skills add" dentro de pitch/
+.agents/
+.claude/
+skills-lock.json
