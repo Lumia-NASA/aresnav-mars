@@ -136,7 +136,8 @@ Ideas taken from MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin and NASA
   - It also answers general questions (math, unit conversions, physics, Mars science). A calculator in the backend (`backend/calc.js`) computes the exact numbers, and the AI only explains them.
   - The answer is spoken over the helmet radio.
   - With no API key, or no network, ARES answers in **local mode**, with the same math as the app.
-  - **The AI works out of the box for the team:** the team's NVIDIA key is in `backend/team.env` (this repository is private). A personal key in `backend/.env` takes priority. **If the repository is ever made public, revoke that key at build.nvidia.com and delete `backend/team.env` first**: it stays in the git history.
+  - **Keys never go in the repository.** Put `NVIDIA_API_KEY=...` (or `ANTHROPIC_API_KEY=...`) in `backend/.env`, which git ignores. With Docker, pass it at run time: `docker run -e NVIDIA_API_KEY ...`. The CI blocks any `.env` file and any API key found in tracked files.
+  - **If one AI provider fails** (timeout, quota, network) and the other key is also set, the backend asks the other one in the same request. If both fail, the browser falls back to local mode.
 
 ## FU Berlin's Jezero
 

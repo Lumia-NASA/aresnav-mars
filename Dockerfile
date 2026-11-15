@@ -14,7 +14,7 @@ WORKDIR /usr/src/app/backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY backend/server.js backend/calc.js backend/team.env ./
+COPY backend/server.js backend/calc.js ./
 COPY backend/data/ ./data/
 COPY frontend/ /usr/src/app/frontend/
 
@@ -32,6 +32,9 @@ CMD ["node", "server.js"]
 
 # Execução recomendada (skill 06):
 #   docker run -d --name aresnav -p 3000:3000 --read-only --tmpfs /tmp \
-#     --security-opt=no-new-privileges:true --cap-drop=ALL --user 1000:1000 aresnav
+#     --security-opt=no-new-privileges:true --cap-drop=ALL --user 1000:1000 \
+#     -e NVIDIA_API_KEY aresnav
+# A chave da IA entra só na hora de rodar (-e NVIDIA_API_KEY lê do ambiente de quem roda); nunca vai para a imagem.
+# Sem chave, o ARES responde no modo local do navegador.
 # Com --read-only o cache novo de blocos e fotos não é gravado em disco (o backend segue funcionando).
 # Para manter o cache entre reinícios, monte um volume em /usr/src/app/backend/data/cache.
