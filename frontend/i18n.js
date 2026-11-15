@@ -1,18 +1,16 @@
-/* Idiomas da interface: inglês (padrão, para a submissão) e português.
+/* Idioma da interface: só inglês (regra da submissão do Space Apps: tudo em inglês).
+   Antes havia também português; o botão de idioma foi tirado para não haver risco de abrir em português.
    O código escreve os textos em português; em inglês, este módulo traduz tudo o que entra na tela
    (textos, títulos, dicas e campos) com um dicionário de frases. Os números já saem no formato do idioma.
    window.T(texto) traduz um texto avulso (usado em desenhos de canvas, rótulos do globo e voz). */
 (function () {
 'use strict';
-let lang = 'en';
-try {
-  const q = new URLSearchParams(location.search).get('lang'), saved = localStorage.getItem('aresnav.lang');
-  if (q === 'pt' || q === 'en') { lang = q; localStorage.setItem('aresnav.lang', q); } else if (saved === 'pt' || saved === 'en') lang = saved;
-} catch (e) { /* sem armazenamento: fica no padrão */ }
+const lang = 'en';
+try { localStorage.removeItem('aresnav.lang'); } catch (e) { /* sem armazenamento */ }
 window.LANG = lang;
 window.LOC = lang === 'en' ? 'en-US' : 'pt-BR';
 document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
-window.setLang = l => { try { localStorage.setItem('aresnav.lang', l); } catch (e) { /* ignora */ } const u = new URL(location.href); u.searchParams.delete('lang'); location.href = u.toString(); };
+window.setLang = () => {};
 
 /* Textos curtos: só traduz quando o texto inteiro é este */
 const EXACT = {
@@ -225,7 +223,7 @@ const EXACT = {
   'recusado': 'declined',
   'Pontos de referência': 'Landmarks',
   'Trilha Jezero': 'Jezero Trail', 'Telemetria': 'Telemetry', 'Dados': 'Data', 'Conteúdo da missão': 'Mission content', 'Plano da caminhada': 'Walk plan',
-  'Segura': 'Safe', 'Mais curta': 'Shortest', 'Emergência': 'Emergency', 'Checklist de saída': 'Pre-walk checklist', 'Imagem': 'Imagery', 'Camadas': 'Layers', 'Destinos': 'Destinations',
+  'Segura': 'Safe', 'Mais curta': 'Shortest', 'Emergência': 'Emergency', 'Voltar à base': 'Return to base', 'NO-GO · íngreme demais': 'NO-GO · too steep', 'NO-GO · O₂ não chega': 'NO-GO · not enough O₂', 'Equipe': 'Crew', 'Rover de apoio': 'Support rover', 'mesma rota · valor de exemplo': 'same route · sample value', 'ponto de recarga e extração': 'recharge and extraction point', 'Checklist de saída': 'Pre-walk checklist', 'Imagem': 'Imagery', 'Camadas': 'Layers', 'Destinos': 'Destinations',
   'Declive': 'Slope', 'Infravermelho diurno': 'Daytime infrared', 'Minerais hidratados': 'Hydrated minerals', 'Trajeto do Perseverance': 'Perseverance traverse', 'Pontos de interesse': 'Points of interest',
   'Relevo colorido': 'Colour relief', 'Mosaico de pouso Mars 2020': 'Mars 2020 landing mosaic', 'Horários': 'Schedule', 'Alertas': 'Alerts', 'Roteiro passo a passo': 'Step-by-step itinerary',
   'Perfil de altitude da ida': 'Outbound elevation profile', 'Na base': 'At base', 'Ida': 'Outbound', 'Volta': 'Return', 'De volta à base': 'Back at base', 'Sem rota': 'No route',
@@ -273,10 +271,9 @@ const EXACT = {
   'Foto de solo tirada pelo Perseverance': 'Ground photo taken by Perseverance', 'Virar à esquerda': 'Turn left', 'Virar à direita': 'Turn right', 'Ir para': 'Go to', 'Altura acima do chão': 'Height above ground',
   'Procedência dos dados': 'Data provenance', 'Destino': 'Destination',
   'Sombras do relevo': 'Terrain shadows', 'Luz rasante de noroeste sobre o relevo real (MOLA + HRSC)': 'Low light from the northwest over the real terrain (MOLA + HRSC)',
-  'Radares': 'Radars', '2 no solo e 4 detecções de radares em órbita (posições aprox.)': '2 on the ground and 4 detections by orbiting radars (approx. positions)',
-  'Perseverance · no solo': 'Perseverance · on the ground', 'Zhurong · no solo': 'Zhurong · on the ground', 'Mars Express · órbita': 'Mars Express · orbit', 'MRO · órbita': 'MRO · orbit',
+  'Radares': 'Radars', '1 no solo e 4 detecções de radares em órbita (posições aprox.)': '1 on the ground and 4 detections by orbiting radars (approx. positions)',
+  'Perseverance · no solo': 'Perseverance · on the ground', 'Mars Express · órbita': 'Mars Express · orbit', 'MRO · órbita': 'MRO · orbit',
   'Radar de penetração no solo do rover: enxerga camadas até cerca de 10 m abaixo do chão ao longo do trajeto em Jezero.': 'The rover\'s ground-penetrating radar: it sees layers down to about 10 m below the surface along the traverse in Jezero.',
-  'Radar de penetração no solo do rover chinês em Utopia Planitia: mostrou camadas de sedimento enterradas.': 'Ground-penetrating radar on the Chinese rover in Utopia Planitia: it revealed buried sediment layers.',
   'Reflexo forte sob 1,5 km de gelo perto do polo sul (2018), interpretado como possível água líquida salgada. Posição aproximada.': 'Bright reflection under 1.5 km of ice near the south pole (2018), interpreted as possible salty liquid water. Approximate position.',
   'Depósito de gelo enterrado do tamanho de um grande lago, a poucos metros da superfície (2016). Posição aproximada.': 'Buried ice deposit the size of a large lake, a few metres below the surface (2016). Approximate position.',
   'Camada extensa de gelo raso sob a planície (2015), candidata a fonte de água para tripulações. Posição aproximada.': 'Extensive layer of shallow ice under the plain (2015), a candidate water source for crews. Approximate position.',
@@ -352,9 +349,9 @@ const PHRASES = [
   [' · declive até 4°', ' · slope up to 4°'], [' · declive 4° a 8°', ' · slope 4° to 8°'], [' · declive acima de 8°', ' · slope above 8°'], ['CRISM · minerais hidratados', 'CRISM · hydrated minerals'],
   ['(último selo guardado, enlace offline)', '(last stored seal, link offline)'], ['(lido de /api/v1/telemetry)', '(read from /api/v1/telemetry)'],
   ['Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend AresNav', 'Data: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via AresNav backend'],
-  ['NO-GO · SLOPE OVERLOAD · com ', 'NO-GO · SLOPE OVERLOAD · with '], [' kg o limite cai para ', ' kg the limit drops to '], ['°. Desvie por terreno plano ou reduza a carga.', '°. Divert over flat ground or reduce the payload.'],
+  [' kg o limite de declive cai para ', ' kg the slope limit drops to '], [' kg o O₂ fica abaixo de 30% na volta. Reduza a carga ou encurte a rota.', ' kg, O₂ would be below 30% back at base. Lighten the load or shorten the route.'], ['NO-GO · com ', 'NO-GO · with '], ['NO-GO · SLOPE OVERLOAD · com ', 'NO-GO · SLOPE OVERLOAD · with '], [' kg o limite cai para ', ' kg the limit drops to '], ['°. Desvie por terreno plano ou reduza a carga.', '°. Divert over flat ground or reduce the payload.'],
   ['NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ', 'NO-GO · METABOLIC OVERLOAD · O₂ at return forecast below 30% with '], [' kg. Reduza a carga ou encurte a rota.', ' kg. Reduce the payload or shorten the route.'],
-  ['EMERGÊNCIA · siga a rota tracejada até a base', 'EMERGENCY · follow the dashed route to base'], ['TEMPESTADE DE POEIRA · alerta ativo (MEDA)', 'DUST STORM · alert active (MEDA)'], ['OXIGÊNIO ABAIXO DE 30% · volte agora', 'OXYGEN BELOW 30% · head back now'],
+  ['EMERGÊNCIA · siga a rota tracejada até a base', 'EMERGENCY · follow the dashed route to base'], ['VOLTANDO À BASE · siga a rota tracejada', 'RETURNING TO BASE · follow the dashed route'], ['TEMPESTADE DE POEIRA · alerta ativo (MEDA)', 'DUST STORM · alert active (MEDA)'], ['OXIGÊNIO ABAIXO DE 30% · volte agora', 'OXYGEN BELOW 30% · head back now'],
   ['Terreno real da NASA (relevo MOLA/HRSC em escala 1:1 + imagem orbital)', 'Real NASA terrain (MOLA/HRSC elevation at 1:1 scale + orbital imagery)'], ['Terreno real da NASA (relevo HiRISE de 1 m em escala 1:1 + imagem orbital)', 'Real NASA terrain (1 m HiRISE elevation at 1:1 scale + orbital imagery)'], [' · chão a ', ' · ground at '], [' · você a ', ' · you are '], [' do chão · declive local ', ' above ground · local slope '],
   ['OFFLINE: as fotos do rover precisam do backend AresNav', 'OFFLINE: rover photos need the AresNav backend'], ['Foto real · Perseverance Navcam', 'Real photo · Perseverance Navcam'],
   [' do trajeto do rover', ' along the rover traverse'], [' · panorama mais próximo, a ', ' · nearest panorama, '], [' de você', ' from you'], ['ponto de recarga e extração a ', 'recharge and extraction point at '],

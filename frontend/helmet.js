@@ -272,29 +272,27 @@ function renderHud() {
   if (!visible()) return;
   const st = A.state, n = st.now, t = st.tele || {}, mob = t.eva_mobility || {}, topo = (t.layers && t.layers.topography) || {}, meda = (t.layers && t.layers.atmosphere_meda) || {}, loc = t.location || {};
   const o2 = n ? n.o2 : Number(mob.o2_remaining_pct), hasO2 = isFinite(o2); // previsão viva (com a carga); sem rota, vale o contrato
-  /* Squad Mesh Link: você, a dupla e o rover de apoio (requisito de caminhada em dupla com veículo robótico) */
+  /* Equipe: você, a dupla e o rover de apoio (caminhada em dupla com veículo robótico). Sem números inventados:
+     a distância da dupla vem do contrato (valor de exemplo) e o ponto de recarga é calculado. */
   const me = position() || A.BASE, kg = st.payloadKg != null ? st.payloadKg : mob.suit_payload_kg;
   const buddy0 = mob.buddy_eva2_distance_m != null ? Number(mob.buddy_eva2_distance_m) : 14.2;
-  const live = st.playing && n, buddy = live ? 14 + 2 * Math.sin(n.t * 0.9) : buddy0;       // oscila de 12 a 16 m durante a simulação
-  const buddyBpm = Math.round(92 + (live ? 4 * Math.sin(n.t * 0.6) : 0));
   const extract = A.metersBetween(me.lat, me.lon, A.BASE.lat, A.BASE.lon);
-  $('#hudCrew').innerHTML = '<div class="squad-title">Squad Mesh Link</div>' +
+  $('#hudCrew').innerHTML = '<div class="squad-title">Equipe</div>' +
     `<div class="crew"><b>Helena · você</b><span class="mono">${n ? Math.round(n.hr) + ' bpm' : '—'}</span>${hasO2 ? bar(o2, tone(o2, 45, 30)) : ''}<small>O₂ ${hasO2 ? Math.round(o2) + '%' : '—'} · carga ${kg != null ? A.num(kg, 1) + ' kg' : '—'} · limite ${A.num(A.LIM.safe, 1)}° (${A.NO_LOAD_SLOPE}° sem carga)</small></div>` +
-    `<div class="crew"><b>Parceiro</b><span class="mono">a ${A.num(buddy, 1)} m</span><small>${buddyBpm} bpm · <i class="oknote">LINK NOMINAL</i></small></div>` +
-    `<div class="crew"><b>Rover M20 de apoio</b><span class="mono">${statusPt(mob.support_rover_status)}</span><small>ponto de recarga e extração a ${dist(extract)}</small></div>`;
+    `<div class="crew"><b>Parceiro</b><span class="mono">a ${A.num(buddy0, 1)} m</span><small>mesma rota · valor de exemplo</small></div>` +
+    `<div class="crew"><b>Rover de apoio</b><span class="mono">a ${dist(extract)}</span><small>ponto de recarga e extração</small></div>`;
   const steep = Number(topo.slope_deg) > Number(topo.max_safe_slope_deg);
   $('#hudSuit').innerHTML = `<div class="big"><span>O₂</span><b class="mono" style="color:${hasO2 ? tone(o2, 45, 30) : 'var(--muted)'}">${hasO2 ? Math.round(o2) : '—'}<small>%</small></b></div>` +
     [['Declive', topo.slope_deg != null ? `<i style="color:${steep ? 'var(--crit)' : 'var(--ok)'}">${A.num(topo.slope_deg, 1)}°</i> / ${A.num(topo.max_safe_slope_deg, 0)}°` : '—'],
-      ['Terreno', statusPt(topo.terrain_status)], ['Temp.', (tc => tc != null ? '≈ ' + A.num(tc, 0) + ' °C' : '—')(A.tempAt(A.T0 + (n ? n.t : 0)))], ['Vento (ex.)', meda.wind_speed_ms != null ? A.num(meda.wind_speed_ms, 1) + ' m/s' : '—'],
-      ['Radiação (ex.)', meda.radiation_msv_day != null ? A.num(meda.radiation_msv_day, 2) + ' mSv' : '—'], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
+      ['Terreno', statusPt(topo.terrain_status)], ['Temp.', (tc => tc != null ? '≈ ' + A.num(tc, 0) + ' °C' : '—')(A.tempAt(A.T0 + (n ? n.t : 0)))], ['Ritmo', n ? A.num(n.speed, 1) + ' km/h' : '—']]
       .map(([a, b]) => `<div class="row"><span>${a}</span><b class="mono">${b}</b></div>`).join('') +
     (loc.lat != null ? `<div class="loc mono">${A.num(loc.lat, 4)}° N ${A.num(loc.lng, 4)}° L · ${A.num(loc.elevation_m, 0)} m</div>` : '');
   renderTarget();
   const hud = (t.hud_alerts || []).find(a => a.level === 'CRITICAL') || (t.hud_alerts || [])[0], al = $('#hudAlert');
   const nogo = st.verdict && !st.verdict.go ? (st.verdict.code === 'SLOPE'
-    ? `NO-GO · SLOPE OVERLOAD · com ${A.num(st.payloadKg, 1)} kg o limite cai para ${A.num(A.LIM.safe, 1)}°. Desvie por terreno plano ou reduza a carga.`
-    : `NO-GO · METABOLIC OVERLOAD · O₂ previsto na volta abaixo de 30% com ${A.num(st.payloadKg, 1)} kg. Reduza a carga ou encurte a rota.`) : null;
-  const msg = st.emerg ? 'EMERGÊNCIA · siga a rota tracejada até a base'
+    ? `NO-GO · com ${A.num(st.payloadKg, 1)} kg o limite de declive cai para ${A.num(A.LIM.safe, 1)}°. Desvie por terreno plano ou reduza a carga.`
+    : `NO-GO · com ${A.num(st.payloadKg, 1)} kg o O₂ fica abaixo de 30% na volta. Reduza a carga ou encurte a rota.`) : null;
+  const msg = st.emerg ? 'VOLTANDO À BASE · siga a rota tracejada'
     : nogo ? nogo : hud ? `${hud.code || 'ALERTA'} · ${hud.action || ''}` : meda.dust_storm_alert ? 'ALERTA DE POEIRA · valor de exemplo do contrato' : hasO2 && o2 < 30 ? 'OXIGÊNIO ABAIXO DE 30% · volte agora' : null;
   al.hidden = !msg; if (msg) al.textContent = msg;
   $('#hudOffline').hidden = st.linkState === 'online';

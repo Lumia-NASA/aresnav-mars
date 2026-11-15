@@ -76,7 +76,7 @@ function localAnswer(q) {
   }
   if (has('emerg', 'socorro', 'help', 'mayday')) {
     return s.emergency_return ? (E ? `Emergency return: ${s.emergency_return.distance_m} m, about ${s.emergency_return.minutes} min by the fastest route. Go now.` : `Retorno de emergência: ${s.emergency_return.distance_m} m, cerca de ${s.emergency_return.minutes} min pela rota mais rápida. Saia agora.`)
-      : (E ? 'Press Emergency to plot the fastest way back to the habitat.' : 'Aperte Emergência para traçar o caminho mais rápido até o habitat.');
+      : (E ? 'Press Return to base to plot the fastest way back to the habitat.' : 'Aperte Voltar à base para traçar o caminho mais rápido até o habitat.');
   }
   if (!v) return E ? 'Still loading the terrain.' : 'Ainda carregando o relevo.';
   return E ? `${v.level}. ${v.reasons.slice(0, 2).join('. ')}.${r ? ` ${r.distance_one_way_m} m one way, back at ${r.back_at_base} with ${r.o2_at_return_pct}% oxygen.` : ''}`
@@ -85,7 +85,7 @@ function localAnswer(q) {
 
 /* ---------- interface ---------- */
 const btn = document.createElement('button'); btn.className = 'ares-fab'; btn.id = 'aresFab'; btn.setAttribute('aria-expanded', 'false');
-btn.innerHTML = '<span class="dot"></span>ARES · IA';
+btn.innerHTML = '<span class="dot"></span>ARES';
 btn.title = 'Copiloto de apoio ao astronauta';
 const panel = document.createElement('section'); panel.className = 'ares'; panel.id = 'ares'; panel.hidden = true; panel.setAttribute('aria-label', 'Copiloto ARES');
 panel.innerHTML = `<header><b>ARES</b><small id="aresMode">Copiloto de apoio</small><button id="aresClose" aria-label="Fechar">✕</button></header>

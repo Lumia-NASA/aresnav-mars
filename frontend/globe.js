@@ -132,13 +132,13 @@ function flyJezero() {
 }
 
 function label(text, far, near) {
-  return { text: T(text), font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#e8ecf8'), showBackground: true,
+  return { text: T(text), font: '500 12px "IBM Plex Mono", monospace', fillColor: C.Color.fromCssColorString('#ECE6DC'), showBackground: true,
     backgroundColor: C.Color.fromCssColorString('rgba(10,13,20,.88)'), backgroundPadding: new C.Cartesian2(6, 4), pixelOffset: new C.Cartesian2(0, -20),
     heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 400000 * K,
     distanceDisplayCondition: new C.DistanceDisplayCondition((near || 0) * K / 1.88, far * K / 1.88) };
 }
 function point(color, size, fill) {
-  return { pixelSize: size, color: C.Color.fromCssColorString(fill || '#0A0D14'), outlineColor: C.Color.fromCssColorString(color), outlineWidth: 2,
+  return { pixelSize: size, color: C.Color.fromCssColorString(fill || '#12120F'), outlineColor: C.Color.fromCssColorString(color), outlineWidth: 2,
     heightReference: C.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: 400000 * K };
 }
 function line(coords, color, width, style) {
@@ -151,7 +151,7 @@ function line(coords, color, width, style) {
 function buildStatic() {
   const B = A.BOX;
   line([B.XMIN, B.YMIN, B.XMAX, B.YMIN, B.XMAX, B.YMAX, B.XMIN, B.YMAX, B.XMIN, B.YMIN], 'rgba(232,236,248,.45)', 1.5, 'dash');
-  viewer.entities.add({ position: C.Cartesian3.fromDegrees(77.4, 18.47), label: Object.assign(label('Cratera Jezero', 4e7, 250000), { pixelOffset: new C.Cartesian2(0, -14) }), point: point('#ff8a4c', 9, '#ff8a4c') });
+  viewer.entities.add({ position: C.Cartesian3.fromDegrees(77.4, 18.47), label: Object.assign(label('Cratera Jezero', 4e7, 250000), { pixelOffset: new C.Cartesian2(0, -14) }), point: point('#C46F4B', 9, '#C46F4B') });
   if (A.roverRuns) { // trajeto do rover com gradiente de perigo por declive
     const col = A.SLOPE_COL(), mars = A.cssv('--mars');
     let runs = A.roverRuns;
@@ -168,10 +168,10 @@ function buildStatic() {
     const e = viewer.entities.add({ position: C.Cartesian3.fromDegrees(p.lon, p.lat), point: point(A.KIND[p.k], 10), label: label(p.n, 26000) });
     (p.k === 'crism' ? ents.crism : ents.pois).push(e);
   });
-  ents.base = viewer.entities.add({ position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 12, '#e8ecf8'), label: label('BASE', 200000) });
-  ents.goal = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 13, A.cssv('--route')), label: label('DESTINO', 200000) });
-  ents.now = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 12, '#ffffff'), label: label('VOCÊ', 120000) });
-  ents.cam = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#0A0D14', 10, A.cssv('--blue')), label: label('VISTA DO CAPACETE', 60000) });
+  ents.base = viewer.entities.add({ position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#12120F', 12, '#ECE6DC'), label: label('BASE', 200000) });
+  ents.goal = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#12120F', 13, A.cssv('--route')), label: label('DESTINO', 200000) });
+  ents.now = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#12120F', 12, '#ffffff'), label: label('VOCÊ', 120000) });
+  ents.cam = viewer.entities.add({ show: false, position: C.Cartesian3.fromDegrees(A.BASE.lon, A.BASE.lat), point: point('#12120F', 10, A.cssv('--blue')), label: label('VISTA DO CAPACETE', 60000) });
 }
 
 /* ---------- Estruturas nos pontos de referência ----------
@@ -183,21 +183,21 @@ const SITE = {
   habitat(a) {
     a('ell', [0, 0, 0], { d: [5, 5, 3.6], c: '#e9e4da' });                                  // cúpula
     a('cyl', [8, 0, 1.5], { l: 8, rad: 1.6, p: 90, c: '#d9d4c8' }); a('cyl', [-1.5, 8, 1.5], { l: 8, rad: 1.6, r: 90, c: '#d9d4c8' }); // módulos
-    a('box', [13, 0, 1.3], { d: [2.4, 2.6, 2.6], c: '#b8b2a4' }); a('box', [14.3, 0, 1.1], { d: [0.15, 1.2, 2], c: '#ff8a4c' });   // câmara de ar e porta
+    a('box', [13, 0, 1.3], { d: [2.4, 2.6, 2.6], c: '#b8b2a4' }); a('box', [14.3, 0, 1.1], { d: [0.15, 1.2, 2], c: '#C46F4B' });   // câmara de ar e porta
     for (let i = 0; i < 4; i++) { a('box', [-10, -6.5 + i * 4.4, 1.6], { d: [3.2, 4, 0.12], p: -24, c: '#2a4fb0' }); a('cyl', [-10, -6.5 + i * 4.4, 0.7], { l: 1.4, rad: 0.08, c: '#9aa0ab' }); }
-    a('cyl', [5, 6, 5], { l: 10, rad: 0.12, c: '#cfd3da' }); a('ell', [5, 6, 10], { d: [1.3, 1.3, 0.35], p: 35, c: '#f2f2f2' }); a('ell', [5, 6, 10.9], { d: [0.2, 0.2, 0.2], c: '#ff3344' }); // mastro e antena
+    a('cyl', [5, 6, 5], { l: 10, rad: 0.12, c: '#cfd3da' }); a('ell', [5, 6, 10], { d: [1.3, 1.3, 0.35], p: 35, c: '#f2f2f2' }); a('ell', [5, 6, 10.9], { d: [0.2, 0.2, 0.2], c: '#D8664F' }); // mastro e antena
   },
   landing(a) {
     a('cyl', [0, 0, 0.03], { l: 0.06, rad: 9, c: 'rgba(255,138,76,.7)' }); a('cyl', [0, 0, 0.05], { l: 0.08, rad: 8.3, c: '#6b4633' });  // anel de pouso
     [[3, 2], [-3, 2], [3, -2], [-3, -2]].forEach(([x, y]) => a('cyl', [x, y, 0.08], { l: 0.06, rad: 1.3, c: '#2a1c16' }));              // marcas dos motores
     a('cyl', [0, 0, 2], { l: 4, rad: 0.42, rt: 0.12, n: 4, c: '#c9ccd4' });                                                            // marco
-    a('cyl', [2.6, 0, 2.6], { l: 5.2, rad: 0.05, c: '#cfd3da' }); a('box', [3.45, 0, 4.6], { d: [1.6, 0.05, 1], c: '#e8ecf8' });         // bandeira
+    a('cyl', [2.6, 0, 2.6], { l: 5.2, rad: 0.05, c: '#cfd3da' }); a('box', [3.45, 0, 4.6], { d: [1.6, 0.05, 1], c: '#ECE6DC' });         // bandeira
   },
   rochette(a) {
     a('ell', [0, 0, 0.35], { d: [1.7, 1.15, 0.8], h: 20, c: '#4a3a33' }); a('ell', [2.3, 0.9, 0.15], { d: [0.85, 0.6, 0.42], h: -30, c: '#57443a' }); a('ell', [-1.6, 1.5, 0.1], { d: [0.5, 0.42, 0.3], c: '#3f322c' });
     a('cyl', [-0.35, 0, 1.12], { l: 0.14, rad: 0.15, c: '#120c0a' }); a('cyl', [0.4, 0.12, 1.1], { l: 0.14, rad: 0.15, c: '#120c0a' }); // furos da broca
     a('cyl', [0.95, -0.35, 0.98], { l: 0.05, rad: 0.3, c: '#b9a595' });                                                                // área raspada
-    a('cyl', [-2.2, -1.2, 0.6], { l: 1.2, rad: 0.11, c: '#dfe3ea' }); a('cyl', [-2.2, -1.2, 1.25], { l: 0.14, rad: 0.14, c: '#ffb800' }); // tubo de amostra
+    a('cyl', [-2.2, -1.2, 0.6], { l: 1.2, rad: 0.11, c: '#dfe3ea' }); a('cyl', [-2.2, -1.2, 1.25], { l: 0.14, rad: 0.14, c: '#D8A74E' }); // tubo de amostra
   },
   strata(a) {
     const tones = ['#8f6a48', '#b98a5e', '#d2a878', '#a47a52'];
@@ -206,9 +206,9 @@ const SITE = {
   },
   organics(a) {
     a('box', [0, 0, 0.25], { d: [6, 3.6, 0.5], h: -12, c: '#b39a7c' }); a('box', [0.4, 0.2, 0.7], { d: [4.4, 2.6, 0.4], h: -12, c: '#c9b08f' }); a('box', [0.2, 0, 1.05], { d: [2.6, 1.6, 0.3], h: -12, c: '#a88c6c' });
-    a('cyl', [0, 0, 2.7], { l: 0.5, rad: 0.85, n: 6, c: '#00ffaa' });                                                      // anel de carbono
-    for (let i = 0; i < 6; i++) { const t = i * Math.PI / 3; a('ell', [Math.cos(t) * 1.35, Math.sin(t) * 1.35, 2.7], { d: [0.24, 0.24, 0.24], c: '#e8ecf8' }); }
-    a('cyl', [0, 0, 1.85], { l: 1.3, rad: 0.04, c: '#00ffaa' });
+    a('cyl', [0, 0, 2.7], { l: 0.5, rad: 0.85, n: 6, c: '#9DBB98' });                                                      // anel de carbono
+    for (let i = 0; i < 6; i++) { const t = i * Math.PI / 3; a('ell', [Math.cos(t) * 1.35, Math.sin(t) * 1.35, 2.7], { d: [0.24, 0.24, 0.24], c: '#ECE6DC' }); }
+    a('cyl', [0, 0, 1.85], { l: 1.3, rad: 0.04, c: '#9DBB98' });
   },
   depot(a) {
     for (let i = 0; i < 10; i++) {
@@ -255,7 +255,7 @@ function buildSites() {
         orientation: C.Transforms.headingPitchRollQuaternion(position, new C.HeadingPitchRoll(rad(o.h || 0), rad(o.p || 0), rad(o.r || 0))) }));
     };
     if (SITE[p.site]) SITE[p.site](add);
-    const c = A.KIND[p.k] || '#ffb800', top = (60 + ((i * 3) % 8) * 26) * S;
+    const c = A.KIND[p.k] || '#D8A74E', top = (60 + ((i * 3) % 8) * 26) * S;
     ents.beacons.push(viewer.entities.add({ show: false,
       polyline: { positions: [groundPos(p.lat, p.lon), groundPos(p.lat, p.lon, top)], width: 7, material: new C.PolylineGlowMaterialProperty({ color: col(c).withAlpha(0.85), glowPower: 0.22, taperPower: 0.9 }),
         distanceDisplayCondition: new C.DistanceDisplayCondition(120 * K, 4e5 * K) } }));
@@ -292,7 +292,7 @@ function drawTargets() {
   (ents.targets || []).forEach(e => viewer.entities.remove(e)); ents.targets = [];
   const list = (A.state.tele && A.state.tele.layers && A.state.tele.layers.science_targets) || [], show = A.layerState().poi;
   list.forEach(t => { if (typeof t.lat === 'number' && typeof t.lng === 'number')
-    ents.targets.push(viewer.entities.add({ show, position: C.Cartesian3.fromDegrees(t.lng, t.lat), point: point('#0A0D14', 12, A.KIND.target), label: label(`${t.id || 'WP'} · ${t.name || ''}`, 26000) })); });
+    ents.targets.push(viewer.entities.add({ show, position: C.Cartesian3.fromDegrees(t.lng, t.lat), point: point('#12120F', 12, A.KIND.target), label: label(`${t.id || 'WP'} · ${t.name || ''}`, 26000) })); });
 }
 let lastEm = null;
 function drawNow() {
