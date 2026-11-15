@@ -187,6 +187,7 @@ const LANDINGS = [
   ['Phoenix', 2008, 68.22, -125.75], ['Curiosity', 2012, -4.59, 137.44], ['Schiaparelli', 2016, -2.05, -6.21], ['InSight', 2018, 4.5, 135.62],
   ['Perseverance', 2021, 18.44, 77.45]
 ];
+A.LANDINGS = LANDINGS;
 let zones = [];
 async function loadZones() {
   try { const r = await fetch(`${A.API}/zones${A.state.forceOffline ? '?offline=1' : ''}`); if (r.ok) zones = (await r.json()).data || []; } catch (e) { zones = []; }

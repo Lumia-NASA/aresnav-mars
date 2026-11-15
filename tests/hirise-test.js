@@ -34,6 +34,19 @@ test('altura bilinear dentro de um bloco e entre dois blocos vizinhos', () => {
   const [lb, lb2] = llOf(11 * 256 + 0.2, 10 * 256 + 80); near(S.height(lb, lb2), f(2816.2, 2640), 0.06, 'na costura');
   assert.ok(isNaN(S.height(...llOf(12 * 256 + 5, 10 * 256 + 5))), 'fora dos blocos carregados');
 });
+test('alinhamento ao relevo de 200 m: tira o desvio de cada bloco sem criar degrau entre blocos', () => {
+  const S = H.Store(), coarse = () => -2500;
+  S.put(10, 10, tile(10, 10, () => -2520)); S.put(11, 10, tile(11, 10, () => -2510));   // 20 m e 10 m abaixo do relevo de 200 m
+  near(S.measureBias(10, 10, coarse), -20, 0.06); near(S.measureBias(11, 10, coarse), -10, 0.06);
+  near(S.aligned(...llOf(10 * 256 + 128, 10 * 256 + 128)), -2500, 0.1, 'centro do bloco volta ao nível do de 200 m');
+  near(S.aligned(...llOf(11 * 256 + 128, 10 * 256 + 128)), -2500, 0.1, 'centro do vizinho também');
+  // na costura o desvio é a média dos dois: a altura alinhada não salta (antes ficava um degrau de 10 m)
+  const a = S.aligned(...llOf(11 * 256 - 1.5, 10 * 256 + 128)), b = S.aligned(...llOf(11 * 256 + 1.5, 10 * 256 + 128));
+  near(S.biasPx(11 * 256, 10 * 256 + 128), -15, 0.1, 'desvio na costura');
+  assert.ok(Math.abs(S.biasPx(11 * 256 - 1.5, 10 * 256 + 128) - S.biasPx(11 * 256 + 1.5, 10 * 256 + 128)) < 0.2, 'desvio contínuo');
+  assert.ok(isFinite(a) && isFinite(b));
+  assert.strictEqual(S.biasPx(...[50 * 256, 50 * 256]), 0, 'sem bloco, sem desvio');
+});
 test('peso de mistura: 1 no miolo, cai a 0 na borda sem vizinho e não cai entre vizinhos carregados', () => {
   const S = H.Store(), f = () => -2550;
   S.put(10, 10, tile(10, 10, f)); S.put(11, 10, tile(11, 10, f));

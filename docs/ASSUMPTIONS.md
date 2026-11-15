@@ -17,6 +17,8 @@ The parameters live in `frontend/physics.js` (`SLOPE_RULE` and `ALGORITHM`, vers
 | Habitat antenna and helmet | 2 m and 1.7 m | design choice | assumption (a taller antenna changes the radio result a lot) |
 | Moving in the 3D terrain: on foot | eyes at 1.7 m, 0.8 m/s (Shift 1.6 m/s), 0.7 m stride | design choice, visualization only | assumption; does not feed the O₂ math or the verdict |
 | Moving in the 3D terrain: crewed rover | eyes at 2.4 m, 10 km/h (Shift 15 km/h), stops on climbs above 20° or side tilt above 25° | order of magnitude of pressurized rovers studied by NASA; AresNav values | **assumption**, visualization only; planning is still for a walk on foot |
+| Jump on foot (Space) | 1.6 m/s push-off, Mars gravity 3.71 m/s²: ~0.35 m and ~0.86 s in the air (Earth: 0.13 m, 0.33 s) | push-off speed is an AresNav value; gravity is the real Mars value | **assumption** for the push-off, visualization only |
+| Astronaut and rover in third person | built from simple shapes, ~1.9 m astronaut and ~5 m rover | illustrative | **illustration**, not a real suit or vehicle model |
 | Rocks and sand near the feet | drawn in the visor up to ~20 m | illustrative (orbital imagery does not show centimeter-sized rocks) | **illustration**, not data |
 | Terrain | HRSC + MOLA, 200 m per point | NASA Mars Trek | **real data**. Cannot see boulders or steps; sits on average 19 m above the elevation Perseverance measured at 613 stops (σ 19 m) |
 | Route corridor terrain | controlled HiRISE DTM, 1 m (JEZ_hirise_soc_006) | USGS Astrogeology / MRO HiRISE | **real data**. Slope measured over 5 m; the steep-stretch limit is the route limit. Differs from the 200 m terrain by 3 to 6 m at the base |

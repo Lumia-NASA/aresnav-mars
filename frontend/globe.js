@@ -13,7 +13,7 @@ const EYE = 1.7;           // altura dos olhos de um astronauta em pé, em metro
 let viewer = null, failed = false, C = null, buildImagery = null, makeTerrain = null;
 const layers = {}, ents = { route: [], pois: [], rover: [], crism: [] };
 const walk = { on: false, lat: 0, lon: 0, heading: 0, pitch: -3, alt: EYE, vel: 0, keys: {}, last: 0, sent: 0, off: null, pace: 'real', moving: false, speed: 0, gx: 0, gy: 0,
-  odo: 0, phase: 0, gz: null, yaw: 0, vp: 0, vr: 0, warn: null };
+  odo: 0, phase: 0, gz: null, yaw: 0, vp: 0, vr: 0, warn: null, person: 'first', jz: 0, jv: 0, jumpT: 0, jumpMax: 0, lastJump: null };
 /* Três jeitos de andar no Terreno 3D (hipóteses em docs/ASSUMPTIONS.md):
    a pé (pace 'real'): astronauta de traje, olhos a 1,7 m, 0,8 m/s (2,9 km/h), passos de 0,7 m;
    rover ('rover'): rover tripulado pressurizado, olhos a 2,4 m, 10 km/h de cruzeiro (Shift = 15 km/h), sobe até 20°;
@@ -325,9 +325,15 @@ function placeCamera(dt) {
     const a = Math.min(1, walk.speed / 2), t = performance.now() / 1000;
     pitch += walk.vp; roll = walk.vr; up = 0.008 * a * Math.sin(t * 2 * Math.PI * 7.3) * Math.sin(t * 2 * Math.PI * 1.1);
   }
+  if (walk.person === 'third' && walk.pace !== 'fast') {   // de fora: o astronauta (ou o rover) na tela, câmera atrás
+    const v = placeAvatar(base);
+    viewer.camera.setView({ destination: v.cam, orientation: { heading: v.heading, pitch: v.pitch, roll: 0 } });
+    return;
+  }
+  showAvatar(null);
   let lat = walk.lat, lon = walk.lon;
   if (side) { const r = Math.PI / 180, h = walk.heading * r; lat += -Math.sin(h) * side / (A.R_MARS * r); lon += Math.cos(h) * side / (A.R_MARS * r * Math.cos(lat * r)); }
-  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(lon, lat, base + (walk.alt + up) * K), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(pitch), roll: C.Math.toRadians(roll) } });
+  viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(lon, lat, base + (walk.alt + up + (walk.jz || 0)) * K), orientation: { heading: C.Math.toRadians(walk.heading), pitch: C.Math.toRadians(pitch), roll: C.Math.toRadians(roll) } });
 }
 /* Inclinação do rover sob as rodas: alturas 1,8 m à frente/atrás e 1,2 m dos lados (graus) */
 function tilt() {
@@ -339,6 +345,116 @@ function tilt() {
   const dr = (Number.isFinite(left) && Number.isFinite(right)) ? left - right : 0;
   return { pitch: Math.atan2(dp, 2 * L) / r, roll: Math.atan2(dr, 2 * W) / r };
 }
+
+/* ---------- Terceira pessoa: astronauta e rover vistos de fora ----------
+   Montados com formas simples (sem arquivo de modelo), cada peça é um Primitive movido por matriz a cada quadro.
+   O astronauta mexe pernas e braços pela fase da passada e pula com a gravidade de Marte; o rover inclina com o
+   chão e as rodas giram com a distância percorrida. Câmera atrás e acima (a pé) ou por cima (rover). */
+const G_MARS = 3.71, G_EARTH = 9.81, JUMP_V = 1.6;   // impulso vertical de um salto de traje (m/s): ~0,35 m em Marte, ~0,13 m na Terra
+const avatar = { astro: null, rover: null };
+/* a gradação de cor do visor (WALK_FS) puxa cores pouco saturadas para a paleta do solo: pré-compensa para o traje
+   sair branco e o rover cinza claro (mesma conta do shader, invertida por aproximação) */
+function gradeComp(hex) {
+  const c = C.Color.fromCssColorString(hex), t = [c.red, c.green, c.blue];
+  const ss = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const lo = [0.16, 0.085, 0.055], mid = [0.66, 0.38, 0.23], hi = [0.93, 0.76, 0.58];
+  const grade = s => {
+    const lum = 0.299 * s[0] + 0.587 * s[1] + 0.114 * s[2], sat = Math.max(...s) - Math.min(...s), k = Math.min(0.65, sat * 3);
+    return s.map((v, i) => { let r = lo[i] + (mid[i] - lo[i]) * ss(0, 0.55, lum); r += (hi[i] - r) * ss(0.5, 1, lum); return r * (1 - k) + v * k; });
+  };
+  let s = t.slice();
+  for (let i = 0; i < 60; i++) { const g = grade(s); s = s.map((v, j) => Math.max(0, Math.min(1, v + 0.7 * (t[j] - g[j])))); }
+  return new C.Color(s[0], s[1], s[2], 1);
+}
+const M3 = { x: a => C.Matrix3.fromRotationX(a), y: a => C.Matrix3.fromRotationY(a), z: a => C.Matrix3.fromRotationZ(a), get I() { return C.Matrix3.IDENTITY; },
+  mul: (...ms) => ms.reduce((acc, m) => C.Matrix3.multiply(acc, m, new C.Matrix3())) };
+const v3 = (m, p) => { const r = C.Matrix3.multiplyByVector(m, new C.Cartesian3(p[0], p[1], p[2]), new C.Cartesian3()); return [r.x, r.y, r.z]; };
+const add3 = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+function makeParts(defs) {
+  const fmt = C.PerInstanceColorAppearance.VERTEX_FORMAT;
+  return defs.map(d => {
+    const s = K, geometry = d.box ? C.BoxGeometry.fromDimensions({ vertexFormat: fmt, dimensions: new C.Cartesian3(d.box[0] * s, d.box[1] * s, d.box[2] * s) })
+      : d.ell ? new C.EllipsoidGeometry({ vertexFormat: fmt, radii: new C.Cartesian3(d.ell[0] * s, d.ell[1] * s, d.ell[2] * s), stackPartitions: 16, slicePartitions: 20 })
+      : new C.CylinderGeometry({ vertexFormat: fmt, length: d.cyl[0] * s, topRadius: d.cyl[1] * s, bottomRadius: d.cyl[1] * s, slices: 20 });
+    const prim = viewer.scene.primitives.add(new C.Primitive({ asynchronous: false, show: false,
+      geometryInstances: new C.GeometryInstance({ geometry, attributes: { color: C.ColorGeometryInstanceAttribute.fromColor(gradeComp(d.c)) } }),
+      appearance: new C.PerInstanceColorAppearance({ closed: true, translucent: false }) }));
+    return { prim, pose: d.pose };
+  });
+}
+/* astronauta: origem nos pés, x para a frente, y para a esquerda, z para cima (metros) */
+function buildAstro() {
+  const SUIT = '#ECE9E2', PACK = '#D6D1C6', DARK = '#5E5A55', GOLD = '#8A6524', defs = [];
+  const P = (part, c, pose) => defs.push(Object.assign({ c, pose }, part));
+  P({ box: [0.34, 0.5, 0.6] }, SUIT, s => ({ p: [0, 0, 1.2], R: M3.y(-s.lean) }));                       // tronco
+  P({ box: [0.24, 0.48, 0.62] }, PACK, s => ({ p: [-0.3, 0, 1.24], R: M3.y(-s.lean) }));                 // mochila de suporte de vida
+  P({ box: [0.07, 0.22, 0.14] }, DARK, s => ({ p: [0.2, 0, 1.3], R: M3.y(-s.lean) }));                   // painel de controle no peito
+  P({ ell: [0.17, 0.17, 0.18] }, SUIT, () => ({ p: [0.02, 0, 1.67], R: M3.I }));                         // capacete
+  P({ ell: [0.1, 0.14, 0.11] }, GOLD, () => ({ p: [0.1, 0, 1.66], R: M3.I }));                           // viseira dourada
+  P({ box: [0.28, 0.42, 0.16] }, SUIT, () => ({ p: [0, 0, 0.96], R: M3.I }));                            // quadril
+  [1, -1].forEach(sd => {
+    const leg = s => { const phi = s.A * Math.sin(Math.PI * s.ph) * sd, kap = s.knee * Math.max(0, Math.cos(Math.PI * s.ph) * sd) + 0.05;
+      const H = [0, 0.12 * sd, 0.92], R1 = M3.y(-phi), Kn = add3(H, v3(R1, [0, 0, -0.44])), R2 = M3.y(-(phi - kap));
+      return { H, R1, Kn, R2, An: add3(Kn, v3(R2, [0, 0, -0.44])) }; };
+    P({ cyl: [0.44, 0.095] }, SUIT, s => { const l = leg(s); return { p: add3(l.H, v3(l.R1, [0, 0, -0.22])), R: l.R1 }; });    // coxa
+    P({ cyl: [0.44, 0.085] }, SUIT, s => { const l = leg(s); return { p: add3(l.Kn, v3(l.R2, [0, 0, -0.22])), R: l.R2 }; });   // canela
+    P({ box: [0.3, 0.14, 0.12] }, DARK, s => { const l = leg(s); return { p: add3(l.An, [0.05, 0, 0.02]), R: M3.I }; });        // bota
+    const arm = s => { const psi = -0.6 * s.A * Math.sin(Math.PI * s.ph) * sd, S = [0, 0.33 * sd, 1.42], R1 = M3.mul(M3.x(0.12 * sd), M3.y(-psi));
+      const E = add3(S, v3(R1, [0, 0, -0.32])), R2 = M3.mul(M3.x(0.12 * sd), M3.y(-(psi + 0.35))); return { S, R1, E, R2 }; };
+    P({ cyl: [0.32, 0.075] }, SUIT, s => { const a = arm(s); return { p: add3(a.S, v3(a.R1, [0, 0, -0.16])), R: a.R1 }; });     // braço
+    P({ cyl: [0.3, 0.068] }, SUIT, s => { const a = arm(s); return { p: add3(a.E, v3(a.R2, [0, 0, -0.15])), R: a.R2 }; });     // antebraço
+    P({ ell: [0.075, 0.07, 0.08] }, PACK, s => { const a = arm(s); return { p: add3(a.E, v3(a.R2, [0, 0, -0.32])), R: a.R2 }; }); // luva
+  });
+  return makeParts(defs);
+}
+/* rover tripulado pressurizado (~5 m): origem no chão, no centro */
+function buildRover() {
+  const BODY = '#E4DFD5', FRAME = '#8C8780', DARK = '#2B2A2C', TIRE = '#4A4643', defs = [];
+  const P = (part, c, pose) => defs.push(Object.assign({ c, pose }, part));
+  P({ box: [4.6, 2.3, 0.45] }, FRAME, () => ({ p: [0, 0, 0.85], R: M3.I }));          // chassi
+  P({ box: [3.0, 2.15, 1.45] }, BODY, () => ({ p: [0.35, 0, 1.78], R: M3.I }));        // cabine pressurizada
+  P({ box: [0.1, 1.85, 0.75] }, DARK, () => ({ p: [1.88, 0, 1.98], R: M3.y(-0.25) })); // para-brisa
+  P({ box: [1.1, 1.7, 1.15] }, BODY, () => ({ p: [-1.75, 0, 1.62], R: M3.I }));        // câmara de ar traseira
+  P({ box: [0.12, 0.9, 0.9] }, '#C46F4B', () => ({ p: [-2.33, 0, 1.6], R: M3.I }));    // escotilha
+  P({ cyl: [1.1, 0.04] }, FRAME, () => ({ p: [0.9, 0.75, 3.05], R: M3.I }));           // mastro
+  P({ ell: [0.32, 0.32, 0.08] }, BODY, () => ({ p: [0.9, 0.75, 3.62], R: M3.y(0.5) })); // antena
+  [1.6, 0, -1.6].forEach(x => [1, -1].forEach(sd => {
+    const at = [x, 1.3 * sd, 0.5];
+    P({ cyl: [0.42, 0.5] }, TIRE, () => ({ p: at, R: M3.x(Math.PI / 2) }));                                   // roda
+    P({ box: [0.92, 0.44, 0.12] }, FRAME, s => ({ p: [x, 1.31 * sd, 0.5], R: M3.y(s.spin) }));                // aro: mostra a roda girando
+  }));
+  return makeParts(defs);
+}
+function showAvatar(which) {
+  ['astro', 'rover'].forEach(k => { if (avatar[k]) avatar[k].forEach(p => { p.prim.show = k === which; }); });
+}
+/* posiciona o avatar e devolve a câmera de perseguição (posição e orientação) */
+function placeAvatar(base) {
+  const rover = walk.pace === 'rover', key = rover ? 'rover' : 'astro';
+  if (!avatar[key]) avatar[key] = rover ? buildRover() : buildAstro();
+  showAvatar(key);
+  const feet = C.Cartesian3.fromDegrees(walk.lon, walk.lat, base + (walk.jz || 0) * K);
+  const enu = C.Transforms.eastNorthUpToFixedFrame(feet), Renu = C.Matrix4.getMatrix3(enu, new C.Matrix3());
+  const rad = Math.PI / 180, Rh = M3.z((90 - walk.heading) * rad);
+  const Rbody = rover ? M3.mul(Rh, M3.y(-walk.vp * rad), M3.x(walk.vr * rad)) : Rh;
+  const a = Math.min(1, walk.speed / FOOT.cruise), air = (walk.jz || 0) > 0.02;
+  const st = { ph: walk.phase, A: (air ? 0.25 : 0.42) * a + (air ? 0.15 : 0), knee: 0.6 * a + (air ? 0.4 : 0), lean: 0.07 * a, spin: -(walk.odo / 0.5) };
+  avatar[key].forEach(part => {
+    const ps = part.pose(st), Rw = M3.mul(Renu, Rbody, ps.R), local = v3(Rbody, ps.p).map(v => v * K);
+    const pos = C.Matrix4.multiplyByPoint(enu, new C.Cartesian3(local[0], local[1], local[2]), new C.Cartesian3());
+    part.prim.modelMatrix = C.Matrix4.fromRotationTranslation(Rw, pos, part.prim.modelMatrix);
+  });
+  // câmera: atrás e acima, girando com o rumo; arrastar para cima/baixo muda a altura da câmera
+  const D = rover ? 14 : 5.4, el = Math.max(4, Math.min(75, (rover ? 34 : 14) - walk.pitch - 3)) * rad, look = rover ? 1.2 : 1.1;
+  const fwd = [Math.sin(walk.heading * rad), Math.cos(walk.heading * rad)];
+  let off = [-fwd[0] * D * Math.cos(el), -fwd[1] * D * Math.cos(el), look + D * Math.sin(el)];
+  let cam = C.Matrix4.multiplyByPoint(enu, new C.Cartesian3(off[0] * K, off[1] * K, off[2] * K), new C.Cartesian3());
+  // não deixa a câmera entrar no morro atrás de quem anda
+  const cc = C.Cartographic.fromCartesian(cam), gh = A.heightAt(C.Math.toDegrees(cc.latitude), C.Math.toDegrees(cc.longitude)) * VS;
+  if (cc.height < gh + 0.8 * K) cam = C.Cartesian3.fromRadians(cc.longitude, cc.latitude, gh + 0.8 * K);
+  return { cam, heading: walk.heading * rad, pitch: -Math.atan2(off[2] - look, D * Math.cos(el)) };
+}
+function setPerson(p) { walk.person = p === 'third' ? 'third' : 'first'; if (walk.person === 'first' || walk.pace === 'fast') showAvatar(null); }
 /* Acabamento da vista do chão: céu marciano, poeira que cresce com a distância, cor de Marte sobre a
    imagem orbital (que vem em tons de cinza) e um granulado fino no solo perto dos pés. Roda na placa de vídeo. */
 const WALK_FS = `
@@ -381,7 +497,7 @@ void main() {
     col = mix(ramp, src, clamp(sat * 3.0, 0.0, 0.65));
     // relevo perto dos pés: normal do chão reconstruída da profundidade dos pixels vizinhos, iluminada pelo sol do céu
     // (sem isso o relevo de 1 m só aparece pelas sombras da foto orbital, que tem outro sol)
-    float nearF = exp(-dist / 320.0);
+    float nearF = exp(-dist / 320.0), flatUp = 1.0;
     if (nearF > 0.02) {
       vec2 px = 1.0 / czm_viewport.zw;
       float dR = czm_unpackDepth(texture(depthTexture, v_textureCoordinates + vec2(px.x, 0.0)));
@@ -393,6 +509,7 @@ void main() {
         float lim = length(p0) * 0.02;                                   // borda de silhueta: não sombreia
         if (length(a) < lim && length(b) < lim) {
           vec3 n = normalize(cross(a, b));
+          flatUp = smoothstep(0.55, 0.85, abs(dot(n, normalize(czm_viewRotation * up))));   // chão (virado para cima), não o astronauta nem o rover
           vec3 sunEye = normalize(czm_viewRotation * sunDir);
           float ndl = clamp(dot(n, sunEye), 0.0, 1.0), flatL = clamp(dot(normalize(czm_viewRotation * up), sunEye), 0.2, 1.0);
           col *= mix(1.0, clamp(0.55 + 0.6 * ndl / flatL, 0.45, 1.35), 0.6 * nearF);
@@ -404,7 +521,7 @@ void main() {
     col *= 1.0 + (grain - 0.5) * 0.5 * exp(-dist / 140.0);
     // detalhe perto dos pés (a foto orbital não tem): ondulações de areia, seixos e pedras soltas com sombra do sol do céu.
     // Ilustrativo, dá a escala do chão; some com a distância e só aparece onde se olha para baixo (chão, não paredes).
-    float nearD = exp(-dist / 22.0) * smoothstep(0.05, 0.25, -sinEl);
+    float nearD = exp(-dist / 22.0) * smoothstep(0.05, 0.25, -sinEl) * flatUp;
     if (nearD > 0.02) {
       vec2 sg = normalize(vec2(dot(sunDir, u_east), dot(sunDir, u_north)) + 1e-4);
       float rip = sin(dot(g, vec2(0.83, 0.56)) * 9.0 + vnoise(g * 0.8) * 5.0);
@@ -567,6 +684,12 @@ function step() {
   }
   if (Math.abs(walk.vel) > 0.005) { move(walk.vel * dt); walk.odo += Math.abs(walk.vel * dt); walk.phase += Math.abs(walk.vel * dt) / FOOT.stride; }
   walk.moving = Math.abs(walk.vel) > 0.05; walk.speed = Math.abs(walk.vel);
+  // salto (a pé): impulso de 1,6 m/s e queda com a gravidade de Marte (3,71 m/s²), ~2,6x mais alto e mais longo que na Terra
+  if (foot && k.jump && walk.jz <= 0 && walk.jv <= 0) { walk.jv = JUMP_V; walk.jumpT = 0; walk.jumpMax = 0; }
+  if (walk.jv > 0 || walk.jz > 0) {
+    walk.jv -= G_MARS * dt; walk.jz = Math.max(0, walk.jz + walk.jv * dt); walk.jumpT += dt; walk.jumpMax = Math.max(walk.jumpMax, walk.jz);
+    if (walk.jz === 0) { walk.jv = 0; walk.lastJump = { h: walk.jumpMax, t: walk.jumpT }; }
+  }
   placeCamera(dt); fxFrame();
   // céu: caramelo perto do chão, escurecendo até o preto do espaço conforme a pessoa sobe
   viewer.scene.backgroundColor = C.Color.lerp(C.Color.BLACK, SKY || (SKY = C.Color.fromCssColorString('#cfa67f')), Math.max(0, 1 - walk.alt / 30000), new C.Color());
@@ -575,7 +698,7 @@ function step() {
 function enterWalk(host, lat, lon, heading) {
   init(); if (!viewer) return false;
   viewer.camera.cancelFlight();
-  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now(), moved: false, gz: null, yaw: 0, vp: 0, vr: 0, warn: null, odo: 0 });
+  Object.assign(walk, { on: true, lat, lon, heading, pitch: -3, vel: 0, keys: {}, last: performance.now(), moved: false, gz: null, yaw: 0, vp: 0, vr: 0, warn: null, odo: 0, jz: 0, jv: 0 });
   setEx(1);                                   // no chão a escala é sempre real
   viewer.camera.frustum.near = 0.2 * K;       // deixa ver o chão a 1,7 m sem cortar
   if ('renderable' in viewer.scene.fog) viewer.scene.fog.renderable = false;   // a névoa do Cesium escurece o horizonte; o filtro do capacete faz a dele
@@ -589,7 +712,7 @@ function enterWalk(host, lat, lon, heading) {
 }
 function exitWalk() {
   if (!walk.on) return;
-  walk.on = false; if (walk.off) walk.off();
+  walk.on = false; if (walk.off) walk.off(); showAvatar(null);
   const home = $('#view-globe'); home.insertBefore($('#globe'), home.firstChild);
   viewer.scene.screenSpaceCameraController.enableInputs = true;
   fxOff();
@@ -624,7 +747,7 @@ A.globe = {
   /* Para a alguns passos ao sul do ponto, olhando para ele */
   visit(p) { const back = ({ habitat: 24, landing: 20, crystals: 22, depot: 17, strata: 15 }[p.site] || 9) * EYE / 1.7; walk.lat = p.lat - back / (A.R_MARS * Math.PI / 180); walk.lon = p.lon; walk.heading = 0; walk.pitch = -6; walk.vel = 0; walk.gz = null; },
   look(dAz, dEl) { walk.heading = (walk.heading + dAz + 360) % 360; walk.pitch = Math.max(-85, Math.min(60, walk.pitch + dEl)); },
-  setAlt, EYE, ALT_MAX, ROVER, FOOT,
+  setAlt, EYE, ALT_MAX, ROVER, FOOT, setPerson, G_MARS, G_EARTH, JUMP_V,
   setExaggeration(v) { userEx = v; if (!walk.on) setEx(v); return EX; },
   get exaggeration() { return userEx; },
   stepBy(m) { move(m); },
