@@ -1,87 +1,91 @@
-# AresNav · Trilha Jezero (frontend)
+# AresNav · Jezero Trail (frontend)
 
-Controle de missão para caminhadas de astronautas na Cratera Jezero, em Marte. Projeto para o desafio de Marte do NASA Space Apps Challenge 2026.
+Mission control for astronaut walks in Jezero Crater, on Mars. Built for the Mars challenge of the NASA Space Apps Challenge 2026.
 
-Escolha um destino e o app traça a rota a pé a partir da base. Ele calcula distância, tempo, oxigênio e horários, monta um checklist GO / NO-GO e sugere paradas científicas. A caminhada pode ser simulada do começo ao fim com o botão ▶.
+Pick a destination and the app plots the walking route from the base. It computes distance, time, oxygen and schedule, builds a GO / NO-GO checklist and suggests science stops. The walk can be simulated from start to finish with the ▶ button.
 
-## Regra de ouro: tudo passa pelo backend
+## Golden rule: everything goes through the backend
 
-O navegador **nunca chama a NASA direto** (skill `01-frontend-hud-skill`). Imagens, relevo, trajeto, minerais, fotos e telemetria vêm do backend AresNav, que repassa os dados da NASA, valida e guarda em cache:
+The browser **never calls NASA directly** (skill `01-frontend-hud-skill`). Imagery, terrain, traverse, minerals, photos and telemetry come from the AresNav backend, which relays NASA's data, validates it and caches it:
 
-| O que | Rota do backend |
+| What | Backend route |
 |---|---|
-| Telemetria unificada (`CONTRATO_API.json`) | `/api/v1/telemetry` |
-| Trajeto do Perseverance | `/api/v1/traverse` |
-| Blocos de imagem do Mars Trek | `/api/v1/tiles/:camada/:z/:y/:x` |
-| Relevo de Jezero (200 m) | `/api/v1/dem/jezero` |
-| Relevo de qualquer lugar de Marte | `/api/v1/dem/patch/:lat/:lon` |
-| Minerais hidratados (CRISM) | `/api/v1/crism` |
-| Fotos da Navcam | `/api/v1/navcam/...` |
+| Unified telemetry (`CONTRATO_API.json`) | `/api/v1/telemetry` |
+| Perseverance traverse | `/api/v1/traverse` |
+| Mars Trek image tiles | `/api/v1/tiles/:layer/:z/:y/:x` |
+| Jezero terrain (200 m) | `/api/v1/dem/jezero` |
+| 1 m HiRISE terrain along the route | `/api/v1/dem/hirise/:tx/:ty` |
+| Terrain anywhere on Mars | `/api/v1/dem/patch/:lat/:lon` |
+| Hydrated minerals (CRISM) | `/api/v1/crism` |
+| Navcam photos | `/api/v1/navcam/...` |
 
-Se o backend cair ou responder `degraded: true`, o app entra em **redundância local** e mostra `OFFLINE TELEMETRY (CACHED)`: usa a última telemetria guardada, o relevo e o trajeto da pasta `data/` e um conjunto pequeno de imagens em `data/tiles/`. As fotos do rover e o zoom de alta resolução só funcionam com o backend.
+If the backend goes down or answers `degraded: true`, the app switches to **local redundancy** and shows `OFFLINE TELEMETRY (CACHED)`: it uses the last stored telemetry, the terrain and traverse in the `data/` folder and a small set of images in `data/tiles/`. Rover photos and high-resolution zoom only work with the backend.
 
-## Idiomas
+## Language
 
-A interface abre em **inglês** (idioma da submissão) e tem **português** pelo botão no canto superior direito. A escolha fica guardada no navegador; também dá para forçar com `?lang=en` ou `?lang=pt` no endereço. Números, datas, pontos cardeais e o aviso por voz acompanham o idioma. O código escreve os textos em português e `i18n.js` traduz o que entra na tela.
+The interface is **English only**, as the submission rules require. The code writes its texts in Portuguese and `i18n.js` translates everything that reaches the screen (texts, tooltips, labels, the copilot voice and canvas drawings). The language is fixed: there is no switch, and a language saved in the browser by an older version is ignored.
 
-## Descer em qualquer lugar de Marte
+## Land anywhere on Mars
 
-1. Clique no bonequinho (canto inferior direito) e depois em qualquer ponto do globo ou do mapa. Ou use a busca e desça lá.
-2. O app pede ao backend o relevo real do lugar (`/api/v1/dem/patch/:lat/:lon`: blocos de 2° × 2°, HRSC + MOLA, cerca de 230 m por ponto) e põe a câmera a 1,7 m do chão, em **escala real**.
-3. No Capacete, modo Terreno 3D:
-   - **Passo real:** 2,9 km/h a 1,7 m do chão (Shift = 5,8 km/h).
-   - **Visualização:** `E` sobe, `Q` desce (ou a roda do mouse, ou o controle "Altura", de 1,7 m a 20 km); a velocidade cresce com a altura.
-   - O rodapé do visor mostra latitude, longitude, altitude do chão, sua altura e o declive local, tudo calculado do relevo da NASA.
+1. Click the little astronaut (bottom right corner) and then any point on the globe or the map. Or use the search and land there.
+2. The app asks the backend for the real terrain of the place (`/api/v1/dem/patch/:lat/:lon`: 2° × 2° blocks, HRSC + MOLA, about 230 m per point) and puts the camera 1.7 m above the ground, at **real scale**.
+3. In the Helmet view, 3D terrain mode, there are three ways to move:
+   - **On foot:** a suited astronaut with eyes at 1.7 m, 2.9 km/h (Shift = 5.8 km/h), with a natural step and head bob.
+   - **Rover:** a crewed rover with eyes at 2.4 m, 10 km/h (Shift = 15 km/h). It tilts with the ground and stops on climbs above 20°.
+   - **Free flight:** `E` climbs, `Q` descends (or the mouse wheel, or the "Height" slider, from 1.7 m to 20 km); speed grows with height.
+   - The visor footer shows latitude, longitude, ground elevation, your height and the local slope, all computed from NASA's terrain.
 
-No globo, o relevo também está em escala real; o botão `1×` / `2,5×` exagera a altura só para leitura na vista de cima. No chão a escala é sempre 1×. Como HiRISE e CTX são imagens em tons de cinza, o modo de caminhada aplica um filtro que pinta os cinzas com a paleta do solo marciano.
+On the globe the terrain is also at real scale; the `1×` / `2.5×` button exaggerates height only for reading the view from above. On the ground the scale is always 1×. Because HiRISE and CTX are grayscale images, walking mode applies a filter that paints the grays with the Martian soil palette.
 
 ## Interface
 
-O mapa ocupa a tela toda e os painéis flutuam por cima, no formato dos exploradores de planeta:
+The map fills the screen and the panels float on top, like planet explorers do:
 
-- **Barra superior:** busca de lugares em Marte (nome ou "lat, lon"; atalho `/`), troca de modo, Telemetria e Dados.
-- **Painel esquerdo (Conteúdo da missão):** checklist de saída, carga do traje, camadas e destinos. Recolhe pela aba lateral.
-- **Painel direito (Plano da caminhada):** veredito, números da rota, perfil de altitude, horários, alertas e paradas.
-- **Canto inferior direito:** entrar no capacete, alternar 3D/2D, apontar para o norte e zoom.
-- **Canto inferior esquerdo:** troca rápida da imagem de fundo.
-- **Barra de baixo:** simulação da caminhada, corte de enlace e emergência; no rodapé, a posição sob o cursor e a altitude da câmera.
+- **Top bar:** search for places on Mars (name or "lat, lon"; shortcut `/`), mode switch, Telemetry, Landmarks, ARES and Data.
+- **Left panel (Mission content):** pre-walk checklist, suit payload, layers and destinations. It folds away with the side tab.
+- **Right panel (Walk plan):** verdict, route numbers, elevation profile, schedule, alerts and stops.
+- **Bottom right corner:** enter the Helmet view, switch 3D/2D, point north and zoom.
+- **Bottom left corner:** quick switch of the background image.
+- **Bottom bar:** walk simulation, the link cut and **Return to base**; in the footer, the position under the cursor and the camera altitude.
 
-## Modos de operação
+The look follows the team's landing page: warm charcoal, ivory and terracotta, Manrope for text and small uppercase mono labels. Muted green, ochre and brick appear only as status (GO / CAUTION / NO-GO).
 
-O botão no topo alterna entre os dois modos pedidos pela skill:
+## Operating modes
 
-- **`[ HABITAT PLANNER ]`**: visão ampla para planejar a rota. Tem três abas:
-  - **Globo 3D**: Marte inteiro em CesiumJS, com o elipsoide marciano (3396,2 / 3376,2 km), relevo real e as imagens de alta resolução de Jezero.
-  - **Mapa**: mapa 2D (Leaflet) com as mesmas camadas.
-  - **Telemetria**: mostradores e gráficos da caminhada, mais os blocos do contrato (ambiente MEDA, mobilidade, topografia, posição).
-- **`[ HELMET HUD ]`**: interface compacta de dentro do visor. Mostra o que vem do contrato (O₂, dupla, rover de apoio, carga do traje, declive e limite seguro, MEDA, alertas) sobre a vista de Marte. A vista tem duas fontes: **Fotos do rover** (panoramas reais da Navcam; dá pra andar pelo caminho do rover) e **Terreno 3D** (gerado só com dados orbitais, funciona em Marte inteiro).
+The button at the top switches between the two modes the skill asks for:
 
-Outros componentes:
+- **`HABITAT PLANNER`**: a wide view for planning the route. It has three tabs:
+  - **3D globe**: all of Mars in CesiumJS, with the Martian ellipsoid (3396.2 / 3376.2 km), real terrain and the high-resolution images of Jezero.
+  - **Map**: a 2D map (Leaflet) with the same layers.
+  - **Telemetry**: gauges and charts of the walk, plus the contract blocks (MEDA environment, mobility, topography, position).
+- **`HELMET HUD`**: a compact interface from inside the visor. It shows what comes from the contract (O₂, buddy, support rover, suit payload, slope and safe limit, alerts) over the view of Mars. The view has two sources: **Rover photos** (real Navcam panoramas; you can walk along the rover's path, and the **Mastcam-Z 360°** button opens the nearest color panorama) and **3D terrain** (built only from orbital data, works anywhere on Mars).
 
-- **Pop-up "1st Person Ground Truth"**: clicar em qualquer alvo científico ou ponto de interesse abre a foto real de solo tirada pelo Perseverance (`optical_first_person_url` do contrato; se não houver, a foto da Navcam mais próxima), com posição, altitude, declive, mineral e contexto geológico.
-- **Rotas com gradiente de perigo**: a rota a pé e o trajeto do rover são coloridos pelo declive (verde até 4°, âmbar de 4° a 8°, vermelho acima de 8°).
-- **Carga do traje**: o limite de declive seguro vem do contrato (`max_safe_slope_deg`, 12° com 18,5 kg; 15° sem carga) e é o limite usado no cálculo da rota.
-- **HUD a 1 Hz**: os textos do HUD e da telemetria atualizam uma vez por segundo.
-- **Roteiro passo a passo**: cada trecho da caminhada com rumo, distância, tempo, hora de chegada, oxigênio previsto e declive máximo.
-- **Voz do copiloto**: o aviso de NO-GO usa a melhor voz instalada no navegador para o idioma (as "Natural"/"Neural" soam bem melhor), com um bipe de rádio antes.
+Other components:
 
-## Como rodar
+- **"1st Person Ground Truth" pop-up**: clicking any science target or point of interest opens the real ground photo taken by Perseverance (`optical_first_person_url` from the contract; if missing, the nearest Navcam photo), with position, elevation, slope, mineral and geological context.
+- **Routes colored by danger**: the walking route and the rover traverse are colored by slope (green up to 4°, amber from 4° to 8°, red above 8°).
+- **Suit payload**: the safe slope limit comes from the contract (`max_safe_slope_deg`, 12° with 18.5 kg; 15° with no payload) and is the limit used in the route calculation.
+- **HUD at 1 Hz**: the HUD and telemetry texts update once per second.
+- **Step-by-step itinerary**: each leg of the walk with heading, distance, time, arrival time, forecast oxygen and maximum slope.
+- **Copilot voice**: ARES speaks with the natural female English voice when the browser has one (Google US English in Chrome; Aria, Jenny, Ava or Emma in Edge), with a radio beep first.
 
-1. Ligue o backend (porta 3000):
+## How to run
+
+1. Start the backend (port 3000):
 
 ```bash
 cd backend && npm install && npm start
 ```
 
-2. Sirva o frontend (porta 5183, que já está liberada no CORS do backend):
+2. Serve the frontend (port 5183, already allowed in the backend's CORS):
 
 ```bash
 cd frontend && python -m http.server 5183
 ```
 
-3. Abra http://localhost:5183.
+3. Open http://localhost:5183.
 
-**Porta única (produção / VPS):** o backend também serve o frontend. Basta ligar o backend e abrir http://localhost:3000. Nesse caso a API é chamada na mesma origem, sem CORS. Com Docker, a partir da raiz do repositório:
+**Single port (production / VPS):** the backend also serves the frontend. Just start the backend and open http://localhost:3000. In that case the API is called on the same origin, with no CORS. With Docker, from the repository root:
 
 ```bash
 docker build -t aresnav .
@@ -91,141 +95,141 @@ docker build -t aresnav .
 docker run -d -p 3000:3000 --read-only --tmpfs /tmp --security-opt=no-new-privileges:true --cap-drop=ALL --user 1000:1000 aresnav
 ```
 
-Para apontar para outro endereço de backend, defina `window.ARESNAV_API` em `config.js`. Se usar outra porta para o frontend em desenvolvimento, inclua a origem em `ALLOWED_ORIGIN` no `.env` do backend.
+To point to another backend address, set `window.ARESNAV_API` in `config.js`. If you use another port for the frontend during development, add that origin to `ALLOWED_ORIGIN` in the backend's `.env`.
 
-## Demonstração para os jurados
+## Demo for the judges
 
-- **Carga do traje:** o slider "Carga de amostras e equipamento" (0 a 25 kg) muda na hora o limite de declive (`max(8, 15 − 0,2 × kg)`) e o consumo (`1 + 0,018 × kg`). A rota é recalculada; se não houver caminho dentro do limite ou o oxigênio previsto na volta cair abaixo de 30%, o veredito vira `[ NO-GO: SLOPE OVERLOAD ]` ou `[ NO-GO: METABOLIC OVERLOAD ]`, o visor alerta e o navegador fala o aviso. As fórmulas estão em `physics.js` e têm testes em `tests/physics-test.js`.
-- **Corte de enlace:** o botão `[ 🟢 UPLINK: NASA LIVE ]`, ao lado do ▶, simula a queda da comunicação Terra–Marte. O app passa a usar só dados locais e o cache do backend, e a navegação continua funcionando.
-- **Squad Mesh Link:** no Capacete, o painel da esquerda mostra você, o parceiro (a distância oscila durante a simulação) e o rover de apoio com a distância até o ponto de extração.
-- **Passo real:** no Terreno 3D do Capacete, "Passo real" anda a 2,9 km/h (5,8 com Shift), como um astronauta de traje; "Visualização" é o sobrevoo rápido. A simulação da caminhada tem 1× (tempo real), 60× e 360×.
-- **Procedência:** o rodapé mostra de onde vêm os dados e o selo SHA-256 do EvidenceGate lido do backend.
+- **Suit payload:** the "Samples and equipment payload" slider (0 to 25 kg) instantly changes the slope limit (`max(8, 15 − 0.2 × kg)`) and the consumption (`1 + 0.018 × kg`). The route is recomputed; if there is no path within the limit or the oxygen forecast on return drops below 30%, the verdict becomes `NO-GO · too steep` or `NO-GO · not enough O₂`, the visor shows an alert and the browser speaks the warning. The formulas are in `physics.js` and are tested in `tests/physics-test.js`.
+- **Link cut:** the **NASA link · live** button, next to ▶, simulates the Earth–Mars link going down. The app switches to local data and the backend cache only, and navigation keeps working.
+- **Crew:** in the Helmet view, the left panel shows you, your buddy (distance from the contract, a sample value) and the support rover with the computed distance to the extraction point.
+- **Ways to move:** in the Helmet's 3D terrain, **On foot**, **Rover** and **Free flight** (see above). The walk simulation runs at 1× (real time), 60× and 360×.
+- **Provenance:** the footer shows where the data comes from and the EvidenceGate SHA-256 seal read from the backend.
 
-## Segurança da caminhada e copiloto (PR #4)
+## Walk safety and copilot
 
-Ideias tiradas de MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin e NASA SUITS, implementadas com os nossos dados:
+Ideas taken from MMGIS, ATLAS, Marswalk Planner, MIT SEXTANT, FU Berlin and NASA SUITS, implemented with our own data:
 
-- **Veredito em 3 níveis** (`GO`, `CAUTION`, `NO-GO`). O botão **[ WHY? ]** mostra:
-  - os motivos com os números (por exemplo `Max slope 14.2° exceeds 12.0° limit for 15.0 kg payload`);
-  - o tempo de ida e de volta, que são diferentes porque a subida da ida vira descida na volta (função de Tobler com a massa do traje);
-  - o **ponto de retorno**: até onde dá para ir e ainda voltar com 30% de O₂;
-  - a nota de calibração. O app compara o nosso relevo com a altitude medida pelo Perseverance em cada parada da rota oficial. Hoje dá **613 paradas, desvio médio de +19,2 m, σ 19,1 m (RMS 27,1 m)**. O número é calculado ao vivo, não é fixo.
-- **Rádio:** linha de visada do habitat (antena a 2 m) até o capacete (1,7 m), pelo relevo real e com a curvatura de Marte, como a ferramenta Sightline do MMGIS. Fica verde (`DIRECT UHF`) ou âmbar (`TERRAIN OCCLUDED -> RELAY MRO`) na barra de estado e na Telemetria.
-- **Selos de procedência** em cada número da Telemetria: `MEASURED` (MEDA, paradas do rover), `DEM-DERIVED` (relevo) ou `SIMULATED` (modelo do traje).
-- **[ ⬇ EXPORT GEOJSON ]:** baixa `aresnav-mission-plan.geojson` com:
-  - a rota, as paradas e o ponto de retorno;
-  - o veredito, os motivos e a carga;
-  - o rádio, a calibração e a hora de Marte;
-  - o hash SHA-256 da telemetria e do próprio plano.
-- **No mapa e no globo:**
-  - **rota curta x segura:** a rota direta perigosa em vermelho tracejado e o desvio seguro em verde;
-  - **alcance a pé** de 15 e 30 min a partir da base;
-  - **ciência alcançável:** quais alvos dá para visitar com a carga atual;
-  - **nível do antigo lago** de Jezero (cota de −2400 m, aproximada).
-- **Marte inteiro (como no ATLAS):**
-  - poeira (MGS TES), firmeza do solo (inércia térmica, MGS TES) e rugosidade (MGS MOLA);
-  - 14 locais de pouso e as 51 zonas de exploração humana do workshop da NASA de 2015;
-  - grade de 10° e o **sol de agora**: dia e noite reais pela hora de Marte.
-- **Relógio de Marte** na barra de estado: hora solar local em Jezero (LMST), sol da missão Mars 2020 e Ls. Usa o algoritmo do Mars24 da NASA GISS.
-- **Capacete:**
-  - **[ 👁️ VIEW: ENHANCED GEOLOGY ]:** falsa cor que realça afloramentos;
-  - **[ 🔊 MARS WIND AMBIENCE ]:** vento de Marte gerado no navegador (ruído filtrado de 180 a 320 Hz, que acompanha o vento do MEDA).
-- **ARES, copiloto com IA** (botão no topo). Pergunte por texto ou voz: "posso sair?", "onde viro para voltar?", "o rádio pega?".
-  - O app manda ao backend um resumo do estado da caminhada, e o backend consulta o Claude (`claude-opus-5-5`, com fallback do servidor se o modelo recusar).
-  - A resposta é falada pelo rádio do capacete.
-  - Sem chave da API, ou sem rede, o ARES responde no **modo local**, com as mesmas contas do app.
-  - Para ligar a IA, ponha `ANTHROPIC_API_KEY` no `backend/.env`.
+- **Three-level verdict** (`GO`, `CAUTION`, `NO-GO`). The **Why?** button shows:
+  - the reasons with numbers (for example `Max slope 14.2° exceeds 12.0° limit for 15.0 kg payload`);
+  - the time out and the time back, which differ because the climb on the way out becomes a descent on the way back (Tobler's function with the suit mass);
+  - the **turn-back point**: how far you can go and still return with 30% O₂;
+  - the calibration note. The app compares our terrain with the elevation Perseverance measured at each stop of the official route. Today that is **613 stops, mean offset +19.2 m, σ 19.1 m (RMS 27.1 m)**. The number is computed live, not hard-coded.
+- **Radio:** line of sight from the habitat (2 m antenna) to the helmet (1.7 m), over the real terrain and including Mars' curvature, like the MMGIS Sightline tool. It shows `DIRECT UHF` or `TERRAIN OCCLUDED -> RELAY MRO` in the status bar and in Telemetry.
+- **Provenance labels** on every Telemetry number: `MEASURED` (MEDA, rover stops), `DEM-DERIVED` (terrain) or `SIMULATED` (suit model).
+- **Export GeoJSON:** downloads `aresnav-mission-plan.geojson` with:
+  - the route, the stops and the turn-back point;
+  - the verdict, the reasons and the payload;
+  - the radio, the calibration and the Mars time;
+  - the SHA-256 hash of the telemetry and of the plan itself.
+- **On the map and the globe:**
+  - **short vs. safe route:** the dangerous direct route in dashed red and the safe detour in green;
+  - **walking reach** of 15 and 30 min from the base;
+  - **reachable science:** which targets can be visited with the current payload;
+  - **level of the ancient lake** of Jezero (−2400 m, approximate).
+- **All of Mars (as in ATLAS):**
+  - dust (MGS TES), soil firmness (thermal inertia, MGS TES) and roughness (MGS MOLA);
+  - 13 landing sites and the 51 human exploration zones from NASA's 2015 workshop;
+  - a 10° grid and the **current Sun**: real day and night from the time on Mars.
+- **Mars clock** in the status bar: local mean solar time at Jezero (LMST), Mars 2020 mission sol and Ls. Uses the NASA GISS Mars24 algorithm.
+- **ARES, the AI copilot** (button at the top). Ask by text or voice: "Can I go out?", "Where do I turn back?", "Does the radio work on the route?".
+  - The app sends the backend a summary of the walk state, and the backend asks Claude (`claude-opus-5-5`, with a server fallback if the model refuses).
+  - The answer is spoken over the helmet radio.
+  - With no API key, or no network, ARES answers in **local mode**, with the same math as the app.
+  - To turn the AI on, put `ANTHROPIC_API_KEY` in `backend/.env`.
 
-## Jezero da FU Berlin
+## FU Berlin's Jezero
 
-O WebGIS de Jezero da Freie Universität Berlin (`maps.planet.fu-berlin.de/jezero`) entrou como fonte, sempre pelo backend:
+The Jezero WebGIS of Freie Universität Berlin (`maps.planet.fu-berlin.de/jezero`) is a data source, always through the backend:
 
-- **Imagem padrão "Jezero em cor natural":** mosaico HiRISE 25 cm + CTX + HRSC já colorido, sem o tom artificial que usávamos nas imagens em cinza.
-  - O WMS deles aceita graus (EPSG:4326), então cada bloco do nosso mapa vira um pedido `GetMap` daquele retângulo.
-  - Os blocos ficam em cache em disco, com no máximo 4 pedidos ao mesmo tempo ao servidor da universidade.
-- **Curvas de nível** (camada opcional).
-- **Camadas vetoriais** em `backend/data/fub/`, servidas por `/api/v1/fub/:layer`:
-  - margem do antigo lago;
-  - 20 canais (Neretva, Sava, Pliva);
-  - elipse de pouso do Perseverance;
-  - 64 pontos de panorama 360° (Mastcam-Z e cenas sintéticas, como o lago cheio). Clicar num ponto abre o **visor 360° do próprio app** (`pano360.js`).
-    - O visor monta o cubo do krpano com CSS 3D, sem biblioteca. Também reprojeta os panoramas esféricos em cubo, num canvas.
-    - Cada panorama tem a versão "cor natural" e a versão "realce de minerais".
-    - Os blocos passam por `/api/v1/fub/pano/...` e ficam em cache no disco.
-    - O formato de cada panorama (pasta, nível e se é esférico) vem do `tour.xml` da FU Berlin, lido por `tools/build-fub-cache.py`. No krpano, o primeiro número de `multires` é o tamanho do bloco.
-- **Como os dados foram gerados:** o WFS deles só fala EPSG:49911 (Marte, cilíndrica equidistante, R = 3 396 190 m). `tools/build-fub-cache.py` baixa as camadas e converte para graus (x/R, y/R). A conversão bate com os limites que o próprio servidor informa.
-- **Créditos exigidos:** HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX: NASA/JPL-Caltech/MSSS; HiRISE: NASA/JPL/University of Arizona (Fergason et al., 2020). Estão no rodapé do app.
+- **Default image "Jezero in natural color":** a HiRISE 25 cm + CTX + HRSC mosaic already in color, without the artificial tint we used on the grayscale images.
+  - Their WMS accepts degrees (EPSG:4326), so each tile of our map becomes a `GetMap` request for that rectangle.
+  - Tiles are cached on disk, with at most 4 simultaneous requests to the university's server.
+- **Contour lines** (optional layer).
+- **Vector layers** in `backend/data/fub/`, served by `/api/v1/fub/:layer`:
+  - the shoreline of the ancient lake;
+  - 20 channels (Neretva, Sava, Pliva);
+  - the Perseverance landing ellipse;
+  - 64 360° panorama points (Mastcam-Z and synthetic scenes, such as the full lake). Clicking a point opens the **app's own 360° viewer** (`pano360.js`).
+    - The viewer builds the krpano cube with CSS 3D, without a library. It also reprojects spherical panoramas into a cube, on a canvas, and loads sharper tiles as you zoom in.
+    - Each panorama has a "natural color" version and a "mineral enhanced" version.
+    - Tiles go through `/api/v1/fub/pano/...` and are cached on disk.
+    - The format of each panorama (folder, level and whether it is spherical) comes from FU Berlin's `tour.xml`, read by `tools/build-fub-cache.py`. In krpano, the first number of `multires` is the tile size.
+- **How the data was generated:** their WFS only speaks EPSG:49911 (Mars, equidistant cylindrical, R = 3 396 190 m). `tools/build-fub-cache.py` downloads the layers and converts them to degrees (x/R, y/R). The conversion matches the bounds the server itself reports.
+- **Required credits:** HRSC: ESA/DLR/FU Berlin (CC BY-SA 3.0 IGO); CTX: NASA/JPL-Caltech/MSSS; HiRISE: NASA/JPL/University of Arizona (Fergason et al., 2020). They are in the app's footer.
 
-## Dados (NASA, ESA/DLR e FU Berlin, sempre pelo backend)
+## Data (NASA, ESA/DLR and FU Berlin, always through the backend)
 
-| Camada | Missão / instrumento | Serviço |
+| Layer | Mission / instrument | Service |
 |---|---|---|
-| Mosaico global colorido | Viking Orbiter | Mars Trek WMTS `Mars_Viking_MDIM21_ClrMosaic_global_232m` |
-| Imagem 25 cm | MRO / HiRISE | Mars Trek WMTS `JEZ_hirise_soc_006_orthoMosaic_25cm_...` |
-| Imagem 6 m | MRO / CTX | Mars Trek WMTS `JEZ_ctx_B_soc_008_orthoMosaic_6m_...` |
-| Mosaico de pouso | HiRISE + CTX + HRSC | Mars Trek WMTS `NES_JEZ_MID_Visible_Mosaic_...` |
-| Relevo colorido | MGS MOLA + Mars Express HRSC | Mars Trek WMTS `Mars_MOLA_blend200ppx_HRSC_ClrShade_...` |
-| Relevo global do globo 3D | MGS MOLA | Mars Trek ImageServer `mola128_mola64_merge_90Nto90S_SimpleC_clon0` (cópia em `data/`) |
-| Altitude para a rota | MOLA + HRSC, 200 m | Mars Trek ImageServer `Mars_MOLA_blend200ppx_HRSC_DEM_...` |
-| Infravermelho diurno | Mars Odyssey / THEMIS | Mars Trek WMTS `THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018` |
-| Minerais hidratados | MRO / CRISM | Mars Trek FeatureServer `Hydrous_Mineral_Detections_OMEGA_CRISM_clon0` |
-| Trajeto do Perseverance | Mars 2020 | Mars Trek FeatureServer `Perseverance_Traverse_Path` |
-| Fotos do modo Capacete | Mars 2020 / Navcam | `mars.nasa.gov/rss/api` (imagens brutas) |
-| Poeira, inércia térmica | MGS / TES | Mars Trek WMTS `TES_Dust`, `TES_Thermal_Inertia` |
-| Rugosidade | MGS / MOLA | Mars Trek WMTS `mola_roughness` |
-| Zonas de exploração humana | Workshop NASA 2015 | Mars Trek MapServer `EZMars` (`/api/v1/zones`) |
-| Calibração do relevo | Mars 2020 | Paradas oficiais do rover (`/api/v1/waypoints`, campo `elev_geoid`) |
+| Global color mosaic | Viking Orbiter | Mars Trek WMTS `Mars_Viking_MDIM21_ClrMosaic_global_232m` |
+| 25 cm imagery | MRO / HiRISE | Mars Trek WMTS `JEZ_hirise_soc_006_orthoMosaic_25cm_...` |
+| 6 m imagery | MRO / CTX | Mars Trek WMTS `JEZ_ctx_B_soc_008_orthoMosaic_6m_...` |
+| Landing mosaic | HiRISE + CTX + HRSC | Mars Trek WMTS `NES_JEZ_MID_Visible_Mosaic_...` |
+| Color relief | MGS MOLA + Mars Express HRSC | Mars Trek WMTS `Mars_MOLA_blend200ppx_HRSC_ClrShade_...` |
+| Global terrain of the 3D globe | MGS MOLA | Mars Trek ImageServer `mola128_mola64_merge_90Nto90S_SimpleC_clon0` (copy in `data/`) |
+| Elevation for the route | MOLA + HRSC, 200 m | Mars Trek ImageServer `Mars_MOLA_blend200ppx_HRSC_DEM_...` |
+| 1 m terrain along the route | MRO / HiRISE DTM | USGS Astrogeology (`JEZ_hirise_soc_006`, range reads) |
+| Daytime infrared | Mars Odyssey / THEMIS | Mars Trek WMTS `THEMIS_DayIR_ControlledMosaics_100m_v2_oct2018` |
+| Hydrated minerals | MRO / CRISM | Mars Trek FeatureServer `Hydrous_Mineral_Detections_OMEGA_CRISM_clon0` |
+| Perseverance traverse | Mars 2020 | Mars Trek FeatureServer `Perseverance_Traverse_Path` |
+| Helmet mode photos | Mars 2020 / Navcam | `mars.nasa.gov/rss/api` (raw images) |
+| Dust, thermal inertia | MGS / TES | Mars Trek WMTS `TES_Dust`, `TES_Thermal_Inertia` |
+| Roughness | MGS / MOLA | Mars Trek WMTS `mola_roughness` |
+| Human exploration zones | NASA 2015 workshop | Mars Trek MapServer `EZMars` (`/api/v1/zones`) |
+| Terrain calibration | Mars 2020 | Official rover stops (`/api/v1/waypoints`, field `elev_geoid`) |
 
-A tabela no rodapé do app mostra, ao vivo, se cada fonte veio do backend ou do cache local.
+The table in the app (**Data**) shows, live, whether each source came from the backend or from the local cache.
 
-### Panoramas do Capacete
+### Helmet panoramas
 
-Ao fim de cada deslocamento o rover tira 5 faixas de 96° × 26° na altura do horizonte. O app cola essas faixas num panorama de 360° usando o ângulo do mastro (metadado da foto) e a direção do rover (lista oficial de paradas). `data/pano/index.json` guarda, para cada parada do rover que tem panorama completo, a posição, a direção e os endereços das fotos (as fotos continuam hospedadas na NASA). Para gerar de novo:
+At the end of each drive the rover takes 5 strips of 96° × 26° at horizon height. The app stitches those strips into a 360° panorama using the mast angle (photo metadata) and the rover heading (official list of stops). `data/pano/index.json` stores, for each rover stop with a complete panorama, the position, the heading and the photo addresses (the photos stay hosted by NASA). With a link, the app swaps the JPEG preview for NASA's original 1280 px PNG. To regenerate:
 
 ```bash
 python tools/build-pano-cache.py
 ```
 
-O script lê as paradas em `backend/data/cache/m20_waypoints.cached.json` e consulta a API de imagens brutas, devagar, porque ela bloqueia rajadas de pedidos.
+The script reads the stops in `backend/data/cache/m20_waypoints.cached.json` and queries the raw image API slowly, because it blocks bursts of requests.
 
-Controles: arraste para olhar em volta; `↑` `↓` (ou os botões) andam para a parada seguinte ou anterior do rover; `←` `→` viram.
+Controls: drag to look around; `↑` `↓` (or the buttons) move to the next or previous rover stop; `←` `→` turn.
 
-### Terreno 3D do Capacete
+### Helmet 3D terrain
 
-Usa o mesmo globo do modo Globo 3D, com a câmera na altura dos olhos. `W`/`S` ou `↑`/`↓` andam, `A`/`D` ou `←`/`→` viram, `Shift` corre e o menu "Ir para…" leva a outros lugares de Marte. Em Jezero a imagem é HiRISE de 25 cm; no resto do planeta é o mosaico Viking de 232 m, então de perto fica borrado.
+It uses the same globe as the 3D globe mode, with the camera at eye height. `W`/`S` or `↑`/`↓` move, `A`/`D` or `←`/`→` turn, `Shift` goes faster, and the "Go to…" menu takes you to other places on Mars. Near the feet, the visor draws small rocks, pebbles and sand ripples (illustrative, for scale). In Jezero the image is 25 cm HiRISE; elsewhere on the planet it is the 232 m Viking mosaic, so it gets blurry up close.
 
-## O que é real e o que é simulado
+## What is real and what is simulated
 
-- **Real:** imagens, relevo, declive, trajeto do rover, detecção CRISM, fotos da Navcam, posição dos pontos de interesse.
-- **Do contrato (backend):** O₂ restante, distância da dupla, rover de apoio, carga do traje, declive e limite seguro, MEDA, alvos científicos e alertas. Hoje o backend serve valores de exemplo do `CONTRATO_API.json`.
-- **Simulado no frontend:** batimentos, ritmo, bateria e a previsão de oxigênio ao longo da caminhada. São calculados a partir do declive real da rota.
-- **Hipotético:** a base Ares-1.
-- **Datas:** os 14 locais de pouso usam as coordenadas publicadas pelas missões. Não vêm de um serviço.
+- **Real:** imagery, terrain, slope, the rover traverse, CRISM detections, Navcam photos, positions of the points of interest.
+- **From the contract (backend):** remaining O₂, buddy distance, support rover, suit payload, slope and safe limit, MEDA, science targets and alerts. Today the backend serves sample values from `CONTRATO_API.json`.
+- **Simulated in the frontend:** heart rate, pace, battery and the oxygen forecast along the walk. They are computed from the real slope of the route.
+- **Hypothetical:** the Ares-1 base.
+- **Dates:** the 13 landing sites use the coordinates published by the missions. They do not come from a service.
 
-## Limitações conhecidas
+## Known limitations
 
-- O relevo da rota tem 200 m de resolução. Serve pra escolher o caminho geral, mas esconde pedras e degraus. Próximo passo: DTM HiRISE de 1 m de Jezero (`JEZ_hirise_soc_006_DTM...` no catálogo do Mars Trek).
-- Fora de Jezero o relevo sob demanda tem cerca de 230 m por ponto e a imagem é THEMIS de 100 m com cor do Viking: de perto, no chão, fica borrado. A geometria (montanhas, crateras, cânions) é real.
-- A qualidade da voz depende das vozes instaladas no navegador de quem apresenta.
-- A skill cita a camada `Mars_MGS_MOLA_ClrShade_blend_mola_128ppd`, mas esse endereço responde 404 no Mars Trek. O app usa a equivalente `Mars_MOLA_blend200ppx_HRSC_ClrShade` (MOLA + HRSC).
-- A bússola do Capacete é aproximada: usa a orientação do rover informada nos metadados da foto, sem corrigir a inclinação do terreno.
-- As faixas de panorama da Navcam vêm em preto e branco e recebem um tom de cor no app. Elas cobrem 26° de altura, então acima e abaixo aparece um fundo liso.
-- Nem toda parada do rover tem panorama completo. O rodapé do visor mostra o sol e a parada de cada foto.
-- O limite de declive seguro é 12°, o mesmo `max_safe_slope_deg` do `CONTRATO_API.json`.
+- The route terrain has 200 m resolution. It is good for choosing the general path, but it hides boulders and steps. The 1 m HiRISE terrain checks the route corridor afterwards (only inside the mosaic area around the landing site), but it does not change the chosen path yet.
+- Outside Jezero, the on-demand terrain is about 230 m per point and the image is 100 m THEMIS with Viking color: up close, on the ground, it is blurry. The geometry (mountains, craters, canyons) is real.
+- Voice quality depends on the voices installed in the presenter's browser.
+- The skill mentions the layer `Mars_MGS_MOLA_ClrShade_blend_mola_128ppd`, but that address answers 404 on Mars Trek. The app uses the equivalent `Mars_MOLA_blend200ppx_HRSC_ClrShade` (MOLA + HRSC).
+- The Helmet compass is approximate: it uses the rover heading from the photo metadata, without correcting for the terrain tilt.
+- The Navcam panorama strips are black and white and get a color tint in the app. They cover 26° in height, so a plain background shows above and below.
+- Not every rover stop has a complete panorama. The visor footer shows the sol and the stop of each photo.
+- The safe slope limit is 12°, the same `max_safe_slope_deg` as in `CONTRATO_API.json`.
 
-## Estrutura
+## Structure
 
-- `index.html`, `style.css`: página e visual
-- `config.js`, `boot.js`: configuração e partida (sem scripts embutidos no HTML, por causa do CSP)
-- `physics.js`: física da carga do traje (limite de declive, consumo, veredito)
-- `app.js`: acesso ao backend, contrato, rota (A*), simulação da caminhada, mapa 2D, checklist, plano e pop-up de foto de solo
-- `globe.js`: globo 3D (CesiumJS)
-- `helmet.js`: modo Capacete (fotos do rover e terreno 3D)
-- `ui.js`: casca da interface (painéis, busca, controles do mapa, barra de estado)
-- `i18n.js`: idiomas (inglês e português)
-- `telemetry.js`: modo Telemetria
-- `mission.js`: WHY?, rádio, exportação GeoJSON, comparação de rotas, alcance, ciência alcançável, lago, camadas globais e relógio de Marte
-- `copilot.js`: ARES, o copiloto (IA pelo backend ou modo local)
-- `ambience.js`: geologia realçada e vento de Marte no Capacete
-- `data/`: redundância local (relevo, trajeto, telemetria e `tiles/`) e o índice de panoramas
-- `../tools/build-pano-cache.py`: gera o índice de panoramas
+- `index.html`, `style.css`: page and look
+- `config.js`, `boot.js`: configuration and startup (no inline scripts in the HTML, because of the CSP)
+- `physics.js`: suit payload physics (slope limit, consumption, verdict)
+- `app.js`: backend access, contract, route (A*), walk simulation, 2D map, checklist, plan and the ground photo pop-up
+- `globe.js`: 3D globe (CesiumJS) and moving in the Helmet's 3D terrain
+- `hirise-core.js`: 1 m HiRISE terrain (tiles, decoding, route corridor)
+- `helmet.js`: Helmet mode (rover photos and 3D terrain)
+- `ui.js`: interface shell (panels, search, map controls, status bar)
+- `i18n.js`: English translation of everything on screen
+- `telemetry.js`: Telemetry mode
+- `mission.js`: Why?, radio, GeoJSON export, route comparison, reach, reachable science, lake, global layers and the Mars clock
+- `copilot.js`: ARES, the copilot (AI through the backend, or local mode)
+- `exec-core.js`, `execution.js`: running the walk live (engine and panel)
+- `pano360.js`, `pano-tiles.js`: the 360° viewer
+- `data/`: local redundancy (terrain, traverse, telemetry and `tiles/`) and the panorama index
+- `../tools/build-pano-cache.py`: builds the panorama index

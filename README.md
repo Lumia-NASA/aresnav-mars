@@ -1,106 +1,110 @@
-# AresNav — Interplanetary Survival Guide: Martian Map 🚀🔴
+# AresNav — Interplanetary Survival Guide: Martian Map
 
-> **NASA Space Apps Challenge 2026**  
-> **Team Lumia**  
-> Target Region: **Jezero Crater Delta (`lat: 18.4447, lng: 77.4508`, `elev: -2540.5m`)**
-
----
-
-## 🌟 Visão Geral
-O **AresNav** é um protótipo de planejamento de caminhadas (EVA) em Marte. Junta dados históricos de missões da NASA e da ESA (relevo, imagens, trajeto do Perseverance, minerais) a um modelo simulado do traje e responde, para uma rota escolhida, se a caminhada é GO, CAUTION ou NO-GO, por quê, e o que mudar. Os dados vêm de arquivos e serviços públicos com cache local: **não são transmissões em tempo real**, e o veredito é uma **simulação para planejamento**, não uma autorização de segurança.
+> **NASA Space Apps Challenge 2026**
+> **Team Lumia**
+> Target region: **Jezero Crater delta (`lat: 18.4447, lng: 77.4508`, `elev: -2540.5 m`)**
 
 ---
 
-## 🛰️ As 3 Camadas Científicas da NASA Unificadas
-1. **Topografia & Altimetria (MGS MOLA + Mars Express HRSC):** relevo de 200 m por ponto e declive calculado dele. Mostra o caminho geral e as encostas fortes; não enxerga pedras nem degraus menores que isso.
-1. **Relevo HiRISE de 1 m (MRO HiRISE, USGS Astrogeology):** o modelo de terreno usado no pouso do Perseverance. Depois de traçar a rota, o app lê o relevo de 1 m ao longo dela e mede o declive real a cada 5 m; trechos curtos acima do limite aparecem no mapa. No capacete, o chão em volta de quem anda usa esse relevo. O backend lê só os blocos de 256 x 256 m necessários (de um arquivo de 1,8 GB) e guarda em cache.
-2. **Meteorologia Marciana (Perseverance MEDA):** mínima, máxima e pressão do último sol que a NASA publicou (`/api/v1/weather`), com a data e a idade do dado.
-   - O feed público do MEDA não traz vento, poeira nem radiação. Esses valores vêm do contrato e aparecem com o selo **SAMPLE**.
-   - O nascer e o pôr do Sol de hoje são calculados com o algoritmo do Mars24 e conferidos contra os horários do próprio MEDA (menos de 1 min de diferença).
-3. **Mineralogia & Rota do Rover (Mars 2020 + CRISM):** trajeto real do Perseverance e detecções orbitais de minerais hidratados (CRISM), que indicam onde houve água.
+## Overview
+**AresNav** is a prototype for planning walks (EVAs) on Mars. It combines historical NASA and ESA mission data (terrain, imagery, the Perseverance traverse, minerals) with a simulated suit model. For a chosen route it answers whether the walk is GO, CAUTION or NO-GO, explains why, and says what to change. The data comes from public files and services with a local cache: **it is not a live feed**, and the verdict is a **planning simulation**, not a safety authorization.
 
 ---
 
-## 🎬 A demo, do início ao fim
-Rota científica → risco explicado → comparação → panorama real do local → decisão → corte de enlace. O roteiro completo, em inglês, está em [`docs/PITCH.md`](docs/PITCH.md).
-
-1. **Rota científica:** escolha o depósito de amostras Three Forks, um lugar real onde o Perseverance deixou tubos de amostra, a 3,7 km da base, com 18,5 kg de carga.
-2. **Risco explicado:** o veredito diz `NO-GO · METABOLIC` e o motivo, "O₂ na volta 21% < 30%". O botão **Por quê?** mostra que a ida (1 h 54) é mais lenta que a volta (1 h 40), porque o caminho sobe, e a calibração do relevo.
-3. **Decisão em um clique:** clicar no veredito leva ao trecho depois do **ponto de retorno**. O quadro **O que fazer** oferece: virar ali, levar no máximo 13,5 kg ou usar a rota segura.
-4. **Comparação:** a rota curta perigosa aparece em vermelho tracejado e o desvio seguro em verde. O mapa também mostra o alcance a pé de 15 e 30 min e o que dá para alcançar com a carga atual.
-5. **Panorama real:** um panorama 360° da Mastcam-Z no local. As vistas sintéticas aparecem em roxo e com a etiqueta "não é foto".
-6. **Copiloto ARES:** responde por voz ("Onde viro para voltar?") usando só os números do app. Funciona com o Claude ou em modo local.
-7. **Executar a caminhada:** o botão **Executar caminhada** acompanha a EVA ao vivo (simulada) no Capacete.
-   - **Painel:** plano x real (tempo e O₂), contagem até o ponto de retorno (pelo O₂ ou pela luz do dia, o que vencer primeiro), próxima parada, rádio e desvio da rota.
-   - **ARES:** fala sozinho nos pontos-chave. Com o ritmo real em 85%, aparecem o atraso, o "vire em 5 min" e o "vire agora".
-8. **Corte de enlace:** o botão UPLINK simula a queda Terra–Marte. Rota, veredito e física continuam funcionando. As camadas que dependem da internet avisam "indisponível offline".
+## The three NASA science layers, unified
+1. **Topography and altimetry (MGS MOLA + Mars Express HRSC):** 200 m terrain per point, with slope computed from it. It shows the general path and the steep slopes; it cannot see boulders or steps smaller than that.
+2. **1 m HiRISE terrain (MRO HiRISE, USGS Astrogeology):** the terrain model used for the Perseverance landing. After a route is plotted, the app reads the 1 m terrain along it and measures the real slope every 5 m; short stretches above the limit are marked on the map. In the Helmet view, the ground around the walker uses this terrain. The backend reads only the 256 × 256 m blocks it needs (out of a 1.8 GB file) and caches them.
+3. **Martian weather (Perseverance MEDA):** minimum and maximum temperature and pressure from the latest sol NASA published (`/api/v1/weather`), with the date and the age of the reading.
+   - The public MEDA feed has no wind, dust or radiation. Those values come from the API contract and carry the **SAMPLE** label.
+   - Today's sunrise and sunset are computed with the Mars24 algorithm and checked against MEDA's own times (less than 1 min apart).
+4. **Mineralogy and the rover route (Mars 2020 + CRISM):** the real Perseverance traverse and orbital detections of hydrated minerals (CRISM), which show where water once was.
 
 ---
 
-## ⚠️ Limites (dizemos isso na apresentação)
-- **Relevo de 200 m:** escolhe o caminho geral, mas esconde pedras e degraus. O relevo de 1 m confere o corredor da rota depois, mas não muda o caminho escolhido, e só existe na área do mosaico (cerca de 37 x 39 km em volta do pouso). Pedras menores que ~2 m continuam invisíveis.
-- **Calibração:** o relevo fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m). O app mostra isso no "Por quê?".
-- **Física simulada:** consumo de O₂, batimentos e ritmo × carga vêm de um modelo, não de um traje real. As hipóteses e o peso de cada uma estão em [`docs/HIPOTESES.md`](docs/HIPOTESES.md).
-- **Clima em dois conjuntos:** temperatura e pressão são medições reais do MEDA, mas datadas (último sol público: abril de 2024). Vento, radiação e poeira são valores de exemplo, com o selo SAMPLE. Esses valores não entram no cálculo do veredito; só a idade da medição aparece como ressalva no checklist.
-- **Rota:** a busca roda numa grade de 200 m dentro da área da missão. "Nenhuma rota segura encontrada" vale para esse modelo, não prova que o caminho não existe.
-- **Base hipotética:** a Ares-1 não existe.
-- **Ainda não testado:** celular de verdade e o copiloto com chave da API ao vivo. Os números de desempenho estão em [`docs/DESEMPENHO.md`](docs/DESEMPENHO.md).
+## The demo, start to finish
+Science route → risk explained → comparison → real panorama of the place → decision → link cut. The full script, including the 29-second video version, is in [`docs/PITCH.md`](docs/PITCH.md).
+
+1. **Science route:** pick the Three Forks sample depot, a real place where Perseverance left sample tubes, 3.7 km from base, carrying 18.5 kg.
+2. **Risk explained:** the verdict reads `NO-GO · not enough O₂` with the reason "return O₂ 21% < 30%". The **Why?** button shows that the walk out (1 h 54) is slower than the walk back (1 h 40) because the path climbs, plus the terrain calibration.
+3. **One-click decision:** clicking the verdict jumps to the stretch past the **turn-back point**. The **What to do** box offers: turn back there, carry at most 13.5 kg, or take the safe route.
+4. **Comparison:** the dangerous short route is dashed red and the safe detour green. The map also shows the 15 and 30 min walking reach and what can be reached with the current payload.
+5. **Real panorama:** a 360° Mastcam-Z panorama of the place. Synthetic views are shown in purple and labeled "not a photo".
+6. **ARES copilot:** answers by voice ("Where do I turn back?") using only the app's numbers. It works with Claude or in local mode.
+7. **Run the walk:** the **Run the walk** button follows the EVA live (simulated) in the Helmet view.
+   - **Panel:** plan vs. actual (time and O₂), countdown to the turn-back point (by O₂ or by daylight, whichever comes first), next stop, radio and distance off the route.
+   - **ARES:** speaks on its own at the key moments. With the actual pace at 85%, it reports the delay, "turn back in 5 min" and "turn back now".
+8. **Link cut:** the **NASA link · live** button simulates the Earth–Mars link going down. Route, verdict and physics keep working. Layers that need the internet say "unavailable offline".
+
+In the Helmet's 3D terrain you can move **on foot** (suited astronaut, eyes at 1.7 m), in a **crewed rover** (eyes at 2.4 m, 10 km/h, stops on climbs above 20°) or in **free flight**.
 
 ---
 
-## 🛡️ Arquitetura de Defesa e Resiliência
-* **Offline-First Cache:** Os dados da rota (relevo, trajeto, telemetria) têm cache local em `/backend/data/cache/` e seguem funcionando sem internet. Camadas da FU Berlin, mapas globais e panoramas 360° só funcionam offline se já estiverem no cache. Oscilações da internet ou da API da NASA não derrubam o app.
-* **ScopeGuard (KhaosForge):** Bloqueio estrito contra SSRF, limitando conexões aos domínios da NASA (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`) e ao WebGIS de Jezero da FU Berlin (`maps.planet.fu-berlin.de`).
-* **EvidenceGate:** o backend calcula o SHA-256 de cada resposta e o envia junto. Isso permite conferir que o dado não mudou **entre o backend e a tela** (e entra no GeoJSON exportado). Não é integridade de ponta a ponta e **não autentica a origem**: o trecho entre a NASA e o nosso backend não é coberto, e o hash é calculado pelo nosso próprio servidor, não assinado pela NASA.
-* **CORS Restrito & Rate Limiting:** Proteção de backend Fastify contra abusos e negação de serviço.
+## Limits (we say this in the presentation)
+- **200 m terrain:** it chooses the general path but hides boulders and steps. The 1 m terrain checks the route corridor afterwards, but does not change the chosen path, and it only exists inside the mosaic area (about 37 × 39 km around the landing site). Rocks smaller than about 2 m remain invisible.
+- **Calibration:** the terrain sits on average 19 m above the elevation Perseverance measured at 613 stops (σ 19 m). The app shows this under "Why?".
+- **Simulated physics:** oxygen use, heart rate and pace vs. payload come from a model, not from a real suit. The assumptions and how much each one weighs are in [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md).
+- **Weather in two sets:** temperature and pressure are real MEDA measurements, but dated (latest public sol: April 2024). Wind, radiation and dust are sample values, labeled SAMPLE. None of these values feed the verdict; only the age of the reading shows up as a caveat in the checklist.
+- **Route:** the search runs on a 200 m grid inside the mission area. "No safe route found" holds for that model; it does not prove that no path exists.
+- **Hypothetical base:** Ares-1 does not exist.
+- **Not yet tested:** a real phone, and the copilot with a live API key. Performance numbers are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ---
 
-## 📁 Estrutura do Repositório
+## Defense and resilience architecture
+* **Offline-first cache:** route data (terrain, traverse, telemetry) is cached locally in `/backend/data/cache/` and keeps working without internet. FU Berlin layers, global maps and 360° panoramas only work offline if they are already cached. Internet or NASA API hiccups do not take the app down.
+* **ScopeGuard (KhaosForge):** strict SSRF blocking that only allows connections to NASA domains (`mars.nasa.gov`, `trek.nasa.gov`, `api.nasa.gov`), the FU Berlin Jezero WebGIS (`maps.planet.fu-berlin.de`) and the USGS Astrogeology data bucket for the HiRISE terrain.
+* **EvidenceGate:** the backend computes the SHA-256 of each response and sends it along. This lets you check that the data did not change **between the backend and the screen** (it also goes into the exported GeoJSON). It is not end-to-end integrity and **does not authenticate the source**: the hop between NASA and our backend is not covered, and the hash is computed by our own server, not signed by NASA.
+* **Restricted CORS and rate limiting:** protects the Fastify backend against abuse and denial of service.
+
+---
+
+## Repository layout
 ```
 aresnav-mars/
-├── CONTRATO_API.json         # Contrato unificado de integração Frontend <-> Backend
-├── .gitignore                # Isolamento estrito de segredos e skills confidenciais
-├── backend/                  # Backend Fastify 5 (proxy com allowlist, cache, rate limit, CSP)
-│   ├── server.js             # Rotas /health, telemetry, traverse, waypoints, tiles, dem, crism e navcam
-│   ├── package.json          # Dependências do backend
+├── CONTRATO_API.json         # Unified frontend <-> backend integration contract
+├── .gitignore                # Strict isolation of secrets and private skills
+├── backend/                  # Fastify 5 backend (allowlisted proxy, cache, rate limit, CSP)
+│   ├── server.js             # Routes: /health, telemetry, traverse, waypoints, tiles, dem, crism and navcam
+│   ├── package.json          # Backend dependencies
 │   ├── Dockerfile            # Container hardening (Alpine, non-root, dumb-init)
-│   ├── .env.example          # Variáveis de ambiente
-│   └── data/cache/           # Cache de telemetria local resiliente
-├── frontend/                 # HUD Tático Marciano (Leaflet 2D / CesiumJS 3D)
+│   ├── .env.example          # Environment variables
+│   └── data/cache/           # Resilient local telemetry cache
+├── frontend/                 # Mars tactical HUD (Leaflet 2D / CesiumJS 3D)
 ├── tests/
-│   ├── smoke-test.js         # Contrato, ScopeGuard e EvidenceGate
-│   ├── physics-test.js       # Física do traje, Tobler, ponto de retorno, rádio, veredito e decisão
-│   ├── sun-test.js           # Sol e hora em Marte contra o MEDA e o pouso do Perseverance
-│   ├── exec-test.js          # Motor da execução: posição, O₂, ponto de retorno por O₂ e luz, avisos
-│   ├── fub-test.js           # Camadas da FU Berlin, visor 360° e modo offline (sobe o backend numa porta de teste)
-│   └── demo-flow-test.js     # Percurso completo da apresentação num Chrome sem janela
-├── tools/build-fub-cache.py  # Baixa e converte as camadas da FU Berlin
-├── tools/prewarm-demo.js     # Pré-carrega e confere offline o que a demo usa
+│   ├── smoke-test.js         # Contract, ScopeGuard and EvidenceGate
+│   ├── physics-test.js       # Suit physics, Tobler, turn-back point, radio, verdict and decision
+│   ├── sun-test.js           # Sun and time on Mars against MEDA and the Perseverance landing
+│   ├── exec-test.js          # Walk execution engine: position, O₂, turn-back by O₂ and daylight, callouts
+│   ├── hirise-test.js        # 1 m HiRISE terrain: tile math, decoding and the route corridor
+│   ├── fub-test.js           # FU Berlin layers, 360° viewer and offline mode (starts the backend on a test port)
+│   └── demo-flow-test.js     # The full presentation run in a headless Chrome
+├── tools/build-fub-cache.py  # Downloads and converts the FU Berlin layers
+├── tools/prewarm-demo.js     # Pre-loads and checks offline everything the demo uses
 └── docs/
-    ├── PITCH.md              # Roteiro da demo para os jurados (inglês)
-    ├── DESEMPENHO.md         # Medições de carregamento, 360° e memória
-    └── HIPOTESES.md          # Hipóteses do modelo e sensibilidade do veredito
+    ├── PITCH.md              # The 29-second video script and the live demo script
+    ├── PERFORMANCE.md        # Loading, 360° and memory measurements
+    └── ASSUMPTIONS.md        # Model assumptions and verdict sensitivity
 ```
 
 ---
 
-## 🧪 Como Executar os Testes de Validação
+## Running the validation tests
 ```bash
 npm ci --prefix backend
 node tests/smoke-test.js
 node tests/physics-test.js
 node tests/sun-test.js
 node tests/exec-test.js
+node tests/hirise-test.js
 node tests/fub-test.js
-node tests/demo-flow-test.js   # percurso completo da demo num Chrome sem janela
+node tests/demo-flow-test.js   # the full demo run in a headless Chrome
 ```
-Ou tudo de uma vez: `cd backend && npm test`, que roda os seis em sequência.
+Or all at once: `cd backend && npm test`, which runs the seven in sequence.
 
-O percurso da demo testa o panorama 360° em dois cenários: um que aceita falha da rede desde que o visor explique o que houve, e outro com o panorama já no cache, que exige a imagem completa.
+The demo run tests the 360° panorama in two scenarios: one that accepts a network failure as long as the viewer explains what happened, and one with the panorama already cached, which requires the complete image.
 
-**Antes da apresentação** (com o backend rodando e internet):
+**Before the presentation** (with the backend running and internet):
 ```bash
-cd backend && npm run prewarm         # grava no cache tudo o que a demo usa (~45 s)
-npm run check-offline                 # confere sem internet que os 813 itens abrem do cache
+cd backend && npm run prewarm         # caches everything the demo uses (~45 s)
+npm run check-offline                 # checks, without internet, that every item opens from the cache
 ```
