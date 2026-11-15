@@ -736,3 +736,14 @@ body.executing.helmet-mode .hud-target{display:none}
 
 /* ---------- Visor 360°: blocos nítidos sob demanda, por cima do nível base ---------- */
 .p360-hdt{position:absolute;background-size:100% 100%;background-repeat:no-repeat;opacity:0;transition:opacity .25s;pointer-events:none}
+
+/* Terreno 3D: painel do jeito de andar (a pé, rover, voo livre) e moldura do para-brisa do rover */
+.hud-drive{right:14px;top:auto;bottom:128px;min-width:214px}
+.hud-drive .big span{white-space:nowrap;margin-right:10px}
+.hud-drive .warn{margin-top:6px;padding:4px 6px;border-radius:5px;background:rgba(122,38,51,.55);color:#FFB3BC;font-size:11px}
+body.executing .hud-drive{display:none}
+.seg2 button:not(:first-child):not(:last-child){border-radius:0;border-right:0}
+#pano.terrain.rover::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:linear-gradient(97deg,rgba(14,12,12,.94) 0 4.2%,rgba(14,12,12,0) 4.5%),linear-gradient(-97deg,rgba(14,12,12,.94) 0 4.2%,rgba(14,12,12,0) 4.5%),
+    linear-gradient(180deg,rgba(14,12,12,.92) 0 6%,rgba(14,12,12,0) 6.4%),linear-gradient(0deg,rgba(18,15,14,.9) 0 5%,rgba(18,15,14,0) 5.6%)}
+@media (max-width:900px){.hud-drive{display:none}}

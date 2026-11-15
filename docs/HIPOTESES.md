@@ -15,6 +15,9 @@ Os parâmetros estão em `frontend/physics.js` (`SLOPE_RULE` e `ALGORITHM`, vers
 | Ritmo perdido por carga | −1,2% por kg | escolha de projeto | hipótese |
 | Ritmo de caminhada (Tobler) | 2,7 km/h no plano, pico em descida suave | função de Tobler com v₀ de astronauta de traje (referência SEXTANT/Apollo) | forma clássica; o valor de v₀ é hipótese |
 | Antena do habitat e capacete | 2 m e 1,7 m | escolha de projeto | hipótese (uma antena mais alta muda muito o resultado do rádio) |
+| Andar no Terreno 3D: a pé | olhos a 1,7 m, 0,8 m/s (Shift 1,6 m/s), passada de 0,7 m | escolha de projeto, só para a visualização | hipótese; não entra no cálculo de O₂ nem no veredito |
+| Andar no Terreno 3D: rover tripulado | olhos a 2,4 m, 10 km/h (Shift 15 km/h), para em subida acima de 20° ou inclinação lateral acima de 25° | ordem de grandeza de rovers pressurizados estudados pela NASA; valores do AresNav | **hipótese**, só para a visualização; o planejamento continua sendo da caminhada a pé |
+| Pedras e areia perto dos pés | desenhadas no visor até ~20 m | ilustrativo (a imagem orbital não mostra pedras de centímetros) | **ilustração**, não é dado |
 | Relevo | HRSC + MOLA, 200 m por ponto | NASA Mars Trek | **dado real**. Não enxerga pedras nem degraus; fica em média 19 m acima da altitude medida pelo Perseverance em 613 paradas (σ 19 m) |
 | Relevo do corredor | HiRISE DTM controlado, 1 m (JEZ_hirise_soc_006) | USGS Astrogeology / MRO HiRISE | **dado real**. Declive medido em 5 m; limite do trecho íngreme = limite da rota. Difere do de 200 m em 3 a 6 m na base |
 | Clima: temperatura e pressão (MEDA) | mínima, máxima e pressão do último sol publicado | feed público do MEDA, via `/api/v1/weather` | **medição real e datada**, não leitura ao vivo. O app mostra a data e a idade do dado; o último sol público é de abril de 2024 |
