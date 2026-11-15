@@ -594,13 +594,14 @@ fastify.get('/api/v1/fub/:layer', async (request, reply) => {
 });
 
 // Blocos dos panoramas 360° (cubos do krpano da FU Berlin), para o visor 360° do próprio app.
-// Só a prévia (6 faces em 256 px) e um nível com faces de até 1280 px (blocos de 512 px).
+// A prévia (6 faces em 256 px), o nível base (faces de até 1280 px) e, sob demanda, os níveis mais nítidos (blocos de 512 px).
 const FUB_PANO = 'https://maps.planet.fu-berlin.de/vtour/panos';
 const PANO_CACHE_DIR = process.env.PANO_CACHE_DIR || path.join(__dirname, 'data', 'cache', 'fubpano');   // os testes apontam para uma pasta temporária
 fastify.get('/api/v1/fub/pano/:folder/*', { config: PROXY_RATE }, async (request, reply) => {
   const folder = request.params.folder, rest = request.params['*'];
-  // formatos do krpano: estéreo "1/f/l2/01/l2_1/f_01_02.jpg" e simples "f/l2/1/l2_f_1_2.jpg"; níveis 1 a 3 (faces de até 1280 px)
-  if (!/^[A-Za-z0-9_-]{3,120}$/.test(folder) || !/^(preview\.jpg|1\/[fblrud]\/l[1-3]\/0[1-3]\/l[1-3]_1\/[fblrud]_0[1-3]_0[1-3]\.jpg|[fblrud]\/l[1-3]\/[1-3]\/l[1-3]_[fblrud]_[1-3]_[1-3]\.jpg|l1\/00[0-3]\/l1_00[0-3]_00[0-5]\.jpg)$/.test(rest)) {   // ... e esférico \"l1/001/l1_001_002.jpg\"
+  // formatos do krpano: estéreo "1/f/l2/01/l2_1/f_01_02.jpg", simples "f/l2/1/l2_f_1_2.jpg" e esférico "l1/001/l1_001_002.jpg".
+  // Níveis 1 a 8: o visor carrega o nível base inteiro e, ao aproximar, só os blocos mais nítidos que estão na tela.
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(folder) || !/^(preview\.jpg|1\/[fblrud]\/l([1-8])\/\d{2}\/l\2_1\/[fblrud]_\d{2}_\d{2}\.jpg|[fblrud]\/l([1-8])\/\d{1,2}\/l\3_[fblrud]_\d{1,2}_\d{1,2}\.jpg|l([1-8])\/\d{3}\/l\4_\d{3}_\d{3}\.jpg)$/.test(rest)) {
     return reply.code(400).send({ error: 'Bloco de panorama inválido' });
   }
   const file = path.join(PANO_CACHE_DIR, folder, rest);

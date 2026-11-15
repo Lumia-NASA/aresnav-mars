@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "aresnav-api", "runtimeExecutable": "node", "runtimeArgs": ["backend/server.js"], "port": 3000 },
+    { "name": "aresnav", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "5183", "-d", "frontend"], "port": 5183 }
+  ]
+}

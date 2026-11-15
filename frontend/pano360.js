@@ -21,7 +21,7 @@ box.innerHTML = `<div class="p360-stage" id="p360Stage" aria-hidden="true"><div 
   <header class="p360-bar"><div><span class="p360-kind" id="p360Kind"></span><b id="p360Name"></b><small id="p360Credit"></small></div>
     <div class="p360-actions"><button id="p360Natural" aria-pressed="false">Cor natural</button><button id="p360Enh" aria-pressed="true">Realce de minerais</button><button id="p360Close" aria-label="Fechar">✕</button></div></header>
   <div class="p360-status" id="p360Status" role="status" aria-live="polite"><span id="p360Msg"></span><button id="p360Retry" hidden>Tentar de novo</button></div>
-  <p class="p360-hint">Arraste para olhar em volta · roda do mouse aproxima · Esc fecha · Panorama: <span id="p360Src"></span></p>`;
+  <p class="p360-hint">Arraste para olhar em volta · roda do mouse aproxima · Esc fecha · Panorama: <span id="p360Src"></span><span id="p360Hd"></span></p>`;
 document.body.appendChild(box);
 const stage = $('#p360Stage'), cubeEl = $('#p360Cube');
 let view = { yaw: 0, pitch: 0, fov: 100 }, cur = null, variant = 'enh', opener = null, buildToken = 0, slowTimer = null, retries = 0;
@@ -33,6 +33,58 @@ function render() {
   const w = stage.clientWidth, h = stage.clientHeight, p = (w / 2) / Math.tan(view.fov * Math.PI / 360);
   stage.style.perspective = p + 'px';
   cubeEl.style.transform = `translate(${w / 2}px, ${h / 2}px) translateZ(${p}px) rotateX(${view.pitch}deg) rotateY(${view.yaw}deg)`;   // yaw positivo = virar para a direita (conferido face a face)
+  clearTimeout(hdTimer); hdTimer = setTimeout(hdUpdate, 140);   // quando o olhar para, busca os blocos mais nítidos do que está na tela
+}
+
+/* ---------- nitidez sob demanda ----------
+   O nível base cobre o panorama inteiro. Acima dele, a FU Berlin tem faces de até ~9500 px (às vezes ~30000):
+   baixar tudo seria centenas de MB, então só entram os blocos de 512 px que estão na tela, no nível que a tela pede.
+   Falha de um bloco nítido não muda o estado do panorama: o nível base continua embaixo. */
+const HD_MAX = 260;
+let hdTimer = null, hd = { cube: null, tiles: new Map(), bad: new Set(), token: 0 };
+const hdDpr = () => Math.min(window.devicePixelRatio || 1, 2);
+function hdReset(cube) { clearTimeout(hdTimer); hd = { cube: cube && !cube.sphere && cube.sizes ? cube : null, tiles: new Map(), bad: new Set(), token: buildToken }; }
+function minFov() {   // deixa aproximar até 1 pixel da foto = 1 pixel da tela
+  const c = hd.cube; if (!c) return 35;
+  return Math.max(6, Math.min(35, 90 * stage.clientWidth * hdDpr() / P.maxSize(c)));
+}
+function hdUpdate() {
+  const c = hd.cube;
+  if (!c || box.hidden || hd.token !== buildToken || typeof DOMMatrix === 'undefined') return;
+  const w = stage.clientWidth, h = stage.clientHeight, p = (w / 2) / Math.tan(view.fov * Math.PI / 360);
+  const lvl = P.hdLevel(c, 2 * p * hdDpr() * 1.4);   // folga de 40%: a perspectiva estica as bordas da tela
+  hdNote(lvl ? c.sizes[lvl - 1] : c.size);
+  if (!lvl) return;
+  const g = P.levelGrid(c, lvl), R = new DOMMatrix(`rotateX(${view.pitch}deg) rotateY(${view.yaw}deg)`), mx = w / 2 + 260, my = h / 2 + 260, seen = new Set(), want = [];
+  const faceEls = cubeEl.querySelectorAll('.p360-face');
+  FACES.forEach((f, fi) => {
+    const M = R.multiply(new DOMMatrix(PLACE[f]));
+    const vis = (x, y) => { const q = M.transformPoint(new DOMPoint(x, y, 0)); if (q.z > -1) return false; const k = p / -q.z; return Math.abs(q.x * k) < mx && Math.abs(q.y * k) < my; };
+    for (let v = 1; v <= g.n; v++) for (let hh = 1; hh <= g.n; hh++) {
+      const r = g.rect(v, hh), x0 = r.x0 * 1024 - 512, x1 = r.x1 * 1024 - 512, y0 = r.y0 * 1024 - 512, y1 = r.y1 * 1024 - 512;
+      if (!(vis((x0 + x1) / 2, (y0 + y1) / 2) || vis(x0, y0) || vis(x1, y0) || vis(x0, y1) || vis(x1, y1))) continue;
+      const key = `${lvl}/${f}/${v}/${hh}`; seen.add(key);
+      if (!hd.tiles.has(key) && !hd.bad.has(key)) want.push({ key, f, fi, v, hh, r });
+    }
+  });
+  if (hd.tiles.size + want.length > HD_MAX) for (const [key, el] of hd.tiles) {   // descarta primeiro o que saiu da tela
+    if (hd.tiles.size + want.length <= HD_MAX) break;
+    if (!seen.has(key)) { el.remove(); hd.tiles.delete(key); }
+  }
+  const token = buildToken;
+  want.forEach(t => {
+    const el = document.createElement('div'); el.className = 'p360-hdt';
+    el.style.cssText = `left:${t.r.x0 * 100}%;top:${t.r.y0 * 100}%;width:${(t.r.x1 - t.r.x0) * 100}%;height:${(t.r.y1 - t.r.y0) * 100}%;z-index:${lvl}`;
+    hd.tiles.set(t.key, el);
+    const src = url(c.folder, g.path(t.f, t.v, t.hh)), img = new Image(), wasOffline = offline();
+    img.onload = () => { if (token !== buildToken || hd.tiles.get(t.key) !== el || !faceEls[t.fi]) return; el.style.backgroundImage = `url('${src}')`; faceEls[t.fi].appendChild(el); requestAnimationFrame(() => { el.style.opacity = 1; }); };
+    img.onerror = () => { if (token !== buildToken) return; hd.tiles.delete(t.key); if (!wasOffline) hd.bad.add(t.key); };   // sem enlace o bloco só não estava no cache: tenta de novo quando o olhar mexer
+    img.src = src;
+  });
+}
+function hdNote(px) {
+  const el = $('#p360Hd'); if (!el) return;
+  el.textContent = cur && hd.cube ? ` · ${tr('Detalhe')}: ${px} px ${tr('por face')}${px < P.maxSize(hd.cube) ? ` · ${tr('aproxime para mais nitidez')}` : ''}` : '';
 }
 
 /* ---------- estado do carregamento ---------- */
@@ -55,14 +107,17 @@ function startSlowTimer(token) {
 /* ---------- esfera -> cubo ---------- */
 const FACE_DIR = { f: (u, v) => [u, -v, 1], r: (u, v) => [1, -v, -u], b: (u, v) => [-u, -v, -1], l: (u, v) => [-1, -v, u], u: (u, v) => [u, 1, v], d: (u, v) => [u, -1, -v] };
 const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
-async function sphereFaces(c, token) {
-  const parts = P.sphereTiles(c), cv = document.createElement('canvas'); cv.width = c.w; cv.height = c.h;
+async function sphereFaces(c0, token) {
+  /* nível da esfera: ~5900 px de largura em tela grande, ~3000 px em tela pequena (a reprojeção roda aqui, na memória do aparelho) */
+  const big = window.matchMedia && window.matchMedia('(min-width: 900px)').matches && (navigator.deviceMemory || 8) >= 4;
+  const lv = P.sphereLevel(c0, big ? 6000 : 3100), sz = P.sphereSize(c0, lv), c = { folder: c0.folder, w: sz.w, h: sz.h };
+  const parts = P.sphereTiles(c0, lv), cv = document.createElement('canvas'); cv.width = c.w; cv.height = c.h;
   load = { total: parts.length, loaded: 0, failed: 0 }; status(token);
   const tiles = await Promise.all(parts.map(t => loadImg(url(c.folder, t.path)).then(img => { if (token === buildToken) { img ? load.loaded++ : load.failed++; status(token); } return img; })));
   if (token !== buildToken || tiles.some(t => !t)) return null;
   const g = cv.getContext('2d');
   tiles.forEach((t, k) => g.drawImage(t, (parts[k].col - 1) * P.TILE, (parts[k].row - 1) * P.TILE));
-  const src = g.getImageData(0, 0, c.w, c.h).data, N = 512, out = {};
+  const src = g.getImageData(0, 0, c.w, c.h).data, N = Math.max(512, Math.min(1536, Math.ceil(c.w / 4 / 256) * 256)), out = {};   // a face cobre 90°, um quarto da largura
   for (const f of FACES) {
     const fc = document.createElement('canvas'); fc.width = fc.height = N;
     const fg = fc.getContext('2d'), img = fg.createImageData(N, N), d = img.data;
@@ -87,7 +142,7 @@ function faces(cube, withTiles) {
   return t;
 }
 function build(cube) {
-  const token = ++buildToken; clearTimeout(slowTimer);
+  const token = ++buildToken; clearTimeout(slowTimer); hdReset(cube); hdNote(cube.size);
   if (cube.sphere) {   // prévia já, faces reprojetadas quando os blocos chegarem
     faces(cube, false); startSlowTimer(token);
     sphereFaces(cube, token).then(fs => {
@@ -130,7 +185,7 @@ function open(p) {
 }
 function close() {
   if (box.hidden) return;
-  box.hidden = true; buildToken++; clearTimeout(slowTimer); cubeEl.innerHTML = ''; cur = null;
+  box.hidden = true; buildToken++; clearTimeout(slowTimer); hdReset(null); cubeEl.innerHTML = ''; cur = null;
   if (opener && document.contains(opener) && opener.focus) opener.focus();   // devolve o foco para quem abriu
   opener = null;
 }
@@ -148,7 +203,7 @@ stage.addEventListener('pointermove', e => {
   view.yaw = drag.yaw - (e.clientX - drag.x) * k; view.pitch = Math.max(-89, Math.min(89, drag.pitch + (e.clientY - drag.y) * k)); render();
 });
 stage.addEventListener('pointerup', () => { drag = null; });
-stage.addEventListener('wheel', e => { e.preventDefault(); view.fov = Math.max(35, Math.min(120, view.fov * Math.exp(e.deltaY * 0.001))); render(); }, { passive: false });
+stage.addEventListener('wheel', e => { e.preventDefault(); view.fov = Math.max(minFov(), Math.min(120, view.fov * Math.exp(e.deltaY * 0.001))); render(); }, { passive: false });
 window.addEventListener('keydown', e => {
   if (box.hidden) return;
   if (e.key === 'Escape') { close(); return; }
@@ -163,5 +218,5 @@ window.addEventListener('keydown', e => {
   if (step) { view.yaw += step[0]; view.pitch = Math.max(-89, Math.min(89, view.pitch + step[1])); render(); e.preventDefault(); }
 });
 window.addEventListener('resize', () => { if (!box.hidden) render(); });
-A.pano360 = { open, close, get view() { return view; }, get load() { return P.summarize(load); } };
+A.pano360 = { open, close, get view() { return view; }, get load() { return P.summarize(load); }, get hd() { return { tiles: hd.tiles.size, failed: hd.bad.size, max: hd.cube ? P.maxSize(hd.cube) : 0 }; } };
 })();

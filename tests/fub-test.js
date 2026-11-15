@@ -44,6 +44,23 @@ const panos = JSON.parse(fs.readFileSync(path.join(root, 'backend/data/fub/panor
     const t = P.sphereTiles({ folder: 'S', sphere: true, lvl: 1, w: 1536, h: 770 });
     assert.strictEqual(t.length, 6); assert.strictEqual(t[5].path, 'l1/002/l1_002_003.jpg');
   });
+  await test('nitidez sob demanda: nível pelo tamanho que a tela pede, grade e caminho dos blocos', () => {
+    const c = { folder: 'X', mono: false, lvl: 2, size: 1152, sizes: [640, 1152, 2304, 4736, 9472] };
+    assert.strictEqual(P.hdLevel(c, 1000), 0, 'o nível base já basta');
+    assert.strictEqual(P.hdLevel(c, 2000), 3); assert.strictEqual(P.hdLevel(c, 5000), 5);
+    assert.strictEqual(P.hdLevel(c, 99999), 5, 'não passa do último nível');
+    assert.strictEqual(P.hdLevel({ lvl: 2, size: 1152 }, 5000), 0, 'sem a lista de níveis, fica no base');
+    assert.strictEqual(P.maxSize(c), 9472);
+    const g = P.levelGrid(c, 4);
+    assert.strictEqual(g.n, 10); assert.strictEqual(g.path('f', 10, 3), '1/f/l4/10/l4_1/f_10_03.jpg');
+    const last = g.rect(10, 10);
+    assert.ok(Math.abs(last.x1 - 1) < 1e-9 && Math.abs(last.x0 - 4608 / 4736) < 1e-9, 'o último bloco é menor e termina na borda');
+    assert.strictEqual(P.levelGrid({ mono: true, sizes: [640, 1280, 2560] }, 3).path('u', 2, 5), 'u/l3/2/l3_u_2_5.jpg');
+    const s = { folder: 'S', sphere: true, lvl: 1, w: 1536, h: 770, levels: [[1536, 770], [3072, 1536], [5888, 2946], [11776, 5888]] };
+    assert.strictEqual(P.sphereLevel(s, 6000), 3); assert.strictEqual(P.sphereLevel(s, 3100), 2); assert.strictEqual(P.sphereLevel({ sphere: true, w: 1536, h: 768 }, 6000), 1);
+    const t = P.sphereTiles(s, 3);
+    assert.strictEqual(t.length, 12 * 6); assert.strictEqual(t[t.length - 1].path, 'l3/006/l3_006_012.jpg');
+  });
   await test('resumo do carregamento: carregando, completo, parcial, falhou, só prévia', () => {
     assert.strictEqual(P.summarize({ total: 24, loaded: 10, failed: 0 }).state, 'loading');
     assert.strictEqual(P.summarize({ total: 24, loaded: 24, failed: 0 }).state, 'complete');

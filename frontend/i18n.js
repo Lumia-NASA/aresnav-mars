@@ -284,6 +284,8 @@ const PHRASES = [
   ['Só a prévia em baixa resolução está disponível para este panorama.', 'Only the low-resolution preview is available for this panorama.'],
   ['conexão lenta: mostrando a prévia enquanto carrega', 'slow connection: showing the preview while it loads'],
   ['Laranja: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°', 'Orange: real rover photo · purple: synthetic terrain view · click to view in 360°'],
+  ['panoramas 360° aqui · clique para aproximar', '360° panoramas here · click to zoom in'],
+  ['aproxime para mais nitidez', 'zoom in for more detail'], ['por face', 'per face'], ['Detalhe', 'Detail'],
   ['vista sintética do relevo (não é foto)', 'synthetic terrain view (not a photo)'],
   ['VISTA SINTÉTICA · renderizada do relevo, não é foto', 'SYNTHETIC VIEW · rendered from terrain, not a photo'],
   ['FOTO REAL · Perseverance Mastcam-Z', 'REAL PHOTO · Perseverance Mastcam-Z'],
