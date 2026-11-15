@@ -95,6 +95,27 @@ function finish(layer, p, cells) {
     if (gray) bg.style.filter = GRAY;
   }
 }
+/* A NASA publica cada faixa da Navcam em 1280 x 256 px (o rover já manda reduzida 4x). A prévia que abre primeiro é um
+   JPEG de 1200 px; com enlace, troca pelo PNG original, sem compressão. Sem enlace fica a prévia, que é o que está no cache. */
+function sharpen(im, cell, seq) {
+  if (!cell || A.state.forceOffline || A.state.linkState !== 'online' || !/_1200\.jpg$/.test(im.rel)) return;
+  const src = A.photoUrl(im.rel.replace(/_1200\.jpg$/, '.png')); if (!src) return;
+  const pre = new Image();
+  pre.onload = () => { if (seq === buildSeq) cell.els.forEach(el => { el.decoding = 'sync'; el.src = src; }); };   // já está na memória: troca sem piscar
+  pre.src = src;
+}
+/* Panorama colorido da Mastcam-Z mais próximo (FU Berlin), para abrir em alta nitidez a partir do Capacete */
+function nearMastcam() {
+  const fc = A.mission && A.mission.FUB && A.mission.FUB.panoramas, me = cur() || position();   // conta a partir da parada do rover que está na tela
+  if (!fc || !me) return null;
+  let best = null;
+  fc.features.forEach(f => {
+    if (Number(f.properties.pano_id) < 0) return;   // vistas sintéticas não são foto
+    const d = A.metersBetween(me.lat, me.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]);
+    if (d <= 400 && (!best || d < best.d)) best = { p: f.properties, d };
+  });
+  return best;
+}
 function build(dir) {
   const host = $('#pano'), box = host.getBoundingClientRect(), p = cur();
   if (!box.height) return;
@@ -117,7 +138,7 @@ function build(dir) {
       if (!cells[i]) cells[i] = { im, img: el, els: [] };
       cells[i].els.push(el);
       waits.push(new Promise(done => {
-        el.addEventListener('load', () => { A.setStatus('navcam', A.state.linkState === 'online' ? 'ok' : 'fb'); done(); }, { once: true });
+        el.addEventListener('load', () => { A.setStatus('navcam', A.state.linkState === 'online' ? 'ok' : 'fb'); done(); if (copy === 0) sharpen(im, cells[i], seq); }, { once: true });
         el.addEventListener('error', () => { el.remove(); done(); }, { once: true });
       }));
       el.src = src; strip.appendChild(el);
@@ -305,8 +326,9 @@ function renderBar() {
     ? A.POIS.filter(p => p.sol).map((p, i) => `<option value="p${i}">${p.n}</option>`).join('')
     : `<option value="me">Onde o astronauta está (Jezero)</option><optgroup label="${T('Pontos de referência')}">` + A.POIS.map((p, i) => `<option value="s${i}">${p.n}</option>`).join('') + '</optgroup>' + PLACES.map((p, i) => `<option value="m${i}">${p[0]}</option>`).join('');
 
-  const w = A.globe.walk;
+  const w = A.globe.walk, mz = photo ? nearMastcam() : null;
   $('#hudSols').innerHTML =
+    (mz ? `<button data-mastcam="1" class="go" title="${T('Panorama colorido da Mastcam-Z em alta nitidez')}">Mastcam-Z 360° · ${dist(mz.d)}</button>` : '') +
     `<span class="seg2"><button data-mode="photo" aria-pressed="${photo}">Fotos do rover</button><button data-mode="terrain" aria-pressed="${!photo}">Terreno 3D</button></span>` +
     `<button data-turn="-1" aria-label="Virar à esquerda">◀</button><button data-walk="-1">▼ voltar</button><button data-walk="1" class="go">▲ avançar</button><button data-turn="1" aria-label="Virar à direita">▶</button>` +
     `<select id="hudJump" aria-label="Ir para"><option value="">Ir para…</option>${jumps}</select>` +
@@ -340,6 +362,7 @@ $('#hudSols').addEventListener('click', e => {
   else if (b.dataset.turn) turnTo((mode === 'terrain' ? A.globe.walk.heading : viewAz) + 30 * b.dataset.turn);
   else if (b.dataset.pace) { A.globe.setPace(b.dataset.pace); renderBar(); renderHud(); }
   else if (b.dataset.follow) { manual = false; follow(); setCam(); renderHud(); renderBar(); }
+  else if (b.dataset.mastcam) { const mz = nearMastcam(); if (mz && A.pano360) A.pano360.open(mz.p); }
 });
 $('#hudSols').addEventListener('change', e => {
   if (e.target.id !== 'hudJump') return;
