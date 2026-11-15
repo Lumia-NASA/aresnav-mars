@@ -81,6 +81,18 @@ runTest('2. Verificação de Isolamento de Skills e Segredos (.gitignore)', () =
   const content = fs.readFileSync(gitignorePath, 'utf8');
   assert(content.includes('.skills-local/'), '.gitignore deve ignorar .skills-local/');
   assert(content.includes('.env'), '.gitignore deve ignorar .env');
+  /* nenhum arquivo rastreado pelo git pode ser .env (fora o .env.example) nem conter chave de API */
+  let tracked = [];
+  try { tracked = require('child_process').execFileSync('git', ['ls-files', '-z'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', maxBuffer: 64 << 20 }).split('\0').filter(Boolean); }
+  catch (e) { console.log('   (git indisponível: varredura de chaves pulada)'); }
+  const envFiles = tracked.filter(f => /(^|\/)[^/]*\.env$/.test(f) || /(^|\/)\.env(\.|$)/.test(f)).filter(f => !/\.env\.example$/.test(f));
+  assert(!envFiles.length, `arquivo .env rastreado pelo git: ${envFiles.join(', ')}`);
+  const KEY = /nvapi-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}/;
+  const leaks = tracked.filter(f => !/\.(png|jpe?g|gif|webp|i16|bin|ico|woff2?|ttf|pdf|zip)$/i.test(f)).filter(f => {
+    const full = path.join(__dirname, '..', f);
+    try { const st = fs.statSync(full); return st.size < 8e6 && KEY.test(fs.readFileSync(full, 'utf8')); } catch (e) { return false; }
+  });
+  assert(!leaks.length, `chave de API em arquivo rastreado: ${leaks.join(', ')}`);
 });
 
 // 3. Teste das Skills Roteadas em .skills-local

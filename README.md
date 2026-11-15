@@ -75,6 +75,8 @@ aresnav-mars/
 │   ├── physics-test.js       # Suit physics, Tobler, turn-back point, radio, verdict and decision
 │   ├── sun-test.js           # Sun and time on Mars against MEDA and the Perseverance landing
 │   ├── exec-test.js          # Walk execution engine: position, O₂, turn-back by O₂ and daylight, callouts
+│   ├── calc-test.js          # ARES exact calculator: math, unit conversions, weight on Mars
+│   ├── copilot-test.js       # ARES switches AI provider when one fails (fake local servers, no real key)
 │   ├── hirise-test.js        # 1 m HiRISE terrain: tile math, decoding and the route corridor
 │   ├── fub-test.js           # FU Berlin layers, 360° viewer and offline mode (starts the backend on a test port)
 │   └── demo-flow-test.js     # The full presentation run in a headless Chrome
@@ -95,11 +97,15 @@ node tests/smoke-test.js
 node tests/physics-test.js
 node tests/sun-test.js
 node tests/exec-test.js
+node tests/calc-test.js
+node tests/copilot-test.js
 node tests/hirise-test.js
 node tests/fub-test.js
 node tests/demo-flow-test.js   # the full demo run in a headless Chrome
 ```
-Or all at once: `cd backend && npm test`, which runs the seven in sequence.
+Or all at once: `cd backend && npm test`, which runs the nine in sequence.
+
+The smoke test also fails if git tracks any `.env` file (other than `.env.example`) or any file containing an API key. AI keys go only in `backend/.env`, which git ignores.
 
 The demo run tests the 360° panorama in two scenarios: one that accepts a network failure as long as the viewer explains what happened, and one with the panorama already cached, which requires the complete image.
 

@@ -53,6 +53,7 @@ jobs:
         run: |
           node tests/exec-test.js
           node tests/calc-test.js
+          node tests/copilot-test.js
           node tests/hirise-test.js
 
       - name: FU Berlin Integration Tests (360° viewer logic, tiles & panorama routes, offline)
