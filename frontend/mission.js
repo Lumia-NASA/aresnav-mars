@@ -158,7 +158,7 @@ extra.innerHTML = `
   <label class="layer"><input type="checkbox" id="ov-shore" checked><b>Margem do antigo lago</b><small>Contorno mapeado pela FU Berlin</small></label>
   <label class="layer"><input type="checkbox" id="ov-channels" checked><b>Canais dos rios</b><small>Neretva e Sava (entrada), Pliva (saída)</small></label>
   <label class="layer"><input type="checkbox" id="ov-ellipse" checked><b>Elipse de pouso do Perseverance</b><small>Área-alvo do pouso da Mars 2020</small></label>
-  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>Câmera: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°</small></label>
+  <label class="layer"><input type="checkbox" id="ov-pano360" checked><b>Panoramas 360° do rover</b><small>Laranja: foto real do rover · roxo: vista sintética do relevo · clique para ver em 360°</small></label>
   <label class="layer"><input type="checkbox" id="ov-contour" checked><b>Curvas de nível</b><small>Relevo da FU Berlin (HRSC + HiRISE)</small></label>
   <h3 class="gap">Marte inteiro</h3>
   <label class="layer"><input type="checkbox" id="ov-sites" checked><b>Locais de pouso</b><small>14 sondas e rovers, 1971–2021</small></label>
@@ -386,9 +386,9 @@ function buildFubLeaflet() {
   if (FUB.landingellipse) fubL.ellipse = L.geoJSON(FUB.landingellipse, { style: { color: '#FFFFFF', weight: 1.5, dashArray: '3 5', fill: false }, interactive: false });
   if (FUB.panoramas) { fubL.pano360 = L.layerGroup(); A.map.on('zoomend', layoutPanos); layoutPanos(); }
 }
-/* Panoramas no mapa 2D: ícone de câmera (foto real) ou de relevo (vista sintética).
+/* Panoramas no mapa 2D: disco escuro com o leque de visão em laranja (foto real) ou o relevo em roxo (vista sintética).
    Ícones que ficariam um em cima do outro viram um círculo com a contagem; clicar nele aproxima até separar. */
-const PANO_SVG = { real: '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 7h3.2l1.4-2h6.8l1.4 2H20a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 7z" fill="currentColor"/><circle cx="12" cy="13" r="3.4" fill="#fff"/><circle cx="12" cy="13" r="1.7" fill="currentColor"/></svg>',
+const PANO_SVG = { real: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 15.5L4.2 7.6a11 11 0 0 1 15.6 0z" fill="currentColor" opacity=".55"/><path d="M4.2 7.6a11 11 0 0 1 15.6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="3.2" fill="currentColor"/></svg>',   // ponto de vista com o leque do campo de visão
   syn: '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M2 19l6.5-11 4 6.5 2.5-3.5L22 19z" fill="currentColor"/></svg>' };
 function layoutPanos() {
   const map = A.map, grp = fubL.pano360;
