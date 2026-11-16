@@ -31,11 +31,12 @@ export const EASE = Easing.bezier(0.16, 1, 0.3, 1);
 
 // Linha do tempo (quadros a 30 fps). Total: 29 s, para nunca passar do limite de 30 s do Space Apps.
 export const OVERLAP = 10;
+// Roteiro do docs/PITCH.md; as falas e o segundo de cada uma estão em voice-lines.json.
 export const SCENES = {
-  intro: [0, 60], // 0-2 s   quem somos
-  challenge: [60, 150], // 2-5 s   o desafio
-  title: [150, 300], // 5-10 s  nome e frase
-  how: [300, 600], // 10-20 s como funciona (5 telas de 2 s)
-  future: [600, 870], // 20-29 s o futuro e o fechamento
+  globe: [0, 183], // 0-6 s       o globo voa até Jezero: as três perguntas
+  plan: [183, 400], // 6-13,3 s   Three Forks: dados reais, NO-GO
+  fix: [400, 600], // 13,3-20 s   Why? e levar 13,5 kg: CAUTION
+  helmet: [600, 738], // 20-24,6 s capacete, Follow live: "turn back now"
+  close: [738, 870], // 24,6-29 s logo e frase
 } as const;
 export const TOTAL_FRAMES = 870;

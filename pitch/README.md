@@ -9,7 +9,8 @@ The 29-second demo video for NASA Space Apps 2026, built with [Remotion](https:/
 - The narration is **not a human voice on purpose**: the guide forbids any image, video or audio likeness of people under 18. The voice is the free Microsoft Edge neural voice `en-US-AriaNeural`, generated with `edge-tts`.
 - No NASA logos. Data sources are named as text.
 - No people on screen, so no minors.
-- Order of the official script: who we are (0-2 s), the challenge (2-5 s), name and tagline (5-10 s), how it works (10-20 s), the future (20-29 s).
+- It follows the 29-second script of `docs/PITCH.md`: the globe flies into Jezero with the three questions (0-6 s), Three Forks and the NO-GO (6-13 s), **Why?** and "carry 13.5 kg instead of 18.5" (13-20 s), the helmet with ARES calling "turn back now" (20-24.6 s), the logo (24.6-29 s).
+- The app screens show the route **without the 1 m detours** (3.73 km, 21% O₂ on return, carry 13.5 kg), with the current interface. They are recorded with `NO_DETOUR=1`.
 
 ## Run it
 
@@ -32,7 +33,8 @@ npx remotion render src/index.ts MarsViewPitch out/marsview-pitch.mp4 --codec=h2
 Run from the repository root (needs `npm ci --prefix backend` and Chrome or Edge):
 
 ```bash
-node pitch/scripts/capture.mjs                   # app screens: planner, Why?, CAUTION, 360 panorama, helmet
+NO_DETOUR=1 node pitch/scripts/capture.mjs                  # app screens: planner NO-GO, Why?, CAUTION (route without the 1 m detours)
+NO_DETOUR=1 HELMET3D=1 node pitch/scripts/capture.mjs       # the helmet in first person with "turn back now"
 FLY_ONLY=1 node pitch/scripts/capture.mjs        # the clean globe fly-over used behind the title
 ```
 
