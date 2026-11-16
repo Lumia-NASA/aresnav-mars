@@ -65,7 +65,7 @@ Paste the public link to the 30-second video (YouTube or Google Drive, set to "a
 - Without the backend the dashboard still opens in offline mode (route, verdict and physics from local data), but the imagery, panoramas and ARES AI need the backend.
 
 ### Detailed Project Description
-**What it does.** MarsView helps an astronaut plan and carry out a Marswalk in Jezero crater, Perseverance's landing site. Pick a destination, for example the Three Forks sample depot 3.7 km from a hypothetical Ares-1 base, and MarsView:
+**What it does.** MarsView helps an astronaut plan and carry out a Marswalk in Jezero crater, Perseverance's landing site. Pick a destination, for example the Three Forks sample depot 3.8 km from a hypothetical Ares-1 base, and MarsView:
 - plots the safest walking route over real terrain, avoiding slopes above the suit's limit for the payload carried;
 - shows distance, walking time out and back (they differ because the route climbs), total duration, climb, maximum slope, an elevation profile and a step-by-step itinerary;
 - gives a three-level verdict (GO / CAUTION / NO-GO) with the reasons in numbers;
@@ -165,7 +165,7 @@ Yes.
 1. **Title:** MarsView. *Every step planned. Every breath counted.* Team Lumia, team member names, and the challenge "Interplanetary Survival Guide: Martian Map".
 2. **The problem:** before every Marswalk, an astronaut needs to know three things: can I get there, can I get back, and will anyone hear me? The data exists, but it's scattered across missions and websites.
 3. **The solution:** a screenshot of the planner with the route to Three Forks. One screen layers the real data and gives a GO / CAUTION / NO-GO verdict.
-4. **It explains and it acts:** NO-GO, return O₂ 21% < 30%. Turn back at 3.07 km, or carry 13.5 kg instead of 18.5. Show the "Why?" card.
+4. **It explains and it acts:** NO-GO, return O₂ 20% < 30%. Turn back at 3.13 km, or carry 13.0 kg instead of 18.5. Show the "Why?" card.
 5. **On the ground:** the helmet HUD with the live walk and the turn-back callout, plus a real Navcam / Mastcam-Z view of the place.
 6. **The data behind it:** logos of the missions and instruments as text, not NASA logos (HiRISE, CTX, CRISM, MOLA, HRSC, THEMIS, MEDA, Perseverance). Validation: the terrain was checked against 613 Perseverance stops. It works offline.
 7. **The future:** any Mars site, a tablet or a visor, real suit telemetry, and crews planning safer and bolder science.
