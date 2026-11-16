@@ -185,6 +185,9 @@ const terrainChanged = throttle(() => emit('terrain'), 2500);
    budgetMs: tempo máximo de espera. Passado o prazo, devolve o que chegou; os downloads seguem em segundo plano
    e `all` avisa quando terminam. Conta quantos blocos vieram do cache do backend e quantos da USGS. */
 const FINE_BUDGET_MS = 25000;
+/* Desvios de 1 m na rota: desligados por padrão, para o mapa ficar como a equipe escolheu (rota da grade de 200 m,
+   com os trechos íngremes do relevo de 1 m só marcados). Com ?detour=1 na URL, a busca de contornos volta. */
+const DETOURS_URL = /[?&]detour=1\b/.test(location.search);   // state.detours: os testes ligam por aqui
 async function loadFine(list, max, budgetMs) {
   const want = list.filter(t => !FINE.has(t.tx, t.ty)).slice(0, max || 200);
   const st = { asked: want.length, got: 0, cache: 0, net: 0, failed: 0, ms: 0, timedOut: false, all: null };
@@ -232,7 +235,7 @@ async function fineCorridor(again) {
     const ec = HiRise.corridor(e, fineHeight, { limitDeg: lim });
     if (ec.steepM > 0 && ec.maxDeg > lim) cand.push({ k, beforeDeg: ec.maxDeg, at: ec.maxAt });
   }
-  if (cand.length) {
+  if (cand.length && state.detours) {
     const need = new Map();
     cand.forEach(x => HiRise.tilesAlong([cellLL(path[x.k - 1]), cellLL(path[x.k])], 110).forEach(t => need.set(HiRise.key(t.tx, t.ty), t)));
     await loadFine([...need.values()], 90, FINE_BUDGET_MS);
@@ -809,7 +812,7 @@ function simAt(t) {
 }
 
 /* ---------- Estado ---------- */
-const state = { mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', dropMode: false, op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [], payloadKg: null, forceOffline: false, verdict: null, speed: 1.5 };
+const state = { detours: DETOURS_URL, mode: 'safe', goal: -1, goalLL: null, goalPoi: DEFAULT_GOAL, path: null, info: null, stops: [], plan: null, sim: null, simT: 0, now: null, playing: false, emerg: false, emPath: null, emInfo: null, msg: '', dropMode: false, op: 'planner', view: 'globe', plannerView: 'globe', ready: false, cam: null, tele: null, linkState: 'offline', alerts: [], payloadKg: null, forceOffline: false, verdict: null, speed: 1.5 };
 
 function recompute(keepTime) {
   if (!HGT) return;
@@ -890,7 +893,7 @@ function drawRoute() {
   }
   const F = state.path && state.fine;
   /* onde a rota depende só da grade de 200 m (sem o relevo de 1 m): tracejado cinza por cima */
-  if (F && F.uncovered && F.status !== 'unverified') F.uncovered.forEach(g => L.polyline(g.ll, { pane: 'routes', color: '#ECE6DC', weight: 2, opacity: 0.9, dashArray: '2 7', interactive: true })
+  if (state.detours && F && F.uncovered && F.status !== 'unverified') F.uncovered.forEach(g => L.polyline(g.ll, { pane: 'routes', color: '#ECE6DC', weight: 2, opacity: 0.9, dashArray: '2 7', interactive: true })
     .bindTooltip(`Sem relevo de 1 m: ${Math.round(g.lengthM)} m conferidos só na grade de 200 m`, { className: 'tag', sticky: true }).addTo(groups.route));
   /* desvios de 1 m aplicados: contorno branco tracejado e um marcador com o que foi evitado */
   if (F && F.detours && state.via) F.detours.filter(d => d.ok).forEach(d => {

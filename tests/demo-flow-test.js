@@ -141,7 +141,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       assert.strictEqual(hdr, 'OFFLINE', 'o backend respondeu do disco, sem ir à FU Berlin');
       await page.keyboard.press('Escape');
     });
-    await step('relevo de 1 m com um morrinho íngreme na rota: o desvio é aplicado e o Play ▶ percorre o contorno', async () => {
+    await step('relevo de 1 m com um morrinho íngreme na rota: por padrão só marca; com os desvios ligados, o desvio é aplicado e o Play ▶ percorre o contorno', async () => {
       // espera terminar o que o app já pedia de relevo de 1 m (blocos reais não podem chegar depois e sobrescrever os sintéticos)
       await until(() => App.state.fine && !App.state.fine.loading && App.fineLoading === 0, 90000, 'relevo de 1 m em curso');
       const r = await page.evaluate(async () => {
@@ -159,6 +159,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
           }
           App.FINE.put(t.tx, t.ty, arr); App.FINE.bias.delete(H.key(t.tx, t.ty));
         });
+        // padrão: desvios desligados, a rota fica a da grade de 200 m (o trecho íngreme só é marcado)
+        await App.fineCorridor();
+        if (st.via || (st.fine.detours || []).length) return { err: 'com os desvios desligados (padrão), a rota não deveria mudar' };
+        if (!(st.fine.steepM > 0)) return { err: 'o morrinho deveria aparecer como trecho íngreme marcado' };
+        st.detours = true;   // como ?detour=1
         await App.fineCorridor();
         const F = st.fine, det = (F.detours || []).find(d => d.k === k);
         if (!det || !det.ok || !st.via || !st.via[k]) return { err: 'desvio não aplicado no trecho ' + k, detours: F.detours, status: F.status };
