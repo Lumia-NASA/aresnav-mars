@@ -2,7 +2,7 @@ import React from "react";
 import { Audio } from "@remotion/media";
 import { AbsoluteFill, Sequence, staticFile, useVideoConfig } from "remotion";
 import { SceneFade, Watermark } from "./components";
-import { Challenge, Future, HowItWorks, Intro, Title } from "./scenes";
+import { Close, Fix, Globe, Helmet, Plan } from "./scenes";
 import { colors, OVERLAP, SCENES } from "./theme";
 import voice from "./voice-lines.json";
 
@@ -39,22 +39,24 @@ const Scene: React.FC<{ name: string; range: readonly [number, number]; first?: 
   );
 };
 
+const len = (r: readonly [number, number]) => r[1] - r[0] + OVERLAP;
+
 export const MarsViewPitch: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: colors.bg }}>
-    <Scene name="1 · Quem somos (0-2 s)" range={SCENES.intro} first>
-      <Intro />
+    <Scene name="1 · Globo até Jezero (0-6 s)" range={SCENES.globe} first>
+      <Globe length={len(SCENES.globe)} />
     </Scene>
-    <Scene name="2 · O desafio (2-5 s)" range={SCENES.challenge}>
-      <Challenge />
+    <Scene name="2 · Three Forks, NO-GO (6-13 s)" range={SCENES.plan}>
+      <Plan length={len(SCENES.plan)} />
     </Scene>
-    <Scene name="3 · Nome e frase (5-10 s)" range={SCENES.title}>
-      <Title />
+    <Scene name="3 · Why? e 13,5 kg (13-20 s)" range={SCENES.fix}>
+      <Fix length={len(SCENES.fix)} />
     </Scene>
-    <Scene name="4 · Como funciona (10-20 s)" range={SCENES.how}>
-      <HowItWorks />
+    <Scene name="4 · Capacete, turn back now (20-24,6 s)" range={SCENES.helmet}>
+      <Helmet length={len(SCENES.helmet)} />
     </Scene>
-    <Scene name="5 · O futuro (20-29 s)" range={SCENES.future} last>
-      <Future />
+    <Scene name="5 · Logo (24,6-29 s)" range={SCENES.close} last>
+      <Close length={SCENES.close[1] - SCENES.close[0]} />
     </Scene>
     <Watermark />
     <Narration />

@@ -48,6 +48,9 @@ const done = async code => { try { if (browser) await browser.close(); } catch (
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await until(() => typeof App !== 'undefined' && App.state.ready && App.state.info, 60000, 'app pronto');
   await page.evaluate(() => { App.speak = () => {}; });
+  // NO_DETOUR=1: a rota sem os desvios de 1 m (o mapa de antes do PR 29: 3,73 km, 21% de O₂, levar 13,5 kg),
+  // com a interface atual. Os trechos íngremes do relevo de 1 m continuam marcados no mapa.
+  if (process.env.NO_DETOUR === '1') await page.evaluate(() => { window.Detour.find = () => null; });
   await sleep(1500);
 
   // FLY_ONLY=1: só o sobrevoo, com a interface escondida (fundo limpo para o título e o desafio)

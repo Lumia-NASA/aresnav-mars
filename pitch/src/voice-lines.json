@@ -1,67 +1,31 @@
 {
   "voice": "en-US-AriaNeural",
-  "rate": "+22%",
+  "rate": "+24%",
   "lines": [
     {
-      "id": "01-team",
-      "start": 0.45,
-      "text": "We are Team Lumia."
+      "id": "01-answers",
+      "start": 0.2,
+      "text": "Before every walk on Mars, an astronaut needs three answers: can I get there, can I get back, and will anyone hear me?"
     },
     {
-      "id": "02-challenge",
-      "start": 2.15,
-      "text": "Our challenge: a survival map for Mars."
+      "id": "02-data",
+      "start": 6.0,
+      "text": "MarsView turns real NASA and ESA data, one-meter HiRISE terrain, MEDA weather and Perseverance's own route, into a go or no-go."
     },
     {
-      "id": "03-name",
-      "start": 5.7,
+      "id": "03-why",
+      "start": 13.5,
+      "text": "When the answer is no, it says why, and what to change: carry less, or turn back at three kilometers."
+    },
+    {
+      "id": "04-ares",
+      "start": 20.1,
+      "text": "Out there, ARES follows the walk and calls the turn-back point."
+    },
+    {
+      "id": "05-close",
+      "start": 24.7,
       "text": "MarsView. Every step planned. Every breath counted."
-    },
-    {
-      "id": "04-nogo",
-      "start": 10.15,
-      "text": "NASA data says: no-go."
-    },
-    {
-      "id": "05-why",
-      "start": 12.15,
-      "text": "It shows why, in numbers."
-    },
-    {
-      "id": "06-change",
-      "start": 14.15,
-      "text": "And what to change."
-    },
-    {
-      "id": "07-ares",
-      "start": 16.15,
-      "text": "ARES calls the turn-back, live."
-    },
-    {
-      "id": "08-rover",
-      "start": 18.15,
-      "text": "With real rover views."
-    },
-    {
-      "id": "09-any",
-      "start": 20.25,
-      "text": "Any site on Mars."
-    },
-    {
-      "id": "10-tablet",
-      "start": 21.6,
-      "text": "On a tablet, in a visor, with real suit data.",
-      "rate": "+28%"
-    },
-    {
-      "id": "11-safer",
-      "start": 24.2,
-      "text": "Safer, bolder science."
-    },
-    {
-      "id": "12-close",
-      "start": 26.5,
-      "text": "MarsView, by Team Lumia."
     }
   ]
 }

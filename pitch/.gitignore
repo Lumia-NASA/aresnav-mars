@@ -13,8 +13,10 @@ skills-lock.json
 
 # Imagens gravadas que o video final nao usa (o script capture.mjs gera de novo)
 public/footage/mars-globe.jpg
-public/footage/planner-nogo.jpg
 public/footage/helmet-photo.jpg
 public/footage/helmet-countdown.jpg
+public/footage/helmet-turnback.jpg
+public/footage/nogo-turnback.jpg
+public/footage/pano360.jpg
 public/footage/jezero-approach.jpg
 public/footage/fly-ui/
