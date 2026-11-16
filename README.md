@@ -24,9 +24,9 @@
 ## The demo, start to finish
 Science route → risk explained → comparison → real panorama of the place → decision → link cut. The full script, including the 29-second video version, is in [`docs/PITCH.md`](docs/PITCH.md).
 
-1. **Science route:** pick the Three Forks sample depot, a real place where Perseverance left sample tubes, 3.8 km from base, carrying 18.5 kg. The 1 m HiRISE check finds two short stretches above the slope limit and walks around them (+59 m); the numbers below include those detours (run `npm run prewarm` so the 1 m tiles are cached).
-2. **Risk explained:** the verdict reads `NO-GO · not enough O₂` with the reason "return O₂ 20% < 30%". The **Why?** button shows that the walk out (1 h 57) is slower than the walk back (1 h 42) because the path climbs, plus the terrain calibration.
-3. **One-click decision:** clicking the verdict jumps to the stretch past the **turn-back point**. The **What to do** box offers: turn back there, carry at most 13.0 kg, or take the safe route.
+1. **Science route:** pick the Three Forks sample depot, a real place where Perseverance left sample tubes, 3.7 km from base, carrying 18.5 kg.
+2. **Risk explained:** the verdict reads `NO-GO · not enough O₂` with the reason "return O₂ 21% < 30%". The **Why?** button shows that the walk out (1 h 54) is slower than the walk back (1 h 40) because the path climbs, plus the terrain calibration.
+3. **One-click decision:** clicking the verdict jumps to the stretch past the **turn-back point**. The **What to do** box offers: turn back there, carry at most 13.5 kg, or take the safe route.
 4. **Comparison:** the dangerous short route is dashed red and the safe detour green. The map also shows the 15 and 30 min walking reach and what can be reached with the current payload.
 5. **Real panorama:** a 360° Mastcam-Z panorama of the place. Synthetic views are shown in purple and labeled "not a photo".
 6. **ARES copilot:** answers by voice ("Where do I turn back?") using only the app's numbers. It works with Claude or in local mode.
@@ -41,8 +41,8 @@ In the Helmet's 3D terrain you can move **on foot** (suited astronaut, eyes at 1
 
 ## Limits (we say this in the presentation)
 - **200 m terrain:** it chooses the general path but hides boulders and steps. The 1 m HiRISE terrain then checks the route corridor:
-  - the panel says how much of the route it checked: **verified** (98% or more), **partial** (with the share, and gray dashes on the map where the route relies only on the 200 m grid) or **not verified**. It never says "confirmed" for a part it did not see;
-  - where a short stretch goes above the slope limit, the app searches a **1 m detour** on a 5 m grid around it and applies it to the route, the ▶ simulation, the live walk and the GeoJSON export. If no detour fits, the stretch stays flagged;
+  - the panel says how much of the route it checked: **verified** (98% or more), **partial** (with the share of the route it checked) or **not verified**. It never says "confirmed" for a part it did not see;
+  - short stretches above the slope limit are marked on the map; the route itself stays the one chosen on the 200 m grid. An experimental **1 m detour** search (a 5 m grid around each flagged stretch, applied to the route, the ▶ simulation, the live walk and the export) is off by default; open the app with `?detour=1` to try it;
   - it only exists inside the mosaic area (about 37 × 39 km around the landing site), and rocks smaller than about 2 m remain invisible.
 - **Cold 1 m download:** a tile not yet cached comes from the USGS file row by row. Neighbor tiles in the same row share those reads, each tile has a 30 s deadline, and the panel shows how many tiles came from cache. After 25 s the analysis uses what arrived (and says it is partial), then runs again when the rest is in. Run `npm run prewarm` before the demo.
 - **Calibration:** the terrain sits on average 19 m above the elevation Perseverance measured at 613 stops (σ 19 m). The app shows this under "Why?".
@@ -110,7 +110,7 @@ node tests/terrain-1m-test.js
 node tests/fub-test.js
 node tests/demo-flow-test.js   # the full demo run in a headless Chrome
 ```
-Or all at once: `cd backend && npm test`, which runs the ten in sequence. The demo run also injects a synthetic 1 m terrain with a steep mound on the route and checks that the detour is applied and that ▶ walks along it (no USGS download needed).
+Or all at once: `cd backend && npm test`, which runs the ten in sequence. The demo run also injects a synthetic 1 m terrain with a steep mound on the route and checks that by default it is only flagged, and that with detours on the detour is applied and ▶ walks along it (no USGS download needed).
 
 The smoke test also fails if git tracks any `.env` file (other than `.env.example`) or any file containing an API key. AI keys go only in `backend/.env`, which git ignores.
 

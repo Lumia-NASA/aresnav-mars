@@ -52,8 +52,6 @@ Case used: the default demo walk, to the Three Forks sample depot. It is 3.73 km
 
 **Reading:** with 18.5 kg, this walk is NO-GO for any reasonable variation of the suit parameters. The conclusion "carry less" is robust. The exact number of kilograms suggested (13.5 kg), however, depends on the assumptions and should be read as an order of magnitude.
 
-**Note on the 1 m detours:** this table was computed on the 200 m route alone (3.73 km). When the 1 m HiRISE tiles are available, the app now walks around two short stretches above the slope limit (+59 m, 3.79 km). That lowers the default to **20%** on return and the suggestion to **13.0 kg** (30.3%, CAUTION). The other rows were not recomputed. The detours only make the walk longer, so they can only lower the O₂ on return: no NO-GO row would turn into a GO.
-
 ### Slope rule
 
 Limit with 18.5 kg depending on the parameters:
