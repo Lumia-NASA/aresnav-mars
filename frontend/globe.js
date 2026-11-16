@@ -77,6 +77,19 @@ function init() {
     if (!scene.skyAtmosphere) scene.skyAtmosphere = new C.SkyAtmosphere(C.Ellipsoid.default);
     scene.skyAtmosphere.hueShift = 0.48; scene.skyAtmosphere.saturationShift = -0.25; scene.skyAtmosphere.brightnessShift = -0.35;
     scene.screenSpaceCameraController.minimumZoomDistance = 220 * K;
+    /* Roda do mouse: aproxima e afasta pelo centro da tela, sem puxar a vista para onde o cursor está
+       (o zoom padrão do Cesium vai em direção ao cursor e descentraliza Jezero). Pinça e botão direito seguem iguais. */
+    scene.screenSpaceCameraController.zoomEventTypes = [C.CameraEventType.RIGHT_DRAG, C.CameraEventType.PINCH];
+    viewer.scene.canvas.addEventListener('wheel', e => {
+      if (walk.on) return;
+      e.preventDefault();
+      const cam = viewer.camera, c = cam.positionCartographic;
+      const ground = A.heightAt(C.Math.toDegrees(c.latitude), C.Math.toDegrees(c.longitude)) * VS * EX;
+      const above = Math.max(1, c.height - ground), dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      const move = above - above * Math.exp(Math.max(-400, Math.min(400, dy)) * 0.0012);
+      if (move > 0) cam.zoomIn(Math.max(0, Math.min(move, above - 220 * K)));
+      else cam.zoomOut(Math.max(0, Math.min(-move, 2.5e7 * K - above)));
+    }, { passive: false });
     viewer.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     buildImagery = () => { // refeito quando o enlace cai ou volta (backend <-> cópia local)

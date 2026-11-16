@@ -507,7 +507,7 @@ function rebuildTiles() {
   buildTiles(); applyLayers();
 }
 function initMap() {
-  map = L.map('map', { crs: L.CRS.EPSG4326, minZoom: 1, maxZoom: 18, zoomSnap: 0.5, maxBounds: [[-90, -200], [90, 200]], maxBoundsViscosity: 0.8, worldCopyJump: false })
+  map = L.map('map', { crs: L.CRS.EPSG4326, scrollWheelZoom: 'center', minZoom: 1, maxZoom: 18, zoomSnap: 0.5, maxBounds: [[-90, -200], [90, 200]], maxBoundsViscosity: 0.8, worldCopyJump: false })
     .setView([18.462, 77.42], link.mapsOnline ? 12.5 : 11.5);
   map.attributionControl.setPrefix(false);
   map.attributionControl.addAttribution('Dados: NASA/JPL/Caltech/MSSS/ESA/ASU/USGS · via backend MarsView');
