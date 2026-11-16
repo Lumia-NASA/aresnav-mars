@@ -93,22 +93,15 @@ export const Chip: React.FC<{ children: React.ReactNode; start: number }> = ({ c
   );
 };
 
-/** O ícone do MarsView (mesmo de frontend/assets/marsview-logo.svg) */
+/** O logo atual do MarsView: o ícone de órbita cor de cobre do site (Pagina-Domum1.0, Brand.tsx: Orbit do Lucide) */
+export const COPPER = "#E99C72";
 export const Logo: React.FC<{ size: number }> = ({ size }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32">
-    <defs>
-      <radialGradient id="mvPlanet" cx="36%" cy="32%" r="72%">
-        <stop offset="0" stopColor="#E6A98B" />
-        <stop offset=".55" stopColor="#C46F4B" />
-        <stop offset="1" stopColor="#5E2717" />
-      </radialGradient>
-    </defs>
-    <circle cx="16" cy="16" r="14.2" fill="none" stroke="#ECE6DC" strokeOpacity=".35" strokeWidth="1" />
-    <circle cx="16" cy="16" r="8" fill="url(#mvPlanet)" />
-    <path d="M12.6 15.2c1.3-1.5 3.6-1.7 4.9-.5.9.8.3 2.2-1 2.5-1.4.3-1.7 1.4-3 1.1-1.2-.3-1.7-2-.9-3.1z" fill="#4E1F12" fillOpacity=".5" />
-    <path d="M18.6 18.9c.8-.4 1.9-.3 2.4.4.3.5-.2 1-1 1-.8.1-1.8-.6-1.4-1.4z" fill="#4E1F12" fillOpacity=".4" />
-    <ellipse cx="16" cy="8.95" rx="2.5" ry=".85" fill="#F6EBE3" fillOpacity=".85" />
-    <circle cx="6" cy="10" r="2.2" fill="#ECE6DC" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={COPPER} strokeWidth={1.25} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <circle cx="19" cy="5" r="2" />
+    <circle cx="5" cy="19" r="2" />
+    <path d="M10.4 21.9a10 10 0 0 0 9.941-15.416" />
+    <path d="M13.5 2.1a10 10 0 0 0-9.841 15.416" />
   </svg>
 );
 

@@ -12,11 +12,12 @@ const cover: React.CSSProperties = { position: "absolute", inset: 0, width: "100
 const pad = (n: number) => String(n).padStart(3, "0");
 
 /* ---------------------------------------------------------------- 0-6 s: o globo voa até Jezero */
-const FLY_COUNT = 30;
+// 120 quadros gravados (FLY_N=120): cerca de um por quadro do vídeo, sem trancos. A suavização já vem da gravação.
+const FLY_COUNT = 120;
 export const Globe: React.FC<{ length: number }> = ({ length }) => {
   const frame = useCurrentFrame();
   const play = length - 30;
-  const t = interpolate(frame, [0, play], [0, FLY_COUNT - 1], { ...clamp, easing: Easing.inOut(Easing.quad) });
+  const t = interpolate(frame, [0, play], [0, FLY_COUNT - 1], clamp);
   const i = Math.floor(t);
   const j = Math.min(i + 1, FLY_COUNT - 1);
   const settle = interpolate(frame, [play - 8, play + 8], [0, 1], clamp);
@@ -222,7 +223,7 @@ export const Close: React.FC<{ length: number }> = ({ length }) => {
         >
           <Logo size={150} />
         </div>
-        <Words text="MARSVIEW" start={6} style={{ fontSize: 112, fontWeight: 600, letterSpacing: "0.3em", paddingLeft: "0.3em" }} />
+        <Words text="MARSVIEW" start={6} style={{ fontSize: 112, fontWeight: 600, letterSpacing: "0.2em", paddingLeft: "0.2em" }} />
         <Words text="Every step planned. Every breath counted." start={30} stagger={5} accent={[3, 4, 5]} style={{ fontSize: 44, fontWeight: 300, justifyContent: "center" }} />
         <div style={{ opacity: interpolate(frame, [70, 84], [0, 1], clamp), display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginTop: 14 }}>
           <Label color={colors.muted} size={22} style={{ letterSpacing: "0.24em" }}>

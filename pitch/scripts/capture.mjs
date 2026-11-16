@@ -82,7 +82,7 @@ const done = async code => { try { if (browser) await browser.close(); } catch (
   await clickText('button', '^Whole Mars$'); await sleep(2500); await settle(20000);
   if (!FLY_ONLY) await shot('mars-globe');
   log('aproximação até Jezero');
-  const N = 30;
+  const N = Number(process.env.FLY_N || 30);   // FLY_N=120: mais quadros, voo mais suave no vídeo
   for (let i = 0; i < N; i++) {
     await page.evaluate((i, N) => {
       const v = App.globe.viewer, C = Cesium, K = C.Ellipsoid.default.maximumRadius / 3396190, e = t => t * t * (3 - 2 * t), t = e(i / (N - 1));
